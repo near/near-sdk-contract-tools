@@ -1,0 +1,13 @@
+[package]
+name = "near-contract-tools"
+version = "0.1.0"
+edition = "2021"
+authors = ["Jacob Lindahl <jacob@near.foundation>"]
+license = "GPL-3.0"
+categories = ["wasm"]
+description = """
+Helpful functions and macros for developing smart contracts on NEAR Protocol.
+"""
+
+[dependencies]
+near-sdk = "4.0.0-pre.8"
