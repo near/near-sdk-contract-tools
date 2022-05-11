@@ -60,9 +60,9 @@ impl Ownership {
     ///     b"o",
     ///     near_sdk::env::predecessor_account_id(),
     /// );
-    /// ownership.assert_owner();
+    /// ownership.require_owner();
     /// ```
-    pub fn assert_owner(&self) {
+    pub fn require_owner(&self) {
         require!(
             &env::predecessor_account_id()
                 == self
@@ -90,7 +90,7 @@ impl Ownership {
     /// assert_eq!(ownership.owner, None);
     /// ```
     pub fn renounce_owner(&mut self) {
-        self.assert_owner();
+        self.require_owner();
         self.owner = None;
         self.proposed_owner.remove();
     }
@@ -113,7 +113,7 @@ impl Ownership {
     /// assert_eq!(ownership.proposed_owner.get(), Some(proposed_owner));
     /// ```
     pub fn propose_owner(&mut self, account_id: Option<AccountId>) {
-        self.assert_owner();
+        self.require_owner();
         if let Some(a) = account_id {
             self.proposed_owner.set(&a);
         } else {
