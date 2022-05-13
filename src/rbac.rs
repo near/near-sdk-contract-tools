@@ -6,6 +6,8 @@ use near_sdk::{
     env, require, AccountId, BorshStorageKey, IntoStorageKey,
 };
 
+use crate::utils::prefix_key;
+
 #[derive(BorshSerialize, BorshStorageKey)]
 enum StorageKey {
     RoleMap,
@@ -25,6 +27,10 @@ impl<R> Rbac<R>
 where
     R: BorshSerialize + IntoStorageKey,
 {
+    fn prefix(&self, key: &dyn AsRef<[u8]>) -> Vec<u8> {
+        prefix_key(&self.storage_key_prefix, key)
+    }
+
     /// Creates a new role-based access controller.
     ///
     /// # Examples
@@ -48,11 +54,7 @@ where
         S: IntoStorageKey,
     {
         let storage_key_prefix = storage_key_prefix.into_storage_key();
-        let roles_prefix = vec![
-            storage_key_prefix.clone(),
-            StorageKey::RoleMap.into_storage_key(),
-        ]
-        .concat();
+        let roles_prefix = prefix_key(&storage_key_prefix, &StorageKey::RoleMap.into_storage_key());
 
         Self {
             storage_key_prefix,
@@ -113,11 +115,8 @@ where
         if let Some(mut list) = self.roles.get(role) {
             list.insert(account_id);
         } else {
-            let prefix = vec![
-                self.storage_key_prefix.clone(),
-                StorageKey::RoleSet(role.try_to_vec().unwrap()).into_storage_key(),
-            ]
-            .concat();
+            let prefix =
+                self.prefix(&StorageKey::RoleSet(role.try_to_vec().unwrap()).into_storage_key());
             let mut list = LookupSet::<AccountId>::new(prefix);
             list.insert(account_id);
             self.roles.insert(role, &list);
