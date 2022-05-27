@@ -1,3 +1,5 @@
+//! Helpers for `#[derive(near_contract_tools::Event)]`
+
 use near_sdk::serde::Serialize;
 
 /// Emit events according to the [NEP-297 event standard](https://nomicon.io/Standards/EventsFormat).
@@ -23,30 +25,34 @@ use near_sdk::serde::Serialize;
 /// }
 /// ```
 pub trait Event {
-    /// Consumes the event and returns an `EVENT_JSON:{}`-formatted log string
-    fn into_event_string(self) -> String;
+    /// Returns an `EVENT_JSON:{}`-formatted log string
+    fn to_event_string(&self) -> String;
     /// Consumes the event and emits it to the NEAR blockchain
     fn emit(self);
 }
 
+/// Metadata for NEP-297-compliant events & variants
 pub trait EventMetadata {
-    fn standard(&self) -> String;
-    fn version(&self) -> String;
-    fn event(&self) -> String;
+    /// The name of the event standard, e.g. "nep171"
+    fn standard(&self) -> &'static str;
+    /// Version of the standard, e.g. "1.0.0"
+    fn version(&self) -> &'static str;
+    /// What type of event within the event standard, e.g. "nft_mint"
+    fn event(&self) -> &'static str;
 }
 
 /// NEP-297 Event Log Data
 /// https://github.com/near/NEPs/blob/master/neps/nep-0297.md#specification
 #[derive(Serialize)]
-struct EventLogData<T> {
-    pub standard: String,
-    pub version: String,
-    pub event: String,
-    pub data: T,
+struct EventLogData<'a, T> {
+    pub standard: &'a str,
+    pub version: &'a str,
+    pub event: &'a str,
+    pub data: &'a T,
 }
 
-impl<T: EventMetadata> From<T> for EventLogData<T> {
-    fn from(m: T) -> Self {
+impl<'a, T: EventMetadata> From<&'a T> for EventLogData<'a, T> {
+    fn from(m: &'a T) -> Self {
         Self {
             standard: m.standard(),
             version: m.version(),
@@ -57,7 +63,7 @@ impl<T: EventMetadata> From<T> for EventLogData<T> {
 }
 
 impl<T: Serialize + EventMetadata> Event for T {
-    fn into_event_string(self) -> String {
+    fn to_event_string(&self) -> String {
         format!(
             "EVENT_JSON:{}",
             serde_json::to_string(&Into::<EventLogData<_>>::into(self))
@@ -66,6 +72,6 @@ impl<T: Serialize + EventMetadata> Event for T {
     }
 
     fn emit(self) {
-        near_sdk::env::log_str(&self.into_event_string());
+        near_sdk::env::log_str(&self.to_event_string());
     }
 }

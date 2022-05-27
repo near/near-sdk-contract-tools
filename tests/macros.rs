@@ -23,7 +23,7 @@ fn derive_event() {
         token_ids: vec!["token_1".to_string(), "token_2".to_string()],
     }]);
     assert_eq!(
-        e.into_event_string(),
+        e.to_event_string(),
         r#"EVENT_JSON:{"standard":"nep171","version":"1.0.0","event":"nft_mint","data":[{"owner_id":"owner","token_ids":["token_1","token_2"]}]}"#
     );
 }

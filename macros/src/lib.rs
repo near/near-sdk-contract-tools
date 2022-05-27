@@ -78,12 +78,12 @@ fn expand(input: DeriveInput) -> Result<TokenStream, syn::Error> {
                 };
 
                 arms.push(match v.fields {
-                    Fields::Unit => quote! { #name :: #id => String::from( #rename ) , },
+                    Fields::Unit => quote! { #name :: #id => #rename , },
                     Fields::Unnamed(..) => {
-                        quote! { #name :: #id (..) => String::from( #rename ) , }
+                        quote! { #name :: #id (..) => #rename , }
                     }
                     Fields::Named(..) => {
-                        quote! { #name :: #id {..} => String::from( #rename ) , }
+                        quote! { #name :: #id {..} => #rename , }
                     }
                 });
             }
@@ -95,15 +95,15 @@ fn expand(input: DeriveInput) -> Result<TokenStream, syn::Error> {
 
     Ok(TokenStream::from(quote! {
         impl near_contract_tools::event::EventMetadata for #name {
-            fn standard(&self) -> String {
-                String::from(#standard)
+            fn standard(&self) -> &'static str {
+                #standard
             }
 
-            fn version(&self) -> String {
-                String::from(#version)
+            fn version(&self) -> &'static str {
+                #version
             }
 
-            fn event(&self) -> String {
+            fn event(&self) -> &'static str {
                 match self {
                     #(#arms)*
                 }
