@@ -48,7 +48,7 @@ pub trait Ownable {
 
 ### Events
 
-```rs
+```rust
 use near_contract_tools::event::*;
 use near_contract_tools::Event;
 use serde::Serialize;
