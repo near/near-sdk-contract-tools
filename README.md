@@ -7,10 +7,13 @@ This package is a collection of common tools and patterns in NEAR smart contract
 - Storage fee management
 - Ownership pattern
 - Role-based access control
+- Derive macro for [NEP-297 events](https://nomicon.io/Standards/EventsFormat)
 
 Not to be confused with [`near-contract-standards`](https://crates.io/crates/near-contract-standards), which contains official implementations of standardized NEPs.
 
 ## Example
+
+### Ownership
 
 ```rust
 use near_sdk::{
@@ -41,6 +44,35 @@ pub trait Ownable {
     fn own_propose_owner(&mut self, account_id: Option<AccountId>);
     fn own_accept_owner(&mut self);
 }
+```
+
+### Events
+
+```rs
+use near_contract_tools::event::*;
+use near_contract_tools::Event;
+use serde::Serialize;
+
+#[derive(Serialize)]
+pub struct Nep171NftMintData {
+    pub owner_id: String,
+    pub token_ids: Vec<String>,
+}
+
+#[derive(Event, Serialize)]
+#[event(standard = "nep171", version = "1.0.0")]
+#[serde(untagged)]
+pub enum Nep171 {
+    #[event = "nft_mint"]
+    NftMint(Vec<Nep171NftMintData>),
+}
+
+let my_event = Nep171::NftMint(vec![Nep171NftMintData {
+    owner_id: "owner".to_string(),
+    token_ids: vec!["token_1".to_string(), "token_2".to_string()],
+}]);
+
+my_event.emit(); // Emits event to the blockchain
 ```
 
 ## Authors
