@@ -145,7 +145,7 @@ impl Ownership {
             .take()
             .unwrap_or_else(|| env::panic_str("No proposed owner"));
         require!(
-            &env::predecessor_account_id() == &proposed_owner,
+            env::predecessor_account_id() == proposed_owner,
             "Proposed owner only"
         );
         self.owner = Some(proposed_owner);

@@ -1,0 +1,17 @@
+[package]
+name = "near-contract-tools-macros"
+version = "0.3.0"
+edition = "2021"
+authors = ["Jacob Lindahl <jacob@near.foundation>"]
+license = "GPL-3.0"
+categories = ["wasm"]
+description = """
+Macros for `near-contract-tools`
+"""
+
+[dependencies]
+quote = "1.0.18"
+syn = "1.0.95"
+
+[lib]
+proc-macro = true
