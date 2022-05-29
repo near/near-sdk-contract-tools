@@ -22,7 +22,13 @@ use crate::utils::prefix_key;
 /// ```
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct Ownership {
+    /// The current owner of the contract.
+    /// Will be `None` if the current owner has renounced ownership.
     pub owner: Option<AccountId>,
+    /// Proposed owner, if current owner has proposed a new owner.
+    /// For 2-step power transition:
+    /// 1. Current owner must propose a new owner
+    /// 2. New owner must accept ownership
     pub proposed_owner: LazyOption<AccountId>,
 }
 
@@ -154,14 +160,48 @@ impl Ownership {
     }
 }
 
+/// A contract that conforms to the ownership pattern as described in this
+/// crate will implement this trait.
 pub trait Ownable {
+    /// Returns the account ID of the current owner
     fn own_get_owner(&self) -> Option<AccountId>;
+    /// Returns the account ID that the current owner has proposed take over ownership
     fn own_get_proposed_owner(&self) -> Option<AccountId>;
+    /// Current owner may call this function to renounce ownership, setting
+    /// current owner to `None`.
+    ///
+    /// **WARNING**: Once this function has been called, this implementation
+    /// does not provide a way for the contract to have an owner again!
     fn own_renounce_owner(&mut self);
+    /// Propose a new owner. Can only be called by the current owner
     fn own_propose_owner(&mut self, account_id: Option<AccountId>);
+    /// The proposed owner may call this function to accept ownership from the
+    /// previous owner
     fn own_accept_owner(&mut self);
 }
 
+/// Implements the ownership pattern on a contract struct
+///
+/// # Examples
+///
+/// ```
+/// use near_sdk::{
+///     near_bindgen,
+///     AccountId,
+///     assert_one_yocto,
+/// };
+/// use near_contract_tools::{
+///     impl_ownership,
+///     ownership::Ownership,
+/// };
+///
+/// #[near_bindgen]
+/// struct Contract {
+///     pub ownership: Ownership,
+/// }
+///
+/// impl_ownership!(Contract, ownership);
+/// ```
 #[macro_export]
 macro_rules! impl_ownership {
     ($contract: ident, $ownership: ident) => {

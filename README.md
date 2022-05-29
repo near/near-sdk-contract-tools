@@ -28,7 +28,7 @@ use near_contract_tools::{
 
 #[near_bindgen]
 struct Contract {
-    pub ownership: Ownership;
+    pub ownership: Ownership,
 }
 
 impl_ownership!(Contract, ownership);

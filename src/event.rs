@@ -3,19 +3,19 @@
 use near_sdk::serde::Serialize;
 
 /// Emit events according to the [NEP-297 event standard](https://nomicon.io/Standards/EventsFormat).
-/// 
+///
 /// # Examples
 /// ```
 /// use near_contract_tools::event::*;
 /// use near_contract_tools::Event;
 /// use serde::Serialize;
-/// 
+///
 /// #[derive(Serialize)]
 /// pub struct Nep171NftMintData {
 ///     pub owner_id: String,
 ///     pub token_ids: Vec<String>,
 /// }
-/// 
+///
 /// #[derive(Event, Serialize)]
 /// #[event(standard = "nep171", version = "1.0.0")]
 /// #[serde(untagged)]
