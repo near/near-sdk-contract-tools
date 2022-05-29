@@ -9,11 +9,20 @@ pub struct Nep171NftMintData {
 }
 
 #[derive(Event, Serialize)]
+// Required fields
 #[event(standard = "nep171", version = "1.0.0")]
+// Optional. Default event name is the untransformed variant name, e.g. NftMint, AnotherEvent, CustomEvent
+#[event(rename_all = "snake_case")]
+// Variant name will not appear in the serialized output
 #[serde(untagged)]
 pub enum Nep171 {
-    #[event = "nft_mint"]
-    NftMint(Vec<Nep171NftMintData>),
+    NftMint(Vec<Nep171NftMintData>), // Name will be "nft_mint" because rename_all = snake_case
+
+    #[event = "sneaky_event"]
+    AnotherEvent, // Name will be "sneaky_event"
+
+    #[event(rename = "SHOUTY-KEBAB-CASE")]
+    CustomEvent, // Name will be "CUSTOM-EVENT"
 }
 
 #[test]
@@ -22,6 +31,7 @@ fn derive_event() {
         owner_id: "owner".to_string(),
         token_ids: vec!["token_1".to_string(), "token_2".to_string()],
     }]);
+    println!("{}", e.to_event_string());
     assert_eq!(
         e.to_event_string(),
         r#"EVENT_JSON:{"standard":"nep171","version":"1.0.0","event":"nft_mint","data":[{"owner_id":"owner","token_ids":["token_1","token_2"]}]}"#
