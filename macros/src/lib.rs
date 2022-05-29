@@ -29,6 +29,7 @@ pub fn derive_event(input: TokenStream) -> TokenStream {
     expand(input).unwrap_or_else(|e| e.into_compile_error().into())
 }
 
+#[allow(clippy::enum_variant_names)]
 enum RenameStrategy {
     UpperCamelCase,
     LowerCamelCase,
