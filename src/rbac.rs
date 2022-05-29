@@ -1,4 +1,4 @@
-//! Role-based Access Control module
+//! Role-based access control
 
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
