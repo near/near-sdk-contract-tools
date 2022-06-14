@@ -1,12 +1,27 @@
 //! Contract ownership pattern
 
+use near_contract_tools_macros::Event;
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
     collections::LazyOption,
     env, require, AccountId, IntoStorageKey,
 };
+use serde::Serialize;
 
-use crate::utils::prefix_key;
+use crate::{event::Event, near_contract_tools, utils::prefix_key};
+
+#[derive(Event, Serialize)]
+#[event(standard = "x-own", version = "1.0.0", rename_all = "snake_case")]
+pub enum OwnershipEvent {
+    Transfer {
+        old: Option<AccountId>,
+        new: Option<AccountId>,
+    },
+    Propose {
+        old: Option<AccountId>,
+        new: Option<AccountId>,
+    },
+}
 
 /// State for contract ownership management
 ///
@@ -50,6 +65,12 @@ impl Ownership {
         S: IntoStorageKey,
     {
         let k = storage_key_prefix.into_storage_key();
+
+        OwnershipEvent::Transfer {
+            old: None,
+            new: Some(owner_id.clone()),
+        }
+        .emit();
 
         Self {
             owner: Some(owner_id),
@@ -99,6 +120,16 @@ impl Ownership {
     /// ```
     pub fn renounce_owner(&mut self) {
         self.require_owner();
+        OwnershipEvent::Transfer {
+            old: self.owner.clone(),
+            new: None,
+        }
+        .emit();
+        OwnershipEvent::Propose {
+            old: self.proposed_owner.get(),
+            new: None,
+        }
+        .emit();
         self.owner = None;
         self.proposed_owner.remove();
     }
@@ -123,9 +154,11 @@ impl Ownership {
     pub fn propose_owner(&mut self, account_id: Option<AccountId>) {
         self.require_owner();
         if let Some(a) = account_id {
-            self.proposed_owner.set(&a);
+            let old = self.proposed_owner.replace(&a);
+            OwnershipEvent::Propose { old, new: Some(a) }.emit();
         } else {
-            self.proposed_owner.remove();
+            let old = self.proposed_owner.take();
+            OwnershipEvent::Propose { old, new: None }.emit();
         }
     }
 
@@ -156,6 +189,11 @@ impl Ownership {
             env::predecessor_account_id() == proposed_owner,
             "Proposed owner only"
         );
+        OwnershipEvent::Transfer {
+            old: self.owner.clone(),
+            new: Some(proposed_owner.clone()),
+        }
+        .emit();
         self.owner = Some(proposed_owner);
     }
 }
