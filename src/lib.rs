@@ -8,3 +8,7 @@ pub mod rbac;
 pub mod utils;
 
 pub use near_contract_tools_macros::Event;
+
+mod near_contract_tools {
+    pub use super::*;
+}

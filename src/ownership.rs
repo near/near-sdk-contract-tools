@@ -1,12 +1,34 @@
 //! Contract ownership pattern
 
+use near_contract_tools_macros::Event;
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
     collections::LazyOption,
     env, require, AccountId, IntoStorageKey,
 };
+use serde::Serialize;
 
-use crate::utils::prefix_key;
+use crate::{event::Event, near_contract_tools, utils::prefix_key};
+
+/// Events emitted by function calls on an ownable contract
+#[derive(Event, Serialize)]
+#[event(standard = "x-own", version = "1.0.0", rename_all = "snake_case")]
+pub enum OwnershipEvent {
+    /// Emitted when the current owner of the contract changes
+    Transfer {
+        /// Former owner of the contract. Will be `None` if the contract is being initialized.
+        old: Option<AccountId>,
+        /// The new owner of the contract. Will be `None` if ownership is renounced.
+        new: Option<AccountId>,
+    },
+    /// Emitted when the proposed owner of the contract changes
+    Propose {
+        /// Old proposed owner.
+        old: Option<AccountId>,
+        /// New proposed owner.
+        new: Option<AccountId>,
+    },
+}
 
 /// State for contract ownership management
 ///
@@ -33,7 +55,38 @@ pub struct Ownership {
 }
 
 impl Ownership {
+    /// Updates the current owner and emits relevant event
+    fn update_owner(&mut self, new: Option<AccountId>) {
+        let old = self.owner.clone();
+        if old != new {
+            OwnershipEvent::Transfer {
+                old,
+                new: new.clone(),
+            }
+            .emit();
+            self.owner = new;
+        }
+    }
+
+    /// Updates proposed owner and emits relevant event
+    fn update_proposed(&mut self, new: Option<AccountId>) {
+        let old = self.proposed_owner.get();
+        if old != new {
+            OwnershipEvent::Propose {
+                old,
+                new: new.clone(),
+            }
+            .emit();
+            match new {
+                Some(account_id) => self.proposed_owner.set(&account_id),
+                _ => self.proposed_owner.remove(),
+            };
+        }
+    }
+
     /// Creates a new Ownership using the specified storage key prefix.
+    ///
+    /// Emits an `OwnershipEvent::Transfer` event.
     ///
     /// # Examples
     ///
@@ -50,6 +103,12 @@ impl Ownership {
         S: IntoStorageKey,
     {
         let k = storage_key_prefix.into_storage_key();
+
+        OwnershipEvent::Transfer {
+            old: None,
+            new: Some(owner_id.clone()),
+        }
+        .emit();
 
         Self {
             owner: Some(owner_id),
@@ -83,6 +142,9 @@ impl Ownership {
 
     /// Removes the contract's owner. Can only be called by the current owner.
     ///
+    /// Emits an `OwnershipEvent::Transfer` event, and an `OwnershipEvent::Propose` event
+    /// if there is a currently proposed owner.
+    ///
     /// # Examples
     ///
     /// ```
@@ -99,12 +161,17 @@ impl Ownership {
     /// ```
     pub fn renounce_owner(&mut self) {
         self.require_owner();
-        self.owner = None;
-        self.proposed_owner.remove();
+
+        self.update_proposed(None);
+        self.update_owner(None);
     }
 
     /// Prepares the contract to change owners, setting the proposed owner to
     /// the provided account ID. Can only be called by the current owner.
+    ///
+    /// Emits an `OwnershipEvent::Propose` event.
+    ///
+    /// The currently proposed owner may be reset by calling this function with the argument `None`.
     ///
     /// # Examples
     ///
@@ -122,15 +189,15 @@ impl Ownership {
     /// ```
     pub fn propose_owner(&mut self, account_id: Option<AccountId>) {
         self.require_owner();
-        if let Some(a) = account_id {
-            self.proposed_owner.set(&a);
-        } else {
-            self.proposed_owner.remove();
-        }
+
+        self.update_proposed(account_id);
     }
 
     /// Sets new owner equal to proposed owner. Can only be called by proposed
     /// owner.
+    ///
+    /// Emits events corresponding to the transfer of ownership and reset of the
+    /// proposed owner.
     ///
     /// # Examples
     ///
@@ -152,11 +219,19 @@ impl Ownership {
             .proposed_owner
             .take()
             .unwrap_or_else(|| env::panic_str("No proposed owner"));
+
         require!(
             env::predecessor_account_id() == proposed_owner,
             "Proposed owner only"
         );
-        self.owner = Some(proposed_owner);
+
+        OwnershipEvent::Propose {
+            old: Some(proposed_owner.clone()),
+            new: None,
+        }
+        .emit();
+
+        self.update_owner(Some(proposed_owner));
     }
 }
 

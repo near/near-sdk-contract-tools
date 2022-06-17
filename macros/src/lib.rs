@@ -10,7 +10,7 @@ use syn::{
 };
 
 /// Derives an NEP-297-compatible event emitting implementation of `Event`.
-/// 
+///
 /// Specify event standard parameters: `#[event(standard = "...", version = "...")]`
 ///
 /// Rename strategy for all variants (default: unchanged): `#[event(rename_all = "<strategy>")]`
