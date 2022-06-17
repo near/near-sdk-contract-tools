@@ -11,6 +11,8 @@ This package is a collection of common tools and patterns in NEAR smart contract
 
 Not to be confused with [`near-contract-standards`](https://crates.io/crates/near-contract-standards), which contains official implementations of standardized NEPs.
 
+**WARNING:** This is still early software, and there may be breaking changes between versions. I'll try my best to keep the docs & changelogs up-to-date. Don't hesitate to create an issue if find anything wrong.
+
 ## Example
 
 ### Ownership
