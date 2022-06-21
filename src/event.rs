@@ -20,7 +20,7 @@ use near_sdk::serde::Serialize;
 /// #[event(standard = "nep171", version = "1.0.0")]
 /// #[serde(untagged)]
 /// pub enum Nep171 {
-///     #[event = "nft_mint"]
+///     #[event(name = "nft_mint")]
 ///     NftMint(Vec<Nep171NftMintData>),
 /// }
 /// ```

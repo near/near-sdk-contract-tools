@@ -18,7 +18,7 @@ pub struct Nep171NftMintData {
 pub enum Nep171 {
     NftMint(Vec<Nep171NftMintData>), // Name will be "nft_mint" because rename_all = snake_case
 
-    #[event = "sneaky_event"]
+    #[event(name = "sneaky_event")]
     AnotherEvent, // Name will be "sneaky_event"
 
     #[event(rename = "SHOUTY-KEBAB-CASE")]

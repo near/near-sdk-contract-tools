@@ -13,6 +13,7 @@ use crate::{event::Event, near_contract_tools, utils::prefix_key};
 /// Events emitted by function calls on an ownable contract
 #[derive(Event, Serialize)]
 #[event(standard = "x-own", version = "1.0.0", rename_all = "snake_case")]
+#[serde(untagged)]
 pub enum OwnershipEvent {
     /// Emitted when the current owner of the contract changes
     Transfer {
