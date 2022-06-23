@@ -1,6 +1,35 @@
-use near_contract_tools::event::*;
-use near_contract_tools::Event;
+use near_contract_tools::{event::*, ownership::OwnershipController, Event, Ownable};
+use near_sdk::{
+    borsh::{self, BorshSerialize},
+    env, near_bindgen, BorshStorageKey,
+};
 use serde::Serialize;
+
+#[derive(BorshStorageKey, BorshSerialize)]
+enum StorageKey {
+    MyStorageKey,
+}
+
+#[derive(Ownable)]
+#[ownable(storage_key = "StorageKey::MyStorageKey")]
+#[near_bindgen]
+pub struct OwnableStruct {
+    pub permissioned_item: u32,
+}
+
+#[near_bindgen]
+impl OwnableStruct {
+    #[init]
+    pub fn new() -> Self {
+        let contract = Self {
+            permissioned_item: 0,
+        };
+
+        contract.init_owner(env::predecessor_account_id());
+
+        contract
+    }
+}
 
 #[derive(Serialize)]
 pub struct Nep171NftMintData {

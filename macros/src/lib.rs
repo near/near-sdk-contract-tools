@@ -27,10 +27,11 @@ pub fn derive_event(input: TokenStream) -> TokenStream {
     event::expand(meta).unwrap_or_else(|e| e.into_compile_error().into())
 }
 
-#[proc_macro_derive(Ownable, attributes(event))]
+#[proc_macro_derive(Ownable, attributes(ownable))]
 pub fn derive_ownable(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
-    let meta: event::EventMeta = FromDeriveInput::from_derive_input(&input).unwrap();
+    let meta: ownable::OwnableMeta = FromDeriveInput::from_derive_input(&input).unwrap();
+    println!("{meta:?}");
 
-    event::expand(meta).unwrap_or_else(|e| e.into_compile_error().into())
+    ownable::expand(meta).unwrap_or_else(|e| e.into_compile_error().into())
 }
