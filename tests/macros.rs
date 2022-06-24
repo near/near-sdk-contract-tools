@@ -11,21 +11,14 @@ use near_sdk::{
 };
 use serde::Serialize;
 
-#[derive(BorshStorageKey, BorshSerialize)]
-enum StorageKey {
-    MyStorageKey,
-}
-
 #[derive(Ownable)]
 #[near_bindgen]
-pub struct OwnedStructImplicitKey
- {
+pub struct OwnedStructImplicitKey {
     pub permissioned_item: u32,
 }
 
 #[near_bindgen]
-impl OwnedStructImplicitKey
- {
+impl OwnedStructImplicitKey {
     #[init]
     pub fn new() -> Self {
         let contract = Self {
@@ -47,6 +40,11 @@ impl OwnedStructImplicitKey
     pub fn get_permissioned_item(&self) -> u32 {
         self.permissioned_item
     }
+}
+
+#[derive(BorshStorageKey, BorshSerialize)]
+enum StorageKey {
+    MyStorageKey,
 }
 
 #[derive(Ownable)]
@@ -156,7 +154,6 @@ fn derive_ownable_im_unauthorized() {
     // Alice is not authorized to call owner-only method
     c.set_permissioned_item(4);
 }
-
 
 #[test]
 fn derive_ownable_ex() {
