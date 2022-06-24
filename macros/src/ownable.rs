@@ -3,7 +3,7 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::Expr;
 
-const DEFAULT_STORAGE_KEY: &'static str = r#"b"~o""#;
+const DEFAULT_STORAGE_KEY: &'static str = r#"(b"~o" as &[u8])"#;
 
 #[derive(Debug, FromDeriveInput)]
 #[darling(attributes(ownable), supports(struct_named))]
@@ -20,10 +20,9 @@ pub fn expand(meta: OwnableMeta) -> Result<TokenStream, syn::Error> {
     } = meta;
 
     let storage_key = if let Some(storage_key) = storage_key {
-        let e = syn::parse_str::<Expr>(&storage_key)?;
-        quote! { #e }
+        syn::parse_str::<Expr>(&storage_key)?
     } else {
-        quote! { #DEFAULT_STORAGE_KEY }
+        syn::parse_str::<Expr>(DEFAULT_STORAGE_KEY)?
     };
 
     let deserialize_ownership = quote! {
