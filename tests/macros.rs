@@ -1,7 +1,13 @@
-use near_contract_tools::{event::*, ownership::OwnershipController, Event, Ownable};
+use near_contract_tools::{
+    event::*,
+    ownership::{Ownable, OwnershipController},
+    Event, Ownable,
+};
 use near_sdk::{
     borsh::{self, BorshSerialize},
-    env, near_bindgen, BorshStorageKey,
+    env, near_bindgen,
+    test_utils::VMContextBuilder,
+    testing_env, AccountId, BorshStorageKey,
 };
 use serde::Serialize;
 
@@ -13,21 +19,32 @@ enum StorageKey {
 #[derive(Ownable)]
 #[ownable(storage_key = "StorageKey::MyStorageKey")]
 #[near_bindgen]
-pub struct OwnableStruct {
+pub struct OwnedStruct {
     pub permissioned_item: u32,
 }
 
 #[near_bindgen]
-impl OwnableStruct {
+impl OwnedStruct {
     #[init]
     pub fn new() -> Self {
         let contract = Self {
             permissioned_item: 0,
         };
 
+        // This method can only be called once throughout the entire duration of the contract
         contract.init_owner(env::predecessor_account_id());
 
         contract
+    }
+
+    pub fn set_permissioned_item(&mut self, value: u32) {
+        self.require_owner();
+
+        self.permissioned_item = value;
+    }
+
+    pub fn get_permissioned_item(&self) -> u32 {
+        self.permissioned_item
     }
 }
 
@@ -65,4 +82,44 @@ fn derive_event() {
         e.to_event_string(),
         r#"EVENT_JSON:{"standard":"nep171","version":"1.0.0","event":"nft_mint","data":[{"owner_id":"owner","token_ids":["token_1","token_2"]}]}"#
     );
+}
+
+#[test]
+fn derive_ownable() {
+    let owner: AccountId = "owner".parse().unwrap();
+    let context = VMContextBuilder::new()
+        .predecessor_account_id(owner.clone())
+        .build();
+
+    testing_env!(context);
+    let mut c = OwnedStruct::new();
+
+    assert_eq!(
+        c.own_get_owner(),
+        Some(owner.clone()),
+        "Owner is initialized",
+    );
+
+    c.set_permissioned_item(4);
+}
+
+#[test]
+#[should_panic(expected = "Owner only")]
+fn derive_ownable_unauthorized() {
+    let owner: AccountId = "owner".parse().unwrap();
+    let context = VMContextBuilder::new()
+        .predecessor_account_id(owner.clone())
+        .build();
+
+    testing_env!(context);
+    let mut c = OwnedStruct::new();
+
+    let alice: AccountId = "alice".parse().unwrap();
+    let context = VMContextBuilder::new()
+        .predecessor_account_id(alice.clone())
+        .build();
+    testing_env!(context);
+
+    // Alice is not authorized to call owner-only method
+    c.set_permissioned_item(4);
 }

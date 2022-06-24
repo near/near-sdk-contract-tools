@@ -263,6 +263,13 @@ pub trait OwnershipController {
 
     /// Get the ownership struct from storage
     fn get_ownership(&self) -> Ownership;
+
+    /// Requires that the predecessor is the owner; rejects otherwise.
+    fn require_owner(&self) -> Ownership {
+        let ownership = self.get_ownership();
+        ownership.require_owner();
+        ownership
+    }
 }
 
 /// Implements the ownership pattern on a contract struct
