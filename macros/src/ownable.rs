@@ -11,13 +11,10 @@ pub struct OwnableMeta {
     pub storage_key: Option<String>,
 
     pub ident: syn::Ident,
-    pub data: darling::ast::Data<(), ()>,
 }
 
 pub fn expand(meta: OwnableMeta) -> Result<TokenStream, syn::Error> {
-    let OwnableMeta {
-        storage_key, ident, ..
-    } = meta;
+    let OwnableMeta { storage_key, ident } = meta;
 
     let storage_key = if let Some(storage_key) = storage_key {
         syn::parse_str::<Expr>(&storage_key)?
@@ -34,6 +31,8 @@ pub fn expand(meta: OwnableMeta) -> Result<TokenStream, syn::Error> {
             ).unwrap() as &[u8])
         ) as Result<near_contract_tools::ownership::Ownership, _>).unwrap()
     };
+
+    let ownership = quote! { <#ident as near_contract_tools::ownership::OwnershipController>::get_ownership(self) };
 
     Ok(TokenStream::from(quote! {
         impl near_contract_tools::ownership::OwnershipController for #ident {
@@ -63,29 +62,29 @@ pub fn expand(meta: OwnableMeta) -> Result<TokenStream, syn::Error> {
         #[near_sdk::near_bindgen]
         impl near_contract_tools::ownership::Ownable for #ident {
             fn own_get_owner(&self) -> Option<near_sdk::AccountId> {
-                #deserialize_ownership.owner
+                #ownership.owner
             }
 
             fn own_get_proposed_owner(&self) -> Option<near_sdk::AccountId> {
-                #deserialize_ownership.proposed_owner.get()
+                #ownership.proposed_owner.get()
             }
 
             #[payable]
             fn own_renounce_owner(&mut self) {
                 near_sdk::assert_one_yocto();
-                #deserialize_ownership.renounce_owner()
+                #ownership.renounce_owner()
             }
 
             #[payable]
             fn own_propose_owner(&mut self, account_id: Option<near_sdk::AccountId>) {
                 near_sdk::assert_one_yocto();
-                #deserialize_ownership.propose_owner(account_id);
+                #ownership.propose_owner(account_id);
             }
 
             #[payable]
             fn own_accept_owner(&mut self) {
                 near_sdk::assert_one_yocto();
-                #deserialize_ownership.accept_owner();
+                #ownership.accept_owner();
             }
         }
     }))
