@@ -8,7 +8,7 @@ const DEFAULT_STORAGE_KEY: &'static str = r#"(b"~o" as &[u8])"#;
 #[derive(Debug, FromDeriveInput)]
 #[darling(attributes(ownable), supports(struct_named))]
 pub struct OwnableMeta {
-    pub storage_key: Option<String>,
+    pub storage_key: Option<Expr>,
 
     pub ident: syn::Ident,
 }
@@ -16,11 +16,8 @@ pub struct OwnableMeta {
 pub fn expand(meta: OwnableMeta) -> Result<TokenStream, syn::Error> {
     let OwnableMeta { storage_key, ident } = meta;
 
-    let storage_key = if let Some(storage_key) = storage_key {
-        syn::parse_str::<Expr>(&storage_key)?
-    } else {
-        syn::parse_str::<Expr>(DEFAULT_STORAGE_KEY)?
-    };
+    let storage_key =
+        storage_key.unwrap_or_else(|| syn::parse_str::<Expr>(DEFAULT_STORAGE_KEY).unwrap());
 
     let deserialize_ownership = quote! {
         (near_sdk::borsh::BorshDeserialize::deserialize(
