@@ -2,9 +2,22 @@ use near_contract_tools::{
     pausable::{Pausable, PausableController},
     Pausable,
 };
-use near_sdk::near_bindgen;
+use near_sdk::{
+    borsh::{self, BorshSerialize},
+    near_bindgen, BorshStorageKey,
+};
+
+#[derive(BorshSerialize, BorshStorageKey)]
+enum StorageKey {
+    Pausable,
+}
 
 #[derive(Pausable)]
+#[near_bindgen]
+struct ContractImplicitKey { }
+
+#[derive(Pausable)]
+#[pausable(storage_key = "StorageKey::Pausable")]
 #[near_bindgen]
 struct Contract {
     pub value: u32,

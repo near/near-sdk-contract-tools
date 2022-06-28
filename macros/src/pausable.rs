@@ -16,8 +16,11 @@ pub struct PausableMeta {
 pub fn expand(meta: PausableMeta) -> Result<TokenStream, syn::Error> {
     let PausableMeta { storage_key, ident } = meta;
 
-    let storage_key =
-        storage_key.unwrap_or_else(|| syn::parse_str::<Expr>(DEFAULT_STORAGE_KEY).unwrap());
+    let storage_key = {
+        let key =
+            storage_key.unwrap_or_else(|| syn::parse_str::<Expr>(DEFAULT_STORAGE_KEY).unwrap());
+        quote! { &near_sdk::IntoStorageKey::into_storage_key(#key) }
+    };
 
     Ok(TokenStream::from(quote! {
         impl near_contract_tools::pausable::PausableController for #ident {
