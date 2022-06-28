@@ -18,22 +18,35 @@ Not to be confused with [`near-contract-standards`](https://crates.io/crates/nea
 ### Ownership
 
 ```rust
-use near_sdk::{
-    near_bindgen,
-    AccountId,
-    assert_one_yocto,
-};
-use near_contract_tools::{
-    impl_ownership,
-    ownership::Ownership,
-};
+use near_contract_tools::{Ownable, ownership::OwnershipController};
+use near_sdk::{AccountId, near_bindgen};
 
+#[derive(Ownable)]
 #[near_bindgen]
 struct Contract {
-    pub ownership: Ownership,
+    // ...
 }
 
-impl_ownership!(Contract, ownership);
+#[near_bindgen]
+impl Contract {
+    #[init]
+    pub fn new(owner_id: AccountId) -> Self {
+        let contract = Self {
+            // ...
+        };
+
+        // Initialize the owner of the contract
+        contract.init_owner(owner_id);
+
+        contract
+    }
+
+    pub fn owner_only_method(&self) {
+        self.require_owner();
+
+        // ...
+    }
+}
 ```
 
 This creates a smart contract which exposes the `Ownable` trait to the blockchain:
