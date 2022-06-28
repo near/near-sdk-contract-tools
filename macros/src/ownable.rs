@@ -19,17 +19,9 @@ pub fn expand(meta: OwnableMeta) -> Result<TokenStream, syn::Error> {
     let storage_key =
         storage_key.unwrap_or_else(|| syn::parse_str::<Expr>(DEFAULT_STORAGE_KEY).unwrap());
 
-    let deserialize_ownership = quote! {
-        (near_sdk::borsh::BorshDeserialize::deserialize(
-            &mut (&near_sdk::env::storage_read(
-                &near_sdk::IntoStorageKey::into_storage_key(
-                    #storage_key
-                )
-            ).unwrap() as &[u8])
-        ) as Result<near_contract_tools::ownership::Ownership, _>).unwrap()
+    let get_ownership = quote! {
+        <#ident as near_contract_tools::ownership::OwnershipController>::get_ownership(self)
     };
-
-    let ownership = quote! { <#ident as near_contract_tools::ownership::OwnershipController>::get_ownership(self) };
 
     Ok(TokenStream::from(quote! {
         impl near_contract_tools::ownership::OwnershipController for #ident {
@@ -52,36 +44,42 @@ pub fn expand(meta: OwnableMeta) -> Result<TokenStream, syn::Error> {
             }
 
             fn get_ownership(&self) -> near_contract_tools::ownership::Ownership {
-                #deserialize_ownership
+                (near_sdk::borsh::BorshDeserialize::deserialize(
+                    &mut (&near_sdk::env::storage_read(
+                        &near_sdk::IntoStorageKey::into_storage_key(
+                            #storage_key
+                        )
+                    ).unwrap() as &[u8])
+                ) as Result<near_contract_tools::ownership::Ownership, _>).unwrap()
             }
         }
 
         #[near_sdk::near_bindgen]
         impl near_contract_tools::ownership::Ownable for #ident {
             fn own_get_owner(&self) -> Option<near_sdk::AccountId> {
-                #ownership.owner
+                #get_ownership.owner
             }
 
             fn own_get_proposed_owner(&self) -> Option<near_sdk::AccountId> {
-                #ownership.proposed_owner.get()
+                #get_ownership.proposed_owner.get()
             }
 
             #[payable]
             fn own_renounce_owner(&mut self) {
                 near_sdk::assert_one_yocto();
-                #ownership.renounce_owner()
+                #get_ownership.renounce_owner()
             }
 
             #[payable]
             fn own_propose_owner(&mut self, account_id: Option<near_sdk::AccountId>) {
                 near_sdk::assert_one_yocto();
-                #ownership.propose_owner(account_id);
+                #get_ownership.propose_owner(account_id);
             }
 
             #[payable]
             fn own_accept_owner(&mut self) {
                 near_sdk::assert_one_yocto();
-                #ownership.accept_owner();
+                #get_ownership.accept_owner();
             }
         }
     }))
