@@ -4,6 +4,7 @@ use syn::{parse_macro_input, DeriveInput};
 
 mod event;
 mod ownable;
+mod pausable;
 mod rename;
 
 /// Derives an NEP-297-compatible event emitting implementation of `Event`.
@@ -41,4 +42,12 @@ pub fn derive_ownable(input: TokenStream) -> TokenStream {
     let meta: ownable::OwnableMeta = FromDeriveInput::from_derive_input(&input).unwrap();
 
     ownable::expand(meta).unwrap_or_else(|e| e.into_compile_error().into())
+}
+
+#[proc_macro_derive(Pausable, attributes(pausable))]
+pub fn derive_pausable(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    let meta: pausable::PausableMeta = FromDeriveInput::from_derive_input(&input).unwrap();
+
+    pausable::expand(meta).unwrap_or_else(|e| e.into_compile_error().into())
 }

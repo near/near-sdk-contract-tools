@@ -4,6 +4,7 @@
 
 pub mod event;
 pub mod ownership;
+pub mod pausable;
 pub mod rbac;
 pub mod utils;
 
