@@ -1,5 +1,4 @@
-use near_contract_tools::event::*;
-use near_contract_tools::Event;
+use near_contract_tools::{event::*, Event};
 use serde::Serialize;
 
 #[derive(Serialize)]
@@ -31,9 +30,13 @@ fn derive_event() {
         owner_id: "owner".to_string(),
         token_ids: vec!["token_1".to_string(), "token_2".to_string()],
     }]);
-    println!("{}", e.to_event_string());
+
     assert_eq!(
         e.to_event_string(),
         r#"EVENT_JSON:{"standard":"nep171","version":"1.0.0","event":"nft_mint","data":[{"owner_id":"owner","token_ids":["token_1","token_2"]}]}"#
     );
+
+    assert_eq!(Nep171::AnotherEvent.event(), "sneaky_event");
+
+    assert_eq!(Nep171::CustomEvent.event(), "CUSTOM-EVENT");
 }

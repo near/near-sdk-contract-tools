@@ -256,6 +256,22 @@ pub trait Ownable {
     fn own_accept_owner(&mut self);
 }
 
+/// Internal management for derive macro
+pub trait OwnershipController {
+    /// Initialization method. May only be called once.
+    fn init_owner(&self, owner_id: AccountId) -> Ownership;
+
+    /// Get the ownership struct from storage
+    fn get_ownership(&self) -> Ownership;
+
+    /// Requires that the predecessor is the owner; rejects otherwise.
+    fn require_owner(&self) -> Ownership {
+        let ownership = self.get_ownership();
+        ownership.require_owner();
+        ownership
+    }
+}
+
 /// Implements the ownership pattern on a contract struct
 ///
 /// # Examples
