@@ -68,6 +68,11 @@ impl OwnedStructExplicitKey {
         contract
     }
 
+    pub fn try_init_again(&self) {
+        // Should fail
+        self.init_owner(env::predecessor_account_id());
+    }
+
     pub fn set_permissioned_item(&mut self, value: u32) {
         self.require_owner();
 
@@ -172,6 +177,20 @@ fn derive_ownable_ex() {
     );
 
     c.set_permissioned_item(4);
+}
+
+#[test]
+#[should_panic(expected = "Ownership already initialized")]
+fn derive_ownable_ex_init_again() {
+    let owner: AccountId = "owner".parse().unwrap();
+    let context = VMContextBuilder::new()
+        .predecessor_account_id(owner.clone())
+        .build();
+
+    testing_env!(context);
+    let c = OwnedStructExplicitKey::new();
+
+    c.try_init_again();
 }
 
 #[test]
