@@ -36,13 +36,7 @@ fn derive_event() {
         r#"EVENT_JSON:{"standard":"nep171","version":"1.0.0","event":"nft_mint","data":[{"owner_id":"owner","token_ids":["token_1","token_2"]}]}"#
     );
 
-    assert_eq!(
-        Nep171::AnotherEvent.event(),
-        "sneaky_event",
-    );
+    assert_eq!(Nep171::AnotherEvent.event(), "sneaky_event");
 
-    assert_eq!(
-        Nep171::CustomEvent.event(),
-        "CUSTOM-EVENT",
-    );
+    assert_eq!(Nep171::CustomEvent.event(), "CUSTOM-EVENT");
 }
