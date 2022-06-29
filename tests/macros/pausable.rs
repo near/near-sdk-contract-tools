@@ -14,7 +14,7 @@ enum StorageKey {
 
 #[derive(Pausable)]
 #[near_bindgen]
-struct ContractImplicitKey { }
+struct ContractImplicitKey {}
 
 #[derive(Pausable)]
 #[pausable(storage_key = "StorageKey::Pausable")]

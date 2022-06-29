@@ -16,7 +16,7 @@ pub enum PausableEvent {
     Unpause,
 }
 
-/// Externally callable interface
+/// Externally-accessible interface for a pausable contract
 pub trait Pausable {
     /// Returns `true` if the contract is paused, `false` otherwise
     fn paus_is_paused(&self) -> bool;
