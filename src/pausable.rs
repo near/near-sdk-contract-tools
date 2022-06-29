@@ -23,6 +23,41 @@ pub trait Pausable {
 }
 
 /// Internal-only interactions for a pausable contract
+///
+/// # Examples
+///
+/// ```
+/// use near_sdk::near_bindgen;
+/// use near_contract_tools::{
+///     pausable::{Pausable, PausableController},
+///     Pausable,
+/// };
+///
+/// #[derive(Pausable)]
+/// #[near_bindgen]
+/// struct Contract {
+///     // ...
+/// }
+///
+/// #[near_bindgen]
+/// impl Contract {
+///     pub fn only_when_unpaused(&self) {
+///         self.require_unpaused();
+///     }
+///
+///     pub fn only_when_paused(&self) {
+///         self.require_paused();
+///     }
+///
+///     pub fn emergency_shutdown(&self) {
+///         self.pause();
+///     }
+///
+///     pub fn emergency_shutdown_end(&self) {
+///         self.unpause();
+///     }
+/// }
+/// ```
 pub trait PausableController {
     /// Force the contract pause state in a particular direction.
     /// Does not emit events or check the current pause state.
