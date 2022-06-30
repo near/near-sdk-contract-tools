@@ -10,10 +10,10 @@ Macros for `near-contract-tools`
 """
 
 [dependencies]
-darling = "0.14.1"
-heck = "0.4.0"
-quote = "1.0.18"
-syn = "1.0.95"
+darling = "0.14"
+heck = "0.4"
+quote = "1"
+syn = "1"
 
 [lib]
 proc-macro = true
