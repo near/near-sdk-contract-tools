@@ -3,7 +3,7 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::Expr;
 
-const DEFAULT_STORAGE_KEY: &'static str = r#"(b"~p" as &[u8])"#;
+const DEFAULT_STORAGE_KEY: &str = r#"(b"~p" as &[u8])"#;
 
 #[derive(Debug, FromDeriveInput)]
 #[darling(attributes(pausable), supports(struct_named))]
