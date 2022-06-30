@@ -9,6 +9,7 @@ description = """
 Helpful functions and macros for developing smart contracts on NEAR Protocol.
 """
 repository = "https://github.com/encody/near-contract-tools"
+documentation = "https://docs.rs/near-contract-tools"
 
 [dependencies]
 near-sdk = "4.0.0"
