@@ -135,8 +135,8 @@ pub trait Owner: OwnerStorage {
 
     /// Removes the contract's owner. Can only be called by the current owner.
     ///
-    /// Emits an `OwnershipEvent::Transfer` event, and an `OwnershipEvent::Propose` event
-    /// if there is a currently proposed owner.
+    /// Emits an `OwnershipEvent::Transfer` event, and an
+    /// `OwnershipEvent::Propose` event if there is a currently proposed owner.
     fn renounce_owner(&self) {
         self.require_owner();
 
@@ -149,22 +149,8 @@ pub trait Owner: OwnerStorage {
     ///
     /// Emits an `OwnershipEvent::Propose` event.
     ///
-    /// The currently proposed owner may be reset by calling this function with the argument `None`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use near_contract_tools::ownership::Ownership;
-    ///
-    /// let mut ownership = Ownership::new(
-    ///     b"o",
-    ///     near_sdk::env::predecessor_account_id(),
-    /// );
-    /// let proposed_owner: near_sdk::AccountId = "account".parse().unwrap();
-    /// assert_eq!(ownership.proposed_owner.get(), None);
-    /// ownership.propose_owner(Some(proposed_owner.clone()));
-    /// assert_eq!(ownership.proposed_owner.get(), Some(proposed_owner));
-    /// ```
+    /// The currently proposed owner may be reset by calling this function with
+    /// the argument `None`.
     fn propose_owner(&self, account_id: Option<AccountId>) {
         self.require_owner();
 
@@ -176,22 +162,6 @@ pub trait Owner: OwnerStorage {
     ///
     /// Emits events corresponding to the transfer of ownership and reset of the
     /// proposed owner.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use near_contract_tools::ownership::Ownership;
-    ///
-    /// let owner_id = "account".parse().unwrap();
-    /// let mut ownership = Ownership::new(
-    ///     b"o",
-    ///     owner_id,
-    /// );
-    /// let proposed_owner = near_sdk::env::predecessor_account_id();
-    /// ownership.proposed_owner.set(&proposed_owner);
-    /// ownership.accept_owner();
-    /// assert_eq!(ownership.owner, Some(proposed_owner));
-    /// ```
     fn accept_owner(&self) {
         let proposed_owner = self
             .proposed_owner()
@@ -268,5 +238,130 @@ mod tests {
             .build());
         contract.own_renounce_owner();
         assert_eq!(contract.own_get_owner(), None);
+    }
+
+    #[test]
+    fn propose_owner() {
+        let owner_id: AccountId = "owner".parse().unwrap();
+        let mut contract = Contract::new(owner_id.clone());
+
+        let proposed_owner: AccountId = "proposed".parse().unwrap();
+
+        testing_env!(VMContextBuilder::new()
+            .predecessor_account_id(owner_id.clone())
+            .attached_deposit(1)
+            .build());
+
+        assert_eq!(contract.own_get_proposed_owner(), None);
+
+        contract.own_propose_owner(Some(proposed_owner.clone()));
+
+        assert_eq!(contract.own_get_proposed_owner(), Some(proposed_owner));
+    }
+
+    #[test]
+    #[should_panic(expected = "Owner only")]
+    fn propose_owner_unauthorized() {
+        let owner_id: AccountId = "owner".parse().unwrap();
+        let mut contract = Contract::new(owner_id.clone());
+
+        let proposed_owner: AccountId = "proposed".parse().unwrap();
+
+        testing_env!(VMContextBuilder::new()
+            .predecessor_account_id(proposed_owner.clone())
+            .attached_deposit(1)
+            .build());
+
+        contract.own_propose_owner(Some(proposed_owner.clone()));
+    }
+
+    #[test]
+    #[should_panic(expected = "Requires attached deposit of exactly 1 yoctoNEAR")]
+    fn propose_owner_no_deposit() {
+        let owner_id: AccountId = "owner".parse().unwrap();
+        let mut contract = Contract::new(owner_id.clone());
+
+        let proposed_owner: AccountId = "proposed".parse().unwrap();
+
+        testing_env!(VMContextBuilder::new()
+            .predecessor_account_id(owner_id.clone())
+            .build());
+
+        contract.own_propose_owner(Some(proposed_owner.clone()));
+    }
+
+    #[test]
+    fn accept_owner() {
+        let owner_id: AccountId = "owner".parse().unwrap();
+
+        let mut contract = Contract::new(owner_id.clone());
+
+        let proposed_owner: AccountId = "proposed".parse().unwrap();
+
+        testing_env!(VMContextBuilder::new()
+            .predecessor_account_id(owner_id.clone())
+            .attached_deposit(1)
+            .build());
+
+        contract.own_propose_owner(Some(proposed_owner.clone()));
+
+        testing_env!(VMContextBuilder::new()
+            .predecessor_account_id(proposed_owner.clone())
+            .attached_deposit(1)
+            .build());
+
+        contract.own_accept_owner();
+
+        assert_eq!(contract.own_get_owner(), Some(proposed_owner));
+        assert_eq!(contract.own_get_proposed_owner(), None);
+    }
+
+    #[test]
+    #[should_panic(expected = "Proposed owner only")]
+    fn accept_owner_unauthorized() {
+        let owner_id: AccountId = "owner".parse().unwrap();
+
+        let mut contract = Contract::new(owner_id.clone());
+
+        let proposed_owner: AccountId = "proposed".parse().unwrap();
+
+        testing_env!(VMContextBuilder::new()
+            .predecessor_account_id(owner_id.clone())
+            .attached_deposit(1)
+            .build());
+
+        contract.own_propose_owner(Some(proposed_owner.clone()));
+
+        let third_party: AccountId = "third".parse().unwrap();
+
+        testing_env!(VMContextBuilder::new()
+            .predecessor_account_id(third_party.clone())
+            .attached_deposit(1)
+            .build());
+
+        contract.own_accept_owner();
+    }
+
+    #[test]
+    #[should_panic(expected = "Requires attached deposit of exactly 1 yoctoNEAR")]
+    fn accept_owner_no_deposit() {
+        let owner_id: AccountId = "owner".parse().unwrap();
+
+        let mut contract = Contract::new(owner_id.clone());
+
+        let proposed_owner: AccountId = "proposed".parse().unwrap();
+
+        testing_env!(VMContextBuilder::new()
+            .predecessor_account_id(owner_id.clone())
+            .attached_deposit(1)
+            .build());
+
+        contract.own_propose_owner(Some(proposed_owner.clone()));
+
+        testing_env!(VMContextBuilder::new()
+            .predecessor_account_id(proposed_owner.clone())
+            .build());
+
+        contract.own_accept_owner();
     }
 }
