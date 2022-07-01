@@ -19,18 +19,22 @@ pub fn expand(meta: OwnerMeta) -> Result<TokenStream, syn::Error> {
     let storage_key =
         storage_key.unwrap_or_else(|| syn::parse_str::<Expr>(DEFAULT_STORAGE_KEY).unwrap());
 
+    let root = quote! {
+        near_contract_tools::slot::Slot::root(#storage_key)
+    };
+
     Ok(TokenStream::from(quote! {
         impl near_contract_tools::owner::OwnerStorage for #ident {
             fn is_initialized(&self) -> near_contract_tools::slot::Slot<bool> {
-                near_contract_tools::slot::Slot::new(#storage_key)
+                #root.field(b"i")
             }
 
             fn owner(&self) -> near_contract_tools::slot::Slot<near_sdk::AccountId> {
-                self.is_initialized().child(b"o")
+                #root.field(b"o")
             }
 
             fn proposed_owner(&self) -> near_contract_tools::slot::Slot<near_sdk::AccountId> {
-                self.is_initialized().child(b"p")
+                #root.field(b"p")
             }
         }
 

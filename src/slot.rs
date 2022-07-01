@@ -12,6 +12,15 @@ pub struct Slot<T> {
     _marker: PhantomData<T>,
 }
 
+impl Slot<()> {
+    pub fn root<K: IntoStorageKey>(key: K) -> Self {
+        Self {
+            key: key.into_storage_key(),
+            _marker: PhantomData,
+        }
+    }
+}
+
 impl<T> Slot<T> {
     pub fn new<K: IntoStorageKey>(key: K) -> Self {
         Self {
@@ -20,7 +29,7 @@ impl<T> Slot<T> {
         }
     }
 
-    pub fn child<K: IntoStorageKey, U>(&self, key: K) -> Slot<U> {
+    pub fn field<K: IntoStorageKey, U>(&self, key: K) -> Slot<U> {
         Slot {
             key: [self.key.clone(), key.into_storage_key()].concat(),
             _marker: PhantomData,
@@ -107,7 +116,7 @@ mod tests {
     use super::Slot;
 
     #[test]
-    fn test() {
+    fn partialeq() {
         let a1 = Slot::<u32>::new(b"a");
         let a2 = Slot::<i32>::new(b"a");
         assert_eq!(a1, a2);
