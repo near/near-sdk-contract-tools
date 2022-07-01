@@ -62,7 +62,7 @@ impl<T> Slot<T> {
     }
 
     /// Write raw bytes into the storage slot. No type checking.
-    pub fn write_raw(&self, value: &[u8]) -> bool {
+    pub fn write_raw(&mut self, value: &[u8]) -> bool {
         env::storage_write(&self.key, value)
     }
 
@@ -78,14 +78,14 @@ impl<T> Slot<T> {
     }
 
     /// Removes the managed key from storage
-    pub fn remove(&self) -> bool {
+    pub fn remove(&mut self) -> bool {
         env::storage_remove(&self.key)
     }
 }
 
 impl<T: BorshSerialize> Slot<T> {
     /// Writes a value to the managed storage slot
-    pub fn write(&self, value: &T) -> bool {
+    pub fn write(&mut self, value: &T) -> bool {
         self.write_raw(&value.try_to_vec().unwrap())
     }
 
@@ -94,7 +94,7 @@ impl<T: BorshSerialize> Slot<T> {
     ///
     /// Use of this method makes the slot function similarly to
     /// `near_sdk::collections::LazyOption`.
-    pub fn set(&self, value: Option<&T>) -> bool {
+    pub fn set(&mut self, value: Option<&T>) -> bool {
         match value {
             Some(value) => self.write(value),
             _ => self.remove(),
@@ -109,7 +109,7 @@ impl<T: BorshDeserialize> Slot<T> {
     }
 
     /// Removes a value from storage and returns it if present.
-    pub fn take(&self) -> Option<T> {
+    pub fn take(&mut self) -> Option<T> {
         if self.remove() {
             // unwrap should be safe if remove returns true
             Some(T::try_from_slice(&env::storage_get_evicted().unwrap()).unwrap())
@@ -121,7 +121,7 @@ impl<T: BorshDeserialize> Slot<T> {
 
 impl<T: BorshSerialize + BorshDeserialize> Slot<T> {
     /// Writes a value to storage and returns the evicted value, if present.
-    pub fn swap(&self, value: T) -> Option<T> {
+    pub fn swap(&mut self, value: T) -> Option<T> {
         if self.write_raw(&value.try_to_vec().unwrap()) {
             // unwrap should be safe because write_raw returned true
             Some(T::try_from_slice(&env::storage_get_evicted().unwrap()).unwrap())

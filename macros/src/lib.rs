@@ -4,7 +4,7 @@ use syn::{parse_macro_input, DeriveInput};
 
 mod event;
 mod owner;
-mod pausable;
+mod pause;
 mod rename;
 
 /// Derives an NEP-297-compatible event emitting implementation of `Event`.
@@ -42,13 +42,14 @@ pub fn derive_owner(input: TokenStream) -> TokenStream {
     owner::expand(meta).unwrap_or_else(|e| e.into_compile_error().into())
 }
 
-/// Makes the contract pausable. Provides an external implementation of the
-/// `Pausable` trait, and an internal-only implementation of the
-/// `PausableController` trait.
-#[proc_macro_derive(Pausable, attributes(pausable))]
-pub fn derive_pausable(input: TokenStream) -> TokenStream {
+/// Makes a contract pausable. Provides an implementation of the `Pause` trait.
+///
+/// The storage key prefix for the fields can be optionally specified (default:
+/// `"~p"`) using `#[pause(storage_key = "<expression>")]`.
+#[proc_macro_derive(Pause, attributes(pause))]
+pub fn derive_pause(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
-    let meta: pausable::PausableMeta = FromDeriveInput::from_derive_input(&input).unwrap();
+    let meta: pause::PauseMeta = FromDeriveInput::from_derive_input(&input).unwrap();
 
-    pausable::expand(meta).unwrap_or_else(|e| e.into_compile_error().into())
+    pause::expand(meta).unwrap_or_else(|e| e.into_compile_error().into())
 }

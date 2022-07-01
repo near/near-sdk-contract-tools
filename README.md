@@ -7,7 +7,7 @@ This package is a collection of common tools and patterns in NEAR smart contract
 - Storage fee management
 - Owner pattern (derive macro available)
 - Role-based access control
-- Pausable (derive macro available)
+- Pause (derive macro available)
 - Derive macro for [NEP-297 events](https://nomicon.io/Standards/EventsFormat)
 
 Not to be confused with [`near-contract-standards`](https://crates.io/crates/near-contract-standards), which contains official implementations of standardized NEPs. This crate is intended to be a complement to `near-contract-standards`.

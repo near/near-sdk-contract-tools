@@ -40,8 +40,8 @@ pub trait OwnerStorage {
 /// A contract with an owner
 pub trait Owner: OwnerStorage {
     /// Updates the current owner and emits relevant event
-    fn update_owner(&self, new: Option<AccountId>) {
-        let owner = self.owner();
+    fn update_owner(&mut self, new: Option<AccountId>) {
+        let mut owner = self.owner();
         let old = owner.read();
         if old != new {
             OwnerEvent::Transfer {
@@ -54,8 +54,8 @@ pub trait Owner: OwnerStorage {
     }
 
     /// Updates proposed owner and emits relevant event
-    fn update_proposed(&self, new: Option<AccountId>) {
-        let proposed_owner = self.proposed_owner();
+    fn update_proposed(&mut self, new: Option<AccountId>) {
+        let mut proposed_owner = self.proposed_owner();
         let old = proposed_owner.read();
         if old != new {
             OwnerEvent::Propose {
@@ -142,7 +142,7 @@ pub trait Owner: OwnerStorage {
     ///
     /// Emits an `OwnerEvent::Transfer` event, and an `OwnerEvent::Propose`
     /// event if there is a currently proposed owner.
-    fn renounce_owner(&self) {
+    fn renounce_owner(&mut self) {
         self.require_owner();
 
         self.update_proposed(None);
@@ -156,7 +156,7 @@ pub trait Owner: OwnerStorage {
     ///
     /// The currently proposed owner may be reset by calling this function with
     /// the argument `None`.
-    fn propose_owner(&self, account_id: Option<AccountId>) {
+    fn propose_owner(&mut self, account_id: Option<AccountId>) {
         self.require_owner();
 
         self.update_proposed(account_id);
@@ -167,7 +167,7 @@ pub trait Owner: OwnerStorage {
     ///
     /// Emits events corresponding to the transfer of ownership and reset of the
     /// proposed owner.
-    fn accept_owner(&self) {
+    fn accept_owner(&mut self) {
         let proposed_owner = self
             .proposed_owner()
             .take()

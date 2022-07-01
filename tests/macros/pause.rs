@@ -1,7 +1,4 @@
-use near_contract_tools::{
-    pausable::{Pausable, PausableController},
-    Pausable,
-};
+use near_contract_tools::{pause::Pause, Pause};
 use near_sdk::{
     borsh::{self, BorshSerialize},
     near_bindgen, BorshStorageKey,
@@ -9,15 +6,15 @@ use near_sdk::{
 
 #[derive(BorshSerialize, BorshStorageKey)]
 enum StorageKey {
-    Pausable,
+    Pause,
 }
 
-#[derive(Pausable)]
+#[derive(Pause)]
 #[near_bindgen]
 struct ContractImplicitKey {}
 
-#[derive(Pausable)]
-#[pausable(storage_key = "StorageKey::Pausable")]
+#[derive(Pause)]
+#[pause(storage_key = "StorageKey::Pause")]
 #[near_bindgen]
 struct Contract {
     pub value: u32,
@@ -43,8 +40,8 @@ impl Contract {
 }
 
 #[test]
-fn derive_pausable() {
-    let contract = Contract { value: 0 };
+fn derive_pause() {
+    let mut contract = Contract { value: 0 };
 
     assert_eq!(
         contract.paus_is_paused(),
@@ -76,7 +73,7 @@ fn derive_pausable() {
 }
 
 #[test]
-fn derive_pausable_methods() {
+fn derive_pause_methods() {
     let mut contract = Contract { value: 0 };
 
     contract.only_when_unpaused(5);
@@ -92,7 +89,7 @@ fn derive_pausable_methods() {
 
 #[test]
 #[should_panic(expected = "Disallowed while contract is unpaused")]
-fn derive_pausable_methods_fail_unpaused() {
+fn derive_pause_methods_fail_unpaused() {
     let mut contract = Contract { value: 0 };
 
     contract.only_when_paused(5);
@@ -100,7 +97,7 @@ fn derive_pausable_methods_fail_unpaused() {
 
 #[test]
 #[should_panic(expected = "Disallowed while contract is paused")]
-fn derive_pausable_methods_fail_paused() {
+fn derive_pause_methods_fail_paused() {
     let mut contract = Contract { value: 0 };
 
     contract.pause();
