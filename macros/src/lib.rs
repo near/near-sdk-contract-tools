@@ -28,13 +28,11 @@ pub fn derive_event(input: TokenStream) -> TokenStream {
     event::expand(meta).unwrap_or_else(|e| e.into_compile_error().into())
 }
 
-/// Creates a managed, lazily-loaded `Ownership` instance for the targeted
-/// `#[near_bindgen]` struct. Creates an externally-accessible `Ownable`
-/// implementation, as well as an internal-only `OwnershipController`
-/// implementation.
+/// Creates a managed, lazily-loaded `Owner` implementation for the targeted
+/// `#[near_bindgen]` struct.
 ///
-/// The storage key prefix for the `Ownership` struct can be optionally
-/// specified (default: `~o`) using `#[ownable(storage_key = "<expression>")]`.
+/// The storage key prefix for the fields can be optionally specified (default:
+/// `"~o"`) using `#[ownable(storage_key = "<expression>")]`.
 /// ```
 #[proc_macro_derive(Owner, attributes(owner))]
 pub fn derive_owner(input: TokenStream) -> TokenStream {

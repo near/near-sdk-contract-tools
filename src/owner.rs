@@ -1,4 +1,4 @@
-//! Contract ownership pattern
+//! Owner pattern
 
 use near_contract_tools_macros::Event;
 use near_sdk::{env, require, AccountId};
@@ -67,9 +67,9 @@ pub trait Owner: OwnerStorage {
         }
     }
 
-    /// Creates a new Ownership using the specified storage key prefix.
+    /// Initializes the contract owner. Can only be called once.
     ///
-    /// Emits an `OwnershipEvent::Transfer` event.
+    /// Emits an `OwnerEvent::Transfer` event.
     ///
     /// # Examples
     ///
@@ -140,8 +140,8 @@ pub trait Owner: OwnerStorage {
 
     /// Removes the contract's owner. Can only be called by the current owner.
     ///
-    /// Emits an `OwnershipEvent::Transfer` event, and an
-    /// `OwnershipEvent::Propose` event if there is a currently proposed owner.
+    /// Emits an `OwnerEvent::Transfer` event, and an `OwnerEvent::Propose`
+    /// event if there is a currently proposed owner.
     fn renounce_owner(&self) {
         self.require_owner();
 
@@ -152,7 +152,7 @@ pub trait Owner: OwnerStorage {
     /// Prepares the contract to change owners, setting the proposed owner to
     /// the provided account ID. Can only be called by the current owner.
     ///
-    /// Emits an `OwnershipEvent::Propose` event.
+    /// Emits an `OwnerEvent::Propose` event.
     ///
     /// The currently proposed owner may be reset by calling this function with
     /// the argument `None`.
@@ -222,6 +222,7 @@ mod tests {
 
     #[near_bindgen]
     impl Contract {
+        #[init]
         pub fn new(owner_id: AccountId) -> Self {
             let contract = Self {};
 
@@ -229,6 +230,39 @@ mod tests {
 
             contract
         }
+
+        pub fn owner_only(&self) {
+            self.require_owner();
+        }
+    }
+
+    #[test]
+    fn require_owner() {
+        let owner_id: AccountId = "owner".parse().unwrap();
+
+        let contract = Contract::new(owner_id.clone());
+
+        testing_env!(VMContextBuilder::new()
+            .predecessor_account_id(owner_id)
+            .build());
+
+        contract.owner_only();
+    }
+
+    #[test]
+    #[should_panic(expected = "Owner only")]
+    fn require_owner_fail() {
+        let owner_id: AccountId = "owner".parse().unwrap();
+
+        let contract = Contract::new(owner_id.clone());
+
+        let alice: AccountId = "alice".parse().unwrap();
+
+        testing_env!(VMContextBuilder::new()
+            .predecessor_account_id(alice)
+            .build());
+
+        contract.owner_only();
     }
 
     #[test]
