@@ -80,7 +80,7 @@ impl OwnedStructExplicitKey {
 }
 
 #[test]
-fn derive_ownable_im() {
+fn derive_owner_im() {
     let owner: AccountId = "owner".parse().unwrap();
     let context = VMContextBuilder::new()
         .predecessor_account_id(owner.clone())
@@ -106,7 +106,7 @@ fn derive_ownable_im() {
 
 #[test]
 #[should_panic(expected = "Owner only")]
-fn derive_ownable_im_unauthorized() {
+fn derive_owner_im_unauthorized() {
     let owner: AccountId = "owner".parse().unwrap();
     let context = VMContextBuilder::new()
         .predecessor_account_id(owner.clone())
@@ -126,7 +126,7 @@ fn derive_ownable_im_unauthorized() {
 }
 
 #[test]
-fn derive_ownable_ex() {
+fn derive_owner_ex() {
     let owner: AccountId = "owner".parse().unwrap();
     let context = VMContextBuilder::new()
         .predecessor_account_id(owner.clone())
@@ -152,7 +152,7 @@ fn derive_ownable_ex() {
 
 #[test]
 #[should_panic(expected = "Owner already initialized")]
-fn derive_ownable_ex_init_again() {
+fn derive_owner_ex_init_again() {
     let owner: AccountId = "owner".parse().unwrap();
     let context = VMContextBuilder::new()
         .predecessor_account_id(owner.clone())
@@ -166,7 +166,7 @@ fn derive_ownable_ex_init_again() {
 
 #[test]
 #[should_panic(expected = "Owner only")]
-fn derive_ownable_ex_unauthorized() {
+fn derive_owner_ex_unauthorized() {
     let owner: AccountId = "owner".parse().unwrap();
     let context = VMContextBuilder::new()
         .predecessor_account_id(owner.clone())

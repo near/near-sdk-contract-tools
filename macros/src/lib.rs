@@ -32,7 +32,7 @@ pub fn derive_event(input: TokenStream) -> TokenStream {
 /// `#[near_bindgen]` struct.
 ///
 /// The storage key prefix for the fields can be optionally specified (default:
-/// `"~o"`) using `#[ownable(storage_key = "<expression>")]`.
+/// `"~o"`) using `#[owner(storage_key = "<expression>")]`.
 /// ```
 #[proc_macro_derive(Owner, attributes(owner))]
 pub fn derive_owner(input: TokenStream) -> TokenStream {

@@ -9,7 +9,7 @@ use near_sdk::{
 };
 
 mod event;
-mod ownable;
+mod owner;
 mod pausable;
 
 #[derive(BorshSerialize, BorshStorageKey)]
