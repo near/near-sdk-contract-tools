@@ -27,12 +27,17 @@ pub enum OwnerEvent {
     },
 }
 
+/// The storage slots needed by the `Owner` trait
 pub trait OwnerStorage {
+    /// Storage slot for initialization state
     fn is_initialized(&self) -> Slot<bool>;
+    /// Storage slot for owner account ID
     fn owner(&self) -> Slot<AccountId>;
+    /// Storage slot for proposed owner account ID
     fn proposed_owner(&self) -> Slot<AccountId>;
 }
 
+/// A contract with an owner
 pub trait Owner: OwnerStorage {
     /// Updates the current owner and emits relevant event
     fn update_owner(&self, new: Option<AccountId>) {
