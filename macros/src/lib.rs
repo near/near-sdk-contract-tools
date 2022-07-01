@@ -38,7 +38,10 @@ pub fn derive_event(input: TokenStream) -> TokenStream {
 #[proc_macro_derive(Owner, attributes(owner))]
 pub fn derive_owner(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
-    let meta: owner::OwnerMeta = FromDeriveInput::from_derive_input(&input).unwrap();
+    let meta = match FromDeriveInput::from_derive_input(&input) {
+        Err(e) => return e.write_errors().into(),
+        Ok(x) => x,
+    };
 
     owner::expand(meta).unwrap_or_else(|e| e.into_compile_error().into())
 }
@@ -50,7 +53,10 @@ pub fn derive_owner(input: TokenStream) -> TokenStream {
 #[proc_macro_derive(Pause, attributes(pause))]
 pub fn derive_pause(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
-    let meta: pause::PauseMeta = FromDeriveInput::from_derive_input(&input).unwrap();
+    let meta = match FromDeriveInput::from_derive_input(&input) {
+        Err(e) => return e.write_errors().into(),
+        Ok(x) => x,
+    };
 
     pause::expand(meta).unwrap_or_else(|e| e.into_compile_error().into())
 }
@@ -58,11 +64,14 @@ pub fn derive_pause(input: TokenStream) -> TokenStream {
 /// Adds role-based access control. No external methods are exposed.
 ///
 /// The storage key prefix for the fields can be optionally specified (default:
-/// `"~r"`) using `#[pause(storage_key = "<expression>")]`.
+/// `"~r"`) using `#[rbac(storage_key = "<expression>")]`.
 #[proc_macro_derive(Rbac, attributes(rbac))]
 pub fn derive_rbac(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
-    let meta: rbac::RbacMeta = FromDeriveInput::from_derive_input(&input).unwrap();
+    let meta = match FromDeriveInput::from_derive_input(&input) {
+        Err(e) => return e.write_errors().into(),
+        Ok(x) => x,
+    };
 
     rbac::expand(meta).unwrap_or_else(|e| e.into_compile_error().into())
 }
