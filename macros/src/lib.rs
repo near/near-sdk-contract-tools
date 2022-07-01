@@ -3,7 +3,7 @@ use proc_macro::TokenStream;
 use syn::{parse_macro_input, DeriveInput};
 
 mod event;
-mod ownable;
+mod owner;
 mod pausable;
 mod rename;
 
@@ -36,12 +36,12 @@ pub fn derive_event(input: TokenStream) -> TokenStream {
 /// The storage key prefix for the `Ownership` struct can be optionally
 /// specified (default: `~o`) using `#[ownable(storage_key = "<expression>")]`.
 /// ```
-#[proc_macro_derive(Ownable, attributes(ownable))]
-pub fn derive_ownable(input: TokenStream) -> TokenStream {
+#[proc_macro_derive(Owner, attributes(owner))]
+pub fn derive_owner(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
-    let meta: ownable::OwnableMeta = FromDeriveInput::from_derive_input(&input).unwrap();
+    let meta: owner::OwnerMeta = FromDeriveInput::from_derive_input(&input).unwrap();
 
-    ownable::expand(meta).unwrap_or_else(|e| e.into_compile_error().into())
+    owner::expand(meta).unwrap_or_else(|e| e.into_compile_error().into())
 }
 
 /// Makes the contract pausable. Provides an external implementation of the

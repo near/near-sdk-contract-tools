@@ -1,20 +1,16 @@
 //! Contract ownership pattern
 
 use near_contract_tools_macros::Event;
-use near_sdk::{
-    borsh::{self, BorshDeserialize, BorshSerialize},
-    collections::LazyOption,
-    env, require, AccountId, IntoStorageKey,
-};
+use near_sdk::{env, require, AccountId};
 use serde::Serialize;
 
-use crate::{event::Event, near_contract_tools, utils::prefix_key};
+use crate::{event::Event, near_contract_tools, slot::Slot};
 
 /// Events emitted by function calls on an ownable contract
 #[derive(Event, Serialize)]
 #[event(standard = "x-own", version = "1.0.0", rename_all = "snake_case")]
 #[serde(untagged)]
-pub enum OwnershipEvent {
+pub enum OwnerEvent {
     /// Emitted when the current owner of the contract changes
     Transfer {
         /// Former owner of the contract. Will be `None` if the contract is being initialized.
@@ -31,57 +27,38 @@ pub enum OwnershipEvent {
     },
 }
 
-/// State for contract ownership management
-///
-/// # Examples
-///
-/// ```
-/// use near_contract_tools::ownership::Ownership;
-///
-/// struct Contract {
-///     // ...
-///     pub ownership: Ownership,
-/// }
-/// ```
-#[derive(BorshDeserialize, BorshSerialize)]
-pub struct Ownership {
-    /// The current owner of the contract.
-    /// Will be `None` if the current owner has renounced ownership.
-    pub owner: Option<AccountId>,
-    /// Proposed owner, if current owner has proposed a new owner.
-    /// For 2-step power transition:
-    /// 1. Current owner must propose a new owner
-    /// 2. New owner must accept ownership
-    pub proposed_owner: LazyOption<AccountId>,
+pub trait OwnerStorage {
+    fn is_initialized(&self) -> Slot<bool>;
+    fn owner(&self) -> Slot<AccountId>;
+    fn proposed_owner(&self) -> Slot<AccountId>;
 }
 
-impl Ownership {
+pub trait Owner: OwnerStorage {
     /// Updates the current owner and emits relevant event
-    fn update_owner(&mut self, new: Option<AccountId>) {
-        let old = self.owner.clone();
+    fn update_owner(&self, new: Option<AccountId>) {
+        let owner = self.owner();
+        let old = owner.read();
         if old != new {
-            OwnershipEvent::Transfer {
+            OwnerEvent::Transfer {
                 old,
                 new: new.clone(),
             }
             .emit();
-            self.owner = new;
+            owner.set(new.as_ref());
         }
     }
 
     /// Updates proposed owner and emits relevant event
-    fn update_proposed(&mut self, new: Option<AccountId>) {
-        let old = self.proposed_owner.get();
+    fn update_proposed(&self, new: Option<AccountId>) {
+        let proposed_owner = self.proposed_owner();
+        let old = proposed_owner.read();
         if old != new {
-            OwnershipEvent::Propose {
+            OwnerEvent::Propose {
                 old,
                 new: new.clone(),
             }
             .emit();
-            match new {
-                Some(account_id) => self.proposed_owner.set(&account_id),
-                _ => self.proposed_owner.remove(),
-            };
+            proposed_owner.set(new.as_ref());
         }
     }
 
@@ -92,29 +69,35 @@ impl Ownership {
     /// # Examples
     ///
     /// ```
-    /// use near_contract_tools::ownership::Ownership;
+    /// use near_sdk::{AccountId, near_bindgen};
+    /// use near_contract_tools::{Owner, owner::Owner};
     ///
-    /// let ownership = Ownership::new(
-    ///     b"o",
-    ///     near_sdk::env::predecessor_account_id(),
-    /// );
+    /// #[derive(Owner)]
+    /// #[near_bindgen]
+    /// struct Contract {}
+    ///
+    /// #[near_bindgen]
+    /// impl Contract {
+    ///     pub fn new(owner_id: AccountId) -> Self {
+    ///         let contract = Self {};
+    ///
+    ///         Owner::init(&contract, owner_id);
+    ///
+    ///         contract
+    ///     }
+    /// }
     /// ```
-    pub fn new<S>(storage_key_prefix: S, owner_id: AccountId) -> Self
-    where
-        S: IntoStorageKey,
-    {
-        let k = storage_key_prefix.into_storage_key();
+    fn init(&self, owner_id: AccountId) {
+        require!(!self.is_initialized().exists(), "Owner already initialized");
 
-        OwnershipEvent::Transfer {
+        self.is_initialized().write(&true);
+        self.owner().write(&owner_id);
+
+        OwnerEvent::Transfer {
             old: None,
-            new: Some(owner_id.clone()),
+            new: Some(owner_id),
         }
         .emit();
-
-        Self {
-            owner: Some(owner_id),
-            proposed_owner: LazyOption::new(prefix_key(&k, b"p"), None),
-        }
     }
 
     /// Requires the predecessor to be the owner
@@ -122,19 +105,28 @@ impl Ownership {
     /// # Examples
     ///
     /// ```
-    /// use near_contract_tools::ownership::Ownership;
+    /// use near_sdk::{AccountId, near_bindgen};
+    /// use near_contract_tools::{Owner, owner::Owner};
     ///
-    /// let ownership = Ownership::new(
-    ///     b"o",
-    ///     near_sdk::env::predecessor_account_id(),
-    /// );
-    /// ownership.require_owner();
+    /// #[derive(Owner)]
+    /// #[near_bindgen]
+    /// struct Contract {}
+    ///
+    /// #[near_bindgen]
+    /// impl Contract {
+    ///     pub fn owner_only(&self) {
+    ///         self.require_owner();
+    ///
+    ///         // ...
+    ///     }
+    /// }
     /// ```
-    pub fn require_owner(&self) {
+    fn require_owner(&self) {
         require!(
             &env::predecessor_account_id()
                 == self
-                    .owner
+                    .owner()
+                    .read()
                     .as_ref()
                     .unwrap_or_else(|| env::panic_str("No owner")),
             "Owner only"
@@ -145,22 +137,7 @@ impl Ownership {
     ///
     /// Emits an `OwnershipEvent::Transfer` event, and an `OwnershipEvent::Propose` event
     /// if there is a currently proposed owner.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use near_contract_tools::ownership::Ownership;
-    ///
-    /// let owner_id = near_sdk::env::predecessor_account_id();
-    /// let mut ownership = Ownership::new(
-    ///     b"o",
-    ///     owner_id.clone(),
-    /// );
-    /// assert_eq!(ownership.owner, Some(owner_id));
-    /// ownership.renounce_owner();
-    /// assert_eq!(ownership.owner, None);
-    /// ```
-    pub fn renounce_owner(&mut self) {
+    fn renounce_owner(&self) {
         self.require_owner();
 
         self.update_proposed(None);
@@ -188,7 +165,7 @@ impl Ownership {
     /// ownership.propose_owner(Some(proposed_owner.clone()));
     /// assert_eq!(ownership.proposed_owner.get(), Some(proposed_owner));
     /// ```
-    pub fn propose_owner(&mut self, account_id: Option<AccountId>) {
+    fn propose_owner(&self, account_id: Option<AccountId>) {
         self.require_owner();
 
         self.update_proposed(account_id);
@@ -215,9 +192,9 @@ impl Ownership {
     /// ownership.accept_owner();
     /// assert_eq!(ownership.owner, Some(proposed_owner));
     /// ```
-    pub fn accept_owner(&mut self) {
+    fn accept_owner(&self) {
         let proposed_owner = self
-            .proposed_owner
+            .proposed_owner()
             .take()
             .unwrap_or_else(|| env::panic_str("No proposed owner"));
 
@@ -226,7 +203,7 @@ impl Ownership {
             "Proposed owner only"
         );
 
-        OwnershipEvent::Propose {
+        OwnerEvent::Propose {
             old: Some(proposed_owner.clone()),
             new: None,
         }
@@ -234,11 +211,9 @@ impl Ownership {
 
         self.update_owner(Some(proposed_owner));
     }
-}
 
-/// A contract that conforms to the ownership pattern as described in this
-/// crate will implement this trait.
-pub trait Ownable {
+    // Externally-accessible functions
+
     /// Returns the account ID of the current owner
     fn own_get_owner(&self) -> Option<AccountId>;
     /// Returns the account ID that the current owner has proposed take over ownership
@@ -256,76 +231,42 @@ pub trait Ownable {
     fn own_accept_owner(&mut self);
 }
 
-/// Internal management for derive macro
-pub trait OwnershipController {
-    /// Initialization method. May only be called once.
-    fn init_owner(&self, owner_id: AccountId) -> Ownership;
+#[cfg(test)]
+mod tests {
+    use near_sdk::{near_bindgen, test_utils::VMContextBuilder, testing_env, AccountId};
 
-    /// Get the ownership struct from storage
-    fn get_ownership(&self) -> Ownership;
+    use crate::{owner::Owner, Owner};
 
-    /// Requires that the predecessor is the owner; rejects otherwise.
-    fn require_owner(&self) -> Ownership {
-        let ownership = self.get_ownership();
-        ownership.require_owner();
-        ownership
+    mod near_contract_tools {
+        pub use crate::*;
     }
-}
 
-/// Implements the ownership pattern on a contract struct
-///
-/// # Examples
-///
-/// ```
-/// use near_sdk::{
-///     near_bindgen,
-///     AccountId,
-///     assert_one_yocto,
-/// };
-/// use near_contract_tools::{
-///     impl_ownership,
-///     ownership::Ownership,
-/// };
-///
-/// #[near_bindgen]
-/// struct Contract {
-///     pub ownership: Ownership,
-/// }
-///
-/// impl_ownership!(Contract, ownership);
-/// ```
-#[macro_export]
-macro_rules! impl_ownership {
-    ($contract: ident, $ownership: ident) => {
-        use $crate::ownership::Ownable;
+    #[derive(Owner)]
+    #[near_bindgen]
+    struct Contract {}
 
-        #[near_bindgen]
-        impl Ownable for $contract {
-            fn own_get_owner(&self) -> Option<AccountId> {
-                self.$ownership.owner.clone()
-            }
+    #[near_bindgen]
+    impl Contract {
+        pub fn new(owner_id: AccountId) -> Self {
+            let contract = Self {};
 
-            fn own_get_proposed_owner(&self) -> Option<AccountId> {
-                self.$ownership.proposed_owner.get()
-            }
+            Owner::init(&contract, owner_id);
 
-            #[payable]
-            fn own_renounce_owner(&mut self) {
-                assert_one_yocto();
-                self.$ownership.renounce_owner()
-            }
-
-            #[payable]
-            fn own_propose_owner(&mut self, account_id: Option<AccountId>) {
-                assert_one_yocto();
-                self.$ownership.propose_owner(account_id);
-            }
-
-            #[payable]
-            fn own_accept_owner(&mut self) {
-                assert_one_yocto();
-                self.$ownership.accept_owner();
-            }
+            contract
         }
-    };
+    }
+
+    #[test]
+    fn renounce_owner() {
+        let owner_id: AccountId = "owner".parse().unwrap();
+
+        let mut contract = Contract::new(owner_id.clone());
+        assert_eq!(contract.own_get_owner(), Some(owner_id.clone()));
+        testing_env!(VMContextBuilder::new()
+            .predecessor_account_id(owner_id)
+            .attached_deposit(1)
+            .build());
+        contract.own_renounce_owner();
+        assert_eq!(contract.own_get_owner(), None);
+    }
 }

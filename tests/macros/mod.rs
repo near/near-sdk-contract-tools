@@ -1,5 +1,5 @@
 use near_contract_tools::{
-    ownership::OwnershipController, pausable::PausableController, rbac::Rbac, Ownable, Pausable,
+    owner::Owner, pausable::PausableController, rbac::Rbac, Owner, Pausable,
 };
 use near_sdk::{
     borsh::{self, BorshSerialize},
@@ -18,7 +18,7 @@ enum Role {
     CanSetValue,
 }
 
-#[derive(Ownable, Pausable)]
+#[derive(Owner, Pausable)]
 #[near_bindgen]
 struct Integration {
     roles: Rbac<Role>,
@@ -34,7 +34,7 @@ impl Integration {
             value: 0,
         };
 
-        contract.init_owner(owner_id.clone());
+        Owner::init(&contract, owner_id.clone());
         contract.roles.add_role(&owner_id, &Role::CanSetValue);
         contract.roles.add_role(&owner_id, &Role::CanPause);
 

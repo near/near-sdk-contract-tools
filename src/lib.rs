@@ -3,9 +3,10 @@
 #![warn(missing_docs)]
 
 pub mod event;
-pub mod ownership;
+pub mod owner;
 pub mod pausable;
 pub mod rbac;
+pub mod slot;
 pub mod utils;
 
 pub use near_contract_tools_macros::*;
