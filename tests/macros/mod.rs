@@ -1,4 +1,4 @@
-use near_contract_tools::{owner::Owner, pause::Pause, rbac::Rbac, Owner, Pause};
+use near_contract_tools::{owner::Owner, pause::Pause, rbac::Rbac, Owner, Pause, Rbac};
 use near_sdk::{
     borsh::{self, BorshSerialize},
     near_bindgen,
@@ -11,15 +11,24 @@ mod owner;
 mod pause;
 
 #[derive(BorshSerialize, BorshStorageKey)]
+enum StorageKey {
+    Owner,
+    Pause,
+    Rbac,
+}
+
+#[derive(BorshSerialize, BorshStorageKey)]
 enum Role {
     CanPause,
     CanSetValue,
 }
 
-#[derive(Owner, Pause)]
+#[derive(Owner, Pause, Rbac)]
+#[owner(storage_key = "StorageKey::Owner")]
+#[pause(storage_key = "StorageKey::Pause")]
+#[rbac(storage_key = "StorageKey::Rbac", roles = "Role")]
 #[near_bindgen]
 struct Integration {
-    roles: Rbac<Role>,
     pub value: u32,
 }
 
@@ -27,14 +36,11 @@ struct Integration {
 impl Integration {
     #[init]
     pub fn new(owner_id: AccountId) -> Self {
-        let mut contract = Self {
-            roles: Rbac::new(b"r"),
-            value: 0,
-        };
+        let mut contract = Self { value: 0 };
 
         Owner::init(&contract, owner_id.clone());
-        contract.roles.add_role(&owner_id, &Role::CanSetValue);
-        contract.roles.add_role(&owner_id, &Role::CanPause);
+        contract.add_role(&owner_id, &Role::CanSetValue);
+        contract.add_role(&owner_id, &Role::CanPause);
 
         contract
     }
@@ -42,23 +48,23 @@ impl Integration {
     pub fn add_value_setter(&mut self, account_id: AccountId) {
         self.require_owner();
 
-        self.roles.add_role(&account_id, &Role::CanSetValue);
+        self.add_role(&account_id, &Role::CanSetValue);
     }
 
     pub fn set_value(&mut self, value: u32) {
         self.require_unpaused();
-        self.roles.require_role(&Role::CanSetValue);
+        self.require_role(&Role::CanSetValue);
 
         self.value = value;
     }
 
     pub fn pause(&mut self) {
-        self.roles.require_role(&Role::CanPause);
+        self.require_role(&Role::CanPause);
         Pause::pause(self);
     }
 
     pub fn unpause(&mut self) {
-        self.roles.require_role(&Role::CanPause);
+        self.require_role(&Role::CanPause);
         Pause::unpause(self);
     }
 

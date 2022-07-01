@@ -39,6 +39,15 @@ impl<T> Slot<T> {
     }
 
     /// Creates a new `Slot` that controls the given key namespaced (prefixed)
+    /// by the parent key, to be used as a namespace for another subfield.
+    pub fn ns<K: IntoStorageKey>(&self, key: K) -> Slot<()> {
+        Slot {
+            key: [self.key.clone(), key.into_storage_key()].concat(),
+            _marker: PhantomData,
+        }
+    }
+
+    /// Creates a new `Slot` that controls the given key namespaced (prefixed)
     /// by the parent key.
     pub fn field<K: IntoStorageKey, U>(&self, key: K) -> Slot<U> {
         Slot {
