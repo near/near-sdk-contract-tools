@@ -28,7 +28,7 @@ pub trait Event {
     /// Returns an `EVENT_JSON:{}`-formatted log string
     fn to_event_string(&self) -> String;
     /// Consumes the event and emits it to the NEAR blockchain
-    fn emit(self);
+    fn emit(&self);
 }
 
 /// Metadata for NEP-297-compliant events & variants
@@ -71,7 +71,7 @@ impl<T: Serialize + EventMetadata> Event for T {
         )
     }
 
-    fn emit(self) {
+    fn emit(&self) {
         near_sdk::env::log_str(&self.to_event_string());
     }
 }

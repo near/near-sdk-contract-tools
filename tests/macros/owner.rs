@@ -24,7 +24,7 @@ impl OwnedStructImplicitKey {
         };
 
         // This method can only be called once throughout the entire duration of the contract
-        Owner::init(&contract, env::predecessor_account_id());
+        Owner::init(&contract, &env::predecessor_account_id());
 
         contract
     }
@@ -61,14 +61,14 @@ impl OwnedStructExplicitKey {
         };
 
         // This method can only be called once throughout the entire duration of the contract
-        Owner::init(&contract, env::predecessor_account_id());
+        Owner::init(&contract, &env::predecessor_account_id());
 
         contract
     }
 
     pub fn try_init_again(&self) {
         // Should fail
-        Owner::init(self, env::predecessor_account_id());
+        Owner::init(self, &env::predecessor_account_id());
     }
 
     pub fn set_permissioned_item(&mut self, value: u32) {

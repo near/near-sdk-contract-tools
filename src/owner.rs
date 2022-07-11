@@ -94,24 +94,24 @@ pub trait Owner {
     ///     pub fn new(owner_id: AccountId) -> Self {
     ///         let contract = Self {};
     ///
-    ///         Owner::init(&contract, owner_id);
+    ///         Owner::init(&contract, &owner_id);
     ///
     ///         contract
     ///     }
     /// }
     /// ```
-    fn init(&self, owner_id: AccountId) {
+    fn init(&self, owner_id: &AccountId) {
         require!(
             !self.slot_is_initialized().exists(),
             "Owner already initialized",
         );
 
         self.slot_is_initialized().write(&true);
-        self.slot_owner().write(&owner_id);
+        self.slot_owner().write(owner_id);
 
         OwnerEvent::Transfer {
             old: None,
-            new: Some(owner_id),
+            new: Some(owner_id.clone()),
         }
         .emit();
     }
@@ -245,7 +245,7 @@ mod tests {
         pub fn new(owner_id: AccountId) -> Self {
             let contract = Self {};
 
-            Owner::init(&contract, owner_id);
+            Owner::init(&contract, &owner_id);
 
             contract
         }

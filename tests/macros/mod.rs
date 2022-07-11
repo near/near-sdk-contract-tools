@@ -38,7 +38,7 @@ impl Integration {
     pub fn new(owner_id: AccountId) -> Self {
         let mut contract = Self { value: 0 };
 
-        Owner::init(&contract, owner_id.clone());
+        Owner::init(&contract, &owner_id);
         contract.add_role(&owner_id, &Role::CanSetValue);
         contract.add_role(&owner_id, &Role::CanPause);
 
