@@ -16,6 +16,8 @@ Not to be confused with [`near-contract-standards`](https://crates.io/crates/nea
 
 ## Example
 
+See also: [the full integration tests](tests/macros/mod.rs).
+
 ### Owner
 
 ```rust
