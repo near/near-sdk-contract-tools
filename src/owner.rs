@@ -27,21 +27,29 @@ pub enum OwnerEvent {
     },
 }
 
-/// The storage slots needed by the `Owner` trait
-pub trait OwnerStorage {
-    /// Storage slot for initialization state
-    fn is_initialized(&self) -> Slot<bool>;
-    /// Storage slot for owner account ID
-    fn owner(&self) -> Slot<AccountId>;
-    /// Storage slot for proposed owner account ID
-    fn proposed_owner(&self) -> Slot<AccountId>;
-}
-
 /// A contract with an owner
-pub trait Owner: OwnerStorage {
+pub trait Owner {
+    /// Storage root
+    fn root(&self) -> Slot<()>;
+
+    /// Storage slot for initialization state
+    fn slot_is_initialized(&self) -> Slot<bool> {
+        self.root().field(b"i")
+    }
+
+    /// Storage slot for owner account ID
+    fn slot_owner(&self) -> Slot<AccountId> {
+        self.root().field(b"o")
+    }
+
+    /// Storage slot for proposed owner account ID
+    fn slot_proposed_owner(&self) -> Slot<AccountId> {
+        self.root().field(b"p")
+    }
+
     /// Updates the current owner and emits relevant event
     fn update_owner(&mut self, new: Option<AccountId>) {
-        let mut owner = self.owner();
+        let mut owner = self.slot_owner();
         let old = owner.read();
         if old != new {
             OwnerEvent::Transfer {
@@ -55,7 +63,7 @@ pub trait Owner: OwnerStorage {
 
     /// Updates proposed owner and emits relevant event
     fn update_proposed(&mut self, new: Option<AccountId>) {
-        let mut proposed_owner = self.proposed_owner();
+        let mut proposed_owner = self.slot_proposed_owner();
         let old = proposed_owner.read();
         if old != new {
             OwnerEvent::Propose {
@@ -93,10 +101,13 @@ pub trait Owner: OwnerStorage {
     /// }
     /// ```
     fn init(&self, owner_id: AccountId) {
-        require!(!self.is_initialized().exists(), "Owner already initialized");
+        require!(
+            !self.slot_is_initialized().exists(),
+            "Owner already initialized"
+        );
 
-        self.is_initialized().write(&true);
-        self.owner().write(&owner_id);
+        self.slot_is_initialized().write(&true);
+        self.slot_owner().write(&owner_id);
 
         OwnerEvent::Transfer {
             old: None,
@@ -130,7 +141,7 @@ pub trait Owner: OwnerStorage {
         require!(
             &env::predecessor_account_id()
                 == self
-                    .owner()
+                    .slot_owner()
                     .read()
                     .as_ref()
                     .unwrap_or_else(|| env::panic_str("No owner")),
@@ -169,7 +180,7 @@ pub trait Owner: OwnerStorage {
     /// proposed owner.
     fn accept_owner(&mut self) {
         let proposed_owner = self
-            .proposed_owner()
+            .slot_proposed_owner()
             .take()
             .unwrap_or_else(|| env::panic_str("No proposed owner"));
 
@@ -186,21 +197,26 @@ pub trait Owner: OwnerStorage {
 
         self.update_owner(Some(proposed_owner));
     }
+}
 
-    // Externally-accessible functions
-
+/// Externally-accessible functions for `Owner`
+pub trait OwnerExternal {
     /// Returns the account ID of the current owner
     fn own_get_owner(&self) -> Option<AccountId>;
+
     /// Returns the account ID that the current owner has proposed take over ownership
     fn own_get_proposed_owner(&self) -> Option<AccountId>;
+
     /// Current owner may call this function to renounce ownership, setting
     /// current owner to `None`.
     ///
     /// **WARNING**: Once this function has been called, this implementation
     /// does not provide a way for the contract to have an owner again!
     fn own_renounce_owner(&mut self);
+
     /// Propose a new owner. Can only be called by the current owner
     fn own_propose_owner(&mut self, account_id: Option<AccountId>);
+
     /// The proposed owner may call this function to accept ownership from the
     /// previous owner
     fn own_accept_owner(&mut self);
@@ -210,7 +226,10 @@ pub trait Owner: OwnerStorage {
 mod tests {
     use near_sdk::{near_bindgen, test_utils::VMContextBuilder, testing_env, AccountId};
 
-    use crate::{owner::Owner, Owner};
+    use crate::{
+        owner::{Owner, OwnerExternal},
+        Owner,
+    };
 
     mod near_contract_tools {
         pub use crate::*;

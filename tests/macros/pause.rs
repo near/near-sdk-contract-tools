@@ -1,4 +1,7 @@
-use near_contract_tools::{pause::Pause, Pause};
+use near_contract_tools::{
+    pause::{Pause, PauseExternal},
+    Pause,
+};
 use near_sdk::{
     borsh::{self, BorshSerialize},
     near_bindgen, BorshStorageKey,
@@ -56,7 +59,7 @@ fn derive_pause() {
     assert_eq!(
         contract.paus_is_paused(),
         true,
-        "Pausing the contract works"
+        "Pausing the contract works",
     );
 
     contract.require_paused();
@@ -66,7 +69,7 @@ fn derive_pause() {
     assert_eq!(
         contract.paus_is_paused(),
         false,
-        "Unpausing the contract works"
+        "Unpausing the contract works",
     );
 
     contract.require_unpaused();

@@ -20,14 +20,14 @@ pub fn expand(meta: PauseMeta) -> Result<TokenStream, syn::Error> {
         storage_key.unwrap_or_else(|| syn::parse_str::<Expr>(DEFAULT_STORAGE_KEY).unwrap());
 
     Ok(TokenStream::from(quote! {
-        impl near_contract_tools::pause::PauseStorage for #ident {
-            fn slot_paused(&self) -> near_contract_tools::slot::Slot<bool> {
+        impl near_contract_tools::pause::Pause for #ident {
+            fn root(&self) -> near_contract_tools::slot::Slot<()> {
                 near_contract_tools::slot::Slot::new(#storage_key)
             }
         }
 
         #[near_sdk::near_bindgen]
-        impl near_contract_tools::pause::Pause for #ident {
+        impl near_contract_tools::pause::PauseExternal for #ident {
             fn paus_is_paused(&self) -> bool {
                 self.is_paused()
             }
