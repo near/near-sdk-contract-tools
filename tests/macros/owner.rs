@@ -1,4 +1,7 @@
-use near_contract_tools::{owner::Owner, Owner};
+use near_contract_tools::{
+    owner::{Owner, OwnerExternal},
+    Owner,
+};
 use near_sdk::{
     borsh::{self, BorshSerialize},
     env, near_bindgen,

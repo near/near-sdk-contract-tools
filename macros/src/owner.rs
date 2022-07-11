@@ -19,33 +19,21 @@ pub fn expand(meta: OwnerMeta) -> Result<TokenStream, syn::Error> {
     let storage_key =
         storage_key.unwrap_or_else(|| syn::parse_str::<Expr>(DEFAULT_STORAGE_KEY).unwrap());
 
-    let root = quote! {
-        near_contract_tools::slot::Slot::root(#storage_key)
-    };
-
     Ok(TokenStream::from(quote! {
-        impl near_contract_tools::owner::OwnerStorage for #ident {
-            fn is_initialized(&self) -> near_contract_tools::slot::Slot<bool> {
-                #root.field(b"i")
-            }
-
-            fn owner(&self) -> near_contract_tools::slot::Slot<near_sdk::AccountId> {
-                #root.field(b"o")
-            }
-
-            fn proposed_owner(&self) -> near_contract_tools::slot::Slot<near_sdk::AccountId> {
-                #root.field(b"p")
+        impl near_contract_tools::owner::Owner for #ident {
+            fn root(&self) -> near_contract_tools::slot::Slot<()> {
+                near_contract_tools::slot::Slot::root(#storage_key)
             }
         }
 
         #[near_sdk::near_bindgen]
-        impl near_contract_tools::owner::Owner for #ident {
+        impl near_contract_tools::owner::OwnerExternal for #ident {
             fn own_get_owner(&self) -> Option<near_sdk::AccountId> {
-                near_contract_tools::owner::OwnerStorage::owner(self).read()
+                near_contract_tools::owner::Owner::slot_owner(self).read()
             }
 
             fn own_get_proposed_owner(&self) -> Option<near_sdk::AccountId> {
-                near_contract_tools::owner::OwnerStorage::proposed_owner(self).read()
+                near_contract_tools::owner::Owner::slot_proposed_owner(self).read()
             }
 
             #[payable]

@@ -16,12 +16,6 @@ pub enum PauseEvent {
     Unpause,
 }
 
-/// Storage slots for pausable contract
-pub trait PauseStorage {
-    /// Storage slot for pause state
-    fn slot_paused(&self) -> Slot<bool>;
-}
-
 /// Internal-only interactions for a pausable contract
 ///
 /// # Examples
@@ -55,7 +49,15 @@ pub trait PauseStorage {
 ///     }
 /// }
 /// ```
-pub trait Pause: PauseStorage {
+pub trait Pause {
+    /// Storage root
+    fn root(&self) -> Slot<()>;
+
+    /// Storage slot for pause state
+    fn slot_paused(&self) -> Slot<bool> {
+        unsafe { self.root().transmute() }
+    }
+
     /// Force the contract pause state in a particular direction.
     /// Does not emit events or check the current pause state.
     fn set_is_paused(&mut self, is_paused: bool) {
@@ -92,9 +94,10 @@ pub trait Pause: PauseStorage {
     fn require_unpaused(&self) {
         require!(!self.is_paused(), "Disallowed while contract is paused");
     }
+}
 
-    // External methods
-
+/// External methods for `Pause`
+pub trait PauseExternal {
     /// Returns `true` if the contract is paused, `false` otherwise
     fn paus_is_paused(&self) -> bool;
 }
