@@ -5,9 +5,9 @@
 This package is a collection of common tools and patterns in NEAR smart contract development:
 
 - Storage fee management
-- Ownership pattern (derive macro available)
+- Owner pattern (derive macro available)
 - Role-based access control
-- Pausable (derive macro available)
+- Pause (derive macro available)
 - Derive macro for [NEP-297 events](https://nomicon.io/Standards/EventsFormat)
 
 Not to be confused with [`near-contract-standards`](https://crates.io/crates/near-contract-standards), which contains official implementations of standardized NEPs. This crate is intended to be a complement to `near-contract-standards`.
@@ -16,13 +16,13 @@ Not to be confused with [`near-contract-standards`](https://crates.io/crates/nea
 
 ## Example
 
-### Ownership
+### Owner
 
 ```rust
-use near_contract_tools::{Ownable, ownership::OwnershipController};
-use near_sdk::{AccountId, near_bindgen};
+use near_sdk::{near_bindgen, AccountId};
+use near_contract_tools::{owner::Owner, Owner};
 
-#[derive(Ownable)]
+#[derive(Owner)]
 #[near_bindgen]
 struct Contract {
     // ...
@@ -36,13 +36,12 @@ impl Contract {
             // ...
         };
 
-        // Initialize the owner of the contract
-        contract.init_owner(owner_id);
+        Owner::init(&contract, owner_id);
 
         contract
     }
 
-    pub fn owner_only_method(&self) {
+    pub fn owner_only(&self) {
         self.require_owner();
 
         // ...
@@ -50,16 +49,14 @@ impl Contract {
 }
 ```
 
-This creates a smart contract which exposes the `Ownable` trait to the blockchain:
+The `Owner` derive macro exposes the following methods to the blockchain:
 
 ```rust
-pub trait Ownable {
-    fn own_get_owner(&self) -> Option<AccountId>;
-    fn own_get_proposed_owner(&self) -> Option<AccountId>;
-    fn own_renounce_owner(&mut self);
-    fn own_propose_owner(&mut self, account_id: Option<AccountId>);
-    fn own_accept_owner(&mut self);
-}
+fn own_get_owner(&self) -> Option<AccountId>;
+fn own_get_proposed_owner(&self) -> Option<AccountId>;
+fn own_renounce_owner(&mut self);
+fn own_propose_owner(&mut self, account_id: Option<AccountId>);
+fn own_accept_owner(&mut self);
 ```
 
 ### Events

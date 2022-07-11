@@ -1,6 +1,6 @@
 //! Contract method pausing/unpausing
 
-use crate::{event::Event, near_contract_tools};
+use crate::{event::Event, near_contract_tools, slot::Slot};
 use near_contract_tools_macros::Event;
 use near_sdk::require;
 use serde::Serialize;
@@ -9,17 +9,17 @@ use serde::Serialize;
 #[derive(Event, Serialize)]
 #[event(standard = "x-paus", version = "1.0.0", rename_all = "snake_case")]
 #[serde(untagged)]
-pub enum PausableEvent {
+pub enum PauseEvent {
     /// Emitted when the contract is paused
     Pause,
     /// Emitted when the contract is unpaused
     Unpause,
 }
 
-/// Externally-accessible interface for a pausable contract
-pub trait Pausable {
-    /// Returns `true` if the contract is paused, `false` otherwise
-    fn paus_is_paused(&self) -> bool;
+/// Storage slots for pausable contract
+pub trait PauseStorage {
+    /// Storage slot for pause state
+    fn slot_paused(&self) -> Slot<bool>;
 }
 
 /// Internal-only interactions for a pausable contract
@@ -28,12 +28,9 @@ pub trait Pausable {
 ///
 /// ```
 /// use near_sdk::near_bindgen;
-/// use near_contract_tools::{
-///     pausable::{Pausable, PausableController},
-///     Pausable,
-/// };
+/// use near_contract_tools::{pause::Pause, Pause};
 ///
-/// #[derive(Pausable)]
+/// #[derive(Pause)]
 /// #[near_bindgen]
 /// struct Contract {
 ///     // ...
@@ -49,36 +46,41 @@ pub trait Pausable {
 ///         self.require_paused();
 ///     }
 ///
-///     pub fn emergency_shutdown(&self) {
+///     pub fn emergency_shutdown(&mut self) {
 ///         self.pause();
 ///     }
 ///
-///     pub fn emergency_shutdown_end(&self) {
+///     pub fn emergency_shutdown_end(&mut self) {
 ///         self.unpause();
 ///     }
 /// }
 /// ```
-pub trait PausableController {
+pub trait Pause: PauseStorage {
     /// Force the contract pause state in a particular direction.
     /// Does not emit events or check the current pause state.
-    fn set_is_paused(&self, is_paused: bool);
+    fn set_is_paused(&mut self, is_paused: bool) {
+        self.slot_paused().write(&is_paused);
+    }
+
     /// Returns `true` if the contract is paused, `false` otherwise
-    fn is_paused(&self) -> bool;
+    fn is_paused(&self) -> bool {
+        self.slot_paused().read().unwrap_or(false)
+    }
 
     /// Pauses the contract if it is currently unpaused, panics otherwise.
-    /// Emits a `PausableEvent::Pause` event.
-    fn pause(&self) {
+    /// Emits a `PauseEvent::Pause` event.
+    fn pause(&mut self) {
         self.require_unpaused();
         self.set_is_paused(true);
-        PausableEvent::Pause.emit();
+        PauseEvent::Pause.emit();
     }
 
     /// Unpauses the contract if it is currently paused, panics otherwise.
-    /// Emits a `PausableEvent::Unpause` event.
-    fn unpause(&self) {
+    /// Emits a `PauseEvent::Unpause` event.
+    fn unpause(&mut self) {
         self.require_paused();
         self.set_is_paused(false);
-        PausableEvent::Unpause.emit();
+        PauseEvent::Unpause.emit();
     }
 
     /// Rejects if the contract is unpaused
@@ -90,4 +92,9 @@ pub trait PausableController {
     fn require_unpaused(&self) {
         require!(!self.is_paused(), "Disallowed while contract is paused");
     }
+
+    // External methods
+
+    /// Returns `true` if the contract is paused, `false` otherwise
+    fn paus_is_paused(&self) -> bool;
 }
