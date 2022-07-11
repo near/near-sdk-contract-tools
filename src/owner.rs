@@ -103,7 +103,7 @@ pub trait Owner {
     fn init(&self, owner_id: AccountId) {
         require!(
             !self.slot_is_initialized().exists(),
-            "Owner already initialized"
+            "Owner already initialized",
         );
 
         self.slot_is_initialized().write(&true);
@@ -145,7 +145,7 @@ pub trait Owner {
                     .read()
                     .as_ref()
                     .unwrap_or_else(|| env::panic_str("No owner")),
-            "Owner only"
+            "Owner only",
         );
     }
 
@@ -186,7 +186,7 @@ pub trait Owner {
 
         require!(
             env::predecessor_account_id() == proposed_owner,
-            "Proposed owner only"
+            "Proposed owner only",
         );
 
         OwnerEvent::Propose {
