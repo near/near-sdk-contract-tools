@@ -38,7 +38,7 @@ impl Contract {
             // ...
         };
 
-        Owner::init(&contract, owner_id);
+        Owner::init(&contract, &owner_id);
 
         contract
     }
