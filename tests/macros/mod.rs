@@ -1,14 +1,25 @@
-use near_contract_tools::{owner::Owner, pause::Pause, rbac::Rbac, Owner, Pause, Rbac};
+use near_contract_tools::{
+    event::Event, owner::Owner, pause::Pause, rbac::Rbac, Event, Owner, Pause, Rbac,
+};
 use near_sdk::{
     borsh::{self, BorshSerialize},
     near_bindgen,
     test_utils::VMContextBuilder,
     testing_env, AccountId, BorshStorageKey,
 };
+use serde::Serialize;
 
 mod event;
 mod owner;
 mod pause;
+
+#[derive(Serialize, Event)]
+#[event(standard = "x-myevent", version = "1.0.0", rename_all = "snake_case")]
+#[serde(untagged)]
+enum MyEvent {
+    ValueChanged { from: u32, to: u32 },
+    PermissionGranted { to: AccountId },
+}
 
 #[derive(BorshSerialize, BorshStorageKey)]
 enum StorageKey {
@@ -49,13 +60,23 @@ impl Integration {
         self.require_owner();
 
         self.add_role(&account_id, &Role::CanSetValue);
+
+        MyEvent::PermissionGranted { to: account_id }.emit();
     }
 
     pub fn set_value(&mut self, value: u32) {
         self.require_unpaused();
         self.require_role(&Role::CanSetValue);
 
+        let old = self.value;
+
         self.value = value;
+
+        MyEvent::ValueChanged {
+            from: old,
+            to: value,
+        }
+        .emit();
     }
 
     pub fn pause(&mut self) {
