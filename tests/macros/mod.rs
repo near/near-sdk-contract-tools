@@ -12,6 +12,7 @@ use serde::Serialize;
 mod event;
 mod owner;
 mod pause;
+mod standard;
 
 #[derive(Serialize, Event)]
 #[event(standard = "x-myevent", version = "1.0.0", rename_all = "snake_case")]

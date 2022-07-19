@@ -2,10 +2,40 @@ use near_sdk::{
     borsh::{self, BorshSerialize},
     env, ext_contract,
     json_types::U128,
-    require, AccountId, BorshStorageKey, Promise, PromiseOrValue,
+    AccountId, BorshStorageKey, Gas, Promise, PromiseOrValue,
 };
+use serde::Serialize;
 
-use crate::slot::Slot;
+use crate::{event::Event, slot::Slot};
+use crate::{near_contract_tools, Event};
+
+pub const GAS_FOR_RESOLVE_TRANSFER: Gas = Gas(5_000_000_000_000);
+pub const GAS_FOR_FT_TRANSFER_CALL: Gas = Gas(25_000_000_000_000 + GAS_FOR_RESOLVE_TRANSFER.0);
+
+#[derive(Serialize, Event)]
+#[event(standard = "nep141", version = "1.0.0", rename_all = "snake_case")]
+#[serde(untagged)]
+pub enum Nep141Event<'a> {
+    FtMint {
+        owner_id: &'a AccountId,
+        amount: &'a U128,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        memo: Option<&'a str>,
+    },
+    FtTransfer {
+        old_owner_id: &'a AccountId,
+        new_owner_id: &'a AccountId,
+        amount: &'a U128,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        memo: Option<&'a str>,
+    },
+    FtBurn {
+        owner_id: &'a AccountId,
+        amount: &'a U128,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        memo: Option<&'a str>,
+    },
+}
 
 #[derive(BorshSerialize, BorshStorageKey)]
 enum StorageKey {
@@ -32,7 +62,7 @@ pub trait Nep141Controller {
         self.slot_total_supply().read().unwrap_or(0)
     }
 
-    fn withdraw(&mut self, account_id: &AccountId, amount: u128) {
+    fn internal_withdraw(&mut self, account_id: &AccountId, amount: u128) {
         if amount != 0 {
             let balance = self.balance_of(account_id);
             if let Some(balance) = balance.checked_sub(amount) {
@@ -50,7 +80,7 @@ pub trait Nep141Controller {
         }
     }
 
-    fn deposit(&mut self, account_id: &AccountId, amount: u128) {
+    fn internal_deposit(&mut self, account_id: &AccountId, amount: u128) {
         if amount != 0 {
             let balance = self.balance_of(account_id);
             if let Some(balance) = balance.checked_add(amount) {
@@ -68,7 +98,7 @@ pub trait Nep141Controller {
         }
     }
 
-    fn transfer(
+    fn internal_transfer(
         &mut self,
         sender_account_id: &AccountId,
         receiver_account_id: &AccountId,
@@ -89,6 +119,46 @@ pub trait Nep141Controller {
             env::panic_str("Sender balance underflow");
         }
     }
+
+    fn transfer(
+        &mut self,
+        sender_account_id: &AccountId,
+        receiver_account_id: &AccountId,
+        amount: u128,
+        memo: Option<&str>,
+    ) {
+        self.internal_transfer(sender_account_id, receiver_account_id, amount);
+
+        Nep141Event::FtTransfer {
+            old_owner_id: sender_account_id,
+            new_owner_id: receiver_account_id,
+            amount: &amount.into(),
+            memo,
+        }
+        .emit();
+    }
+
+    fn mint(&mut self, account_id: &AccountId, amount: u128, memo: Option<&str>) {
+        self.internal_deposit(account_id, amount);
+
+        Nep141Event::FtMint {
+            owner_id: account_id,
+            amount: &amount.into(),
+            memo,
+        }
+        .emit();
+    }
+
+    fn burn(&mut self, account_id: &AccountId, amount: u128, memo: Option<&str>) {
+        self.internal_withdraw(account_id, amount);
+
+        Nep141Event::FtBurn {
+            owner_id: account_id,
+            amount: &amount.into(),
+            memo,
+        }
+        .emit();
+    }
 }
 
 #[ext_contract(ext_nep141_receiver)]
@@ -99,6 +169,11 @@ pub trait Nep141Receiver {
         amount: U128,
         msg: String,
     ) -> PromiseOrValue<U128>;
+}
+
+#[ext_contract(ext_nep141_resolver)]
+pub trait Nep141Resolver {
+    fn ft_resolve_transfer(sender_id: AccountId, receiver_id: AccountId, amount: U128) -> U128;
 }
 
 #[ext_contract(ext_nep141)]
