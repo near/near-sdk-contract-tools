@@ -177,7 +177,7 @@ pub trait Nep141Resolver {
 }
 
 #[ext_contract(ext_nep141)]
-pub trait Nep141External {
+pub trait Nep141 {
     fn ft_transfer(&mut self, receiver_id: AccountId, amount: U128, memo: Option<String>);
     fn ft_transfer_call(
         &mut self,

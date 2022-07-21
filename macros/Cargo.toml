@@ -10,6 +10,7 @@ Macros for `near-contract-tools`
 """
 
 [dependencies]
+base64 = "0.13.0"
 darling = "0.14"
 heck = "0.4"
 quote = "1"

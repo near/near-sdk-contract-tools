@@ -4,6 +4,7 @@ use syn::{parse_macro_input, DeriveInput};
 
 mod event;
 mod nep141;
+mod nep148;
 mod owner;
 mod pause;
 mod rbac;
@@ -74,4 +75,9 @@ pub fn derive_rbac(input: TokenStream) -> TokenStream {
 #[proc_macro_derive(Nep141, attributes(nep141))]
 pub fn derive_nep141(input: TokenStream) -> TokenStream {
     make_derive(input, nep141::expand)
+}
+
+#[proc_macro_derive(Nep148, attributes(nep148))]
+pub fn derive_nep148(input: TokenStream) -> TokenStream {
+    make_derive(input, nep148::expand)
 }

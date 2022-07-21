@@ -3,10 +3,10 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::Expr;
 
-const DEFAULT_STORAGE_KEY: &str = r#"(b"$141" as &[u8])"#;
+const DEFAULT_STORAGE_KEY: &str = r#"(b"~$141" as &[u8])"#;
 
 #[derive(Debug, FromDeriveInput)]
-#[darling(attributes(pause), supports(struct_named))]
+#[darling(attributes(nep141), supports(struct_named))]
 pub struct Nep141Meta {
     pub storage_key: Option<Expr>,
 
@@ -34,7 +34,7 @@ pub fn expand(meta: Nep141Meta) -> Result<TokenStream, syn::Error> {
         }
 
         #[near_sdk::near_bindgen]
-        impl #imp near_contract_tools::standard::nep141::Nep141External for #ident #ty #wher {
+        impl #imp near_contract_tools::standard::nep141::Nep141 for #ident #ty #wher {
             #[payable]
             fn ft_transfer(
                 &mut self,
