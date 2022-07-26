@@ -1,12 +1,36 @@
 use near_contract_tools::{standard::nep141::*, Nep141};
-use near_sdk::{near_bindgen, test_utils::VMContextBuilder, testing_env, AccountId};
+use near_sdk::{near_bindgen, test_utils::VMContextBuilder, testing_env, AccountId, json_types::U128, PromiseOrValue, collections::Vector, log};
 
 #[derive(Nep141)]
 #[near_bindgen]
 struct FungibleToken {}
 
+#[near_bindgen]
+struct FungibleTokenReceiver {
+    pub log: Vector<(String, u128)>,
+}
+
+impl near_contract_tools::standard::nep141::Nep141Receiver for FungibleTokenReceiver {
+    fn ft_on_transfer(
+        &mut self,
+        sender_id: AccountId,
+        amount: U128,
+        msg: String,
+    ) -> PromiseOrValue<U128> {
+        let used_amount: u128 = amount.0 / 2;
+
+        let out = format!("ft_on_transfer[used={used_amount}]");
+        log!(&out);
+        println!("{out}");
+
+        self.log.push(&(msg, amount.0));
+
+        PromiseOrValue::Value(U128(used_amount))
+    }
+}
+
 #[test]
-fn test() {
+fn nep141_transfer() {
     let mut ft = FungibleToken {};
 
     let alice: AccountId = "alice".parse().unwrap();

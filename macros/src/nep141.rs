@@ -62,43 +62,18 @@ pub fn expand(meta: Nep141Meta) -> Result<TokenStream, syn::Error> {
                 memo: Option<String>,
                 msg: String,
             ) -> near_sdk::Promise {
-                use near_sdk::{assert_one_yocto, require, env};
-                use near_contract_tools::{
-                    event::Event,
-                    standard::nep141::{
-                        ext_nep141_receiver,
-                        ext_nep141_resolver,
-                        Nep141Controller,
-                        Nep141Event,
-                        GAS_FOR_FT_TRANSFER_CALL,
-                        GAS_FOR_RESOLVE_TRANSFER,
-                    },
-                };
+                near_sdk::assert_one_yocto();
+                let sender_id = near_sdk::env::predecessor_account_id();
 
-                assert_one_yocto();
-                require!(
-                    env::prepaid_gas() > GAS_FOR_FT_TRANSFER_CALL,
-                    "More gas is required",
-                );
-
-                let sender_id = env::predecessor_account_id();
-                let amount_num: u128 = amount.into();
-
-                Nep141Controller::transfer(self, &sender_id, &receiver_id, amount_num, memo.as_deref());
-
-                let receiver_gas = env::prepaid_gas()
-                    .0
-                    .checked_sub(GAS_FOR_FT_TRANSFER_CALL.0)
-                    .unwrap_or_else(|| env::panic_str("Prepaid gas overflow"));
-                // Initiating receiver's call and the callback
-                ext_nep141_receiver::ext(receiver_id.clone())
-                    .with_static_gas(receiver_gas.into())
-                    .ft_on_transfer(sender_id.clone(), amount.into(), msg)
-                    .then(
-                        ext_nep141_resolver::ext(env::current_account_id())
-                            .with_static_gas(GAS_FOR_RESOLVE_TRANSFER)
-                            .ft_resolve_transfer(sender_id, receiver_id, amount.into()),
-                    )
+                near_contract_tools::standard::nep141::Nep141Controller::transfer_call(
+                    self,
+                    sender_id,
+                    receiver_id,
+                    amount.into(),
+                    memo.as_deref(),
+                    msg,
+                    near_sdk::env::prepaid_gas(),
+                )
             }
 
             fn ft_total_supply(&self) -> near_sdk::json_types::U128 {
@@ -107,6 +82,19 @@ pub fn expand(meta: Nep141Meta) -> Result<TokenStream, syn::Error> {
 
             fn ft_balance_of(&self, account_id: near_sdk::AccountId) -> near_sdk::json_types::U128 {
                 near_contract_tools::standard::nep141::Nep141Controller::balance_of(self, &account_id).into()
+            }
+        }
+
+        #[near_sdk::near_bindgen]
+        impl #imp near_contract_tools::standard::nep141::Nep141Resolver for #ident #ty #wher {
+            #[private]
+            fn ft_resolve_transfer(
+                &mut self,
+                sender_id: AccountId,
+                receiver_id: AccountId,
+                amount: U128,
+            ) -> U128 {
+                near_contract_tools::standard::nep141::Nep141Controller::resolve_transfer(self, sender_id, receiver_id, amount.into()).into()
             }
         }
     }))

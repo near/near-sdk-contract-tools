@@ -1,8 +1,9 @@
 use near_sdk::{
+    assert_one_yocto,
     borsh::{self, BorshSerialize},
     env, ext_contract,
     json_types::U128,
-    AccountId, BorshStorageKey, Gas, Promise, PromiseOrValue,
+    require, AccountId, BorshStorageKey, Gas, Promise, PromiseOrValue, PromiseResult,
 };
 use serde::Serialize;
 
@@ -159,6 +160,74 @@ pub trait Nep141Controller {
         }
         .emit();
     }
+
+    fn transfer_call(
+        &mut self,
+        sender_account_id: AccountId,
+        receiver_account_id: AccountId,
+        amount: u128,
+        memo: Option<&str>,
+        msg: String,
+        gas_allowance: Gas,
+    ) -> Promise {
+        require!(
+            gas_allowance > GAS_FOR_FT_TRANSFER_CALL,
+            "More gas is required",
+        );
+
+        self.transfer(&sender_account_id, &receiver_account_id, amount, memo);
+
+        let receiver_gas = gas_allowance
+            .0
+            .checked_sub(GAS_FOR_FT_TRANSFER_CALL.0)
+            .unwrap_or_else(|| env::panic_str("Prepaid gas overflow"));
+        // Initiating receiver's call and the callback
+        ext_nep141_receiver::ext(receiver_account_id.clone())
+            .with_static_gas(receiver_gas.into())
+            .ft_on_transfer(sender_account_id.clone(), amount.into(), msg)
+            .then(
+                ext_nep141_resolver::ext(env::current_account_id())
+                    .with_static_gas(GAS_FOR_RESOLVE_TRANSFER)
+                    .ft_resolve_transfer(sender_account_id, receiver_account_id, amount.into()),
+            )
+    }
+
+    fn resolve_transfer(
+        &mut self,
+        sender_id: AccountId,
+        receiver_id: AccountId,
+        amount: u128,
+    ) -> u128 {
+        let ft_on_transfer_promise_result = env::promise_result(0);
+
+        let unused_amount = match ft_on_transfer_promise_result {
+            PromiseResult::NotReady => env::abort(),
+            PromiseResult::Successful(value) => {
+                if let Ok(U128(unused_amount)) = serde_json::from_slice::<U128>(&value) {
+                    std::cmp::min(amount, unused_amount)
+                } else {
+                    amount
+                }
+            }
+            PromiseResult::Failed => amount,
+        };
+
+        let refunded_amount = if unused_amount > 0 {
+            let receiver_balance = self.balance_of(&receiver_id);
+            if receiver_balance > 0 {
+                let refund_amount = std::cmp::min(receiver_balance, unused_amount);
+                self.transfer(&receiver_id, &sender_id, refund_amount, None);
+                refund_amount
+            } else {
+                0
+            }
+        } else {
+            0
+        };
+
+        // Used amount
+        amount - refunded_amount
+    }
 }
 
 #[ext_contract(ext_nep141_receiver)]
@@ -173,7 +242,12 @@ pub trait Nep141Receiver {
 
 #[ext_contract(ext_nep141_resolver)]
 pub trait Nep141Resolver {
-    fn ft_resolve_transfer(sender_id: AccountId, receiver_id: AccountId, amount: U128) -> U128;
+    fn ft_resolve_transfer(
+        &mut self,
+        sender_id: AccountId,
+        receiver_id: AccountId,
+        amount: U128,
+    ) -> U128;
 }
 
 #[ext_contract(ext_nep141)]
