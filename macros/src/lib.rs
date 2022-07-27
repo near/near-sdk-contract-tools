@@ -73,16 +73,40 @@ pub fn derive_rbac(input: TokenStream) -> TokenStream {
     make_derive(input, rbac::expand)
 }
 
+/// Adds NEP-141 fungible token core functionality to a contract. Exposes
+/// `ft_*` functions to the public blockchain, implements internal controller
+/// and receiver functionality (see: `near_contract_tools::standard::nep141`).
+///
+/// The storage key prefix for the fields can be optionally specified (default:
+/// `"~$141"`) using `#[nep141(storage_key = "<expression>")]`.
 #[proc_macro_derive(Nep141, attributes(nep141))]
 pub fn derive_nep141(input: TokenStream) -> TokenStream {
     make_derive(input, nep141::expand)
 }
 
+/// Adds NEP-148 fungible token metadata functionality to a contract. Metadata
+/// is hardcoded into the contract code, and is therefore not stored in storage.
+/// 
+/// Specify metadata using the `#[nep148(...)]` attribute.
+/// 
+/// Fields:
+///  - `name`
+///  - `symbol`
+///  - `decimals`
+///  - `spec` (optional)
+///  - `icon` (optional)
+///  - `reference` (optional)
+///  - `reference_hash` (optional)
 #[proc_macro_derive(Nep148, attributes(nep148))]
 pub fn derive_nep148(input: TokenStream) -> TokenStream {
     make_derive(input, nep148::expand)
 }
 
+/// Implements NEP-141 and NEP-148 functionality, like
+/// `#[derive(Nep141, Nep148)]`.
+/// 
+/// Attributes are the union of those for the constituent derive macros.
+/// Specify attributes with `#[fungible_token(...)]`.
 #[proc_macro_derive(FungibleToken, attributes(fungible_token))]
 pub fn derive_fungible_token(input: TokenStream) -> TokenStream {
     make_derive(input, fungible_token::expand)
