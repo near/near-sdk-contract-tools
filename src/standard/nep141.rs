@@ -1,5 +1,4 @@
 use near_sdk::{
-    assert_one_yocto,
     borsh::{self, BorshSerialize},
     env, ext_contract,
     json_types::U128,
@@ -10,7 +9,9 @@ use serde::Serialize;
 use crate::{event::Event, slot::Slot};
 use crate::{near_contract_tools, Event};
 
+/// Gas value required for ft_resolve_transfer calls
 pub const GAS_FOR_RESOLVE_TRANSFER: Gas = Gas(5_000_000_000_000);
+/// Gas value required for ft_transfer_call calls (includes gas for )
 pub const GAS_FOR_FT_TRANSFER_CALL: Gas = Gas(25_000_000_000_000 + GAS_FOR_RESOLVE_TRANSFER.0);
 
 #[derive(Serialize, Event)]

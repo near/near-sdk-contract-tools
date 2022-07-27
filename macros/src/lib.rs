@@ -3,6 +3,7 @@ use proc_macro::TokenStream;
 use syn::{parse_macro_input, DeriveInput};
 
 mod event;
+mod fungible_token;
 mod nep141;
 mod nep148;
 mod owner;
@@ -80,4 +81,9 @@ pub fn derive_nep141(input: TokenStream) -> TokenStream {
 #[proc_macro_derive(Nep148, attributes(nep148))]
 pub fn derive_nep148(input: TokenStream) -> TokenStream {
     make_derive(input, nep148::expand)
+}
+
+#[proc_macro_derive(FungibleToken, attributes(fungible_token))]
+pub fn derive_fungible_token(input: TokenStream) -> TokenStream {
+    make_derive(input, fungible_token::expand)
 }

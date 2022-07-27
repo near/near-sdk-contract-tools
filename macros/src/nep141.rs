@@ -90,10 +90,10 @@ pub fn expand(meta: Nep141Meta) -> Result<TokenStream, syn::Error> {
             #[private]
             fn ft_resolve_transfer(
                 &mut self,
-                sender_id: AccountId,
-                receiver_id: AccountId,
-                amount: U128,
-            ) -> U128 {
+                sender_id: near_sdk::AccountId,
+                receiver_id: near_sdk::AccountId,
+                amount: near_sdk::json_types::U128,
+            ) -> near_sdk::json_types::U128 {
                 near_contract_tools::standard::nep141::Nep141Controller::resolve_transfer(self, sender_id, receiver_id, amount.into()).into()
             }
         }

@@ -19,7 +19,7 @@ impl near_contract_tools::standard::nep141::Nep141Receiver for FungibleTokenRece
     ) -> PromiseOrValue<U128> {
         let used_amount: u128 = amount.0 / 2;
 
-        let out = format!("ft_on_transfer[used={used_amount}]");
+        let out = format!("ft_on_transfer[from={sender_id}, used={used_amount}]");
         log!(&out);
         println!("{out}");
 
