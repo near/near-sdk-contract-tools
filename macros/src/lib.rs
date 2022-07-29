@@ -3,6 +3,7 @@ use proc_macro::TokenStream;
 use syn::{parse_macro_input, DeriveInput};
 
 mod event;
+mod migrate;
 mod owner;
 mod pause;
 mod rbac;
@@ -68,4 +69,9 @@ pub fn derive_pause(input: TokenStream) -> TokenStream {
 #[proc_macro_derive(Rbac, attributes(rbac))]
 pub fn derive_rbac(input: TokenStream) -> TokenStream {
     make_derive(input, rbac::expand)
+}
+
+#[proc_macro_derive(Migrate, attributes(migrate))]
+pub fn derive_migrate(input: TokenStream) -> TokenStream {
+    make_derive(input, migrate::expand)
 }

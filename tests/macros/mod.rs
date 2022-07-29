@@ -1,15 +1,16 @@
 use near_contract_tools::{
-    event::Event, owner::Owner, pause::Pause, rbac::Rbac, Event, Owner, Pause, Rbac,
+    event::Event, owner::Owner, pause::Pause, rbac::Rbac, Event, Migrate, Owner, Pause, Rbac,
 };
 use near_sdk::{
-    borsh::{self, BorshSerialize},
+    borsh::{self, BorshDeserialize, BorshSerialize},
     near_bindgen,
     test_utils::VMContextBuilder,
-    testing_env, AccountId, BorshStorageKey,
+    testing_env, AccountId, BorshStorageKey, env,
 };
 use serde::Serialize;
 
 mod event;
+mod migrate;
 mod owner;
 mod pause;
 
@@ -34,7 +35,7 @@ enum Role {
     CanSetValue,
 }
 
-#[derive(Owner, Pause, Rbac)]
+#[derive(Owner, Pause, Rbac, BorshDeserialize, BorshSerialize)]
 #[owner(storage_key = "StorageKey::Owner")]
 #[pause(storage_key = "StorageKey::Pause")]
 #[rbac(storage_key = "StorageKey::Rbac", roles = "Role")]
@@ -94,6 +95,23 @@ impl Integration {
     }
 }
 
+#[derive(Migrate, BorshSerialize, BorshDeserialize)]
+#[migrate(from = "Integration")]
+#[near_bindgen]
+struct MigrateIntegration {
+    pub new_value: String,
+    pub moved_value: u32,
+}
+
+impl From<Integration> for MigrateIntegration {
+    fn from(old: Integration) -> Self {
+        Self {
+            new_value: "my string".to_string(),
+            moved_value: old.value,
+        }
+    }
+}
+
 #[test]
 fn integration() {
     let owner: AccountId = "owner".parse().unwrap();
@@ -133,6 +151,13 @@ fn integration() {
     c.set_value(25);
 
     assert_eq!(c.get_value(), 25);
+
+    env::state_write(&c);
+
+    let migrated = MigrateIntegration::migrate();
+
+    assert_eq!(migrated.moved_value, 25);
+    assert_eq!(migrated.new_value, "my string");
 }
 
 #[test]
