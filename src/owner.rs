@@ -92,9 +92,9 @@ pub trait Owner {
     /// #[near_bindgen]
     /// impl Contract {
     ///     pub fn new(owner_id: AccountId) -> Self {
-    ///         let contract = Self {};
+    ///         let mut contract = Self {};
     ///
-    ///         Owner::init(&contract, &owner_id);
+    ///         Owner::init(&mut contract, &owner_id);
     ///
     ///         contract
     ///     }
@@ -131,7 +131,7 @@ pub trait Owner {
     /// #[near_bindgen]
     /// impl Contract {
     ///     pub fn owner_only(&self) {
-    ///         self.require_owner();
+    ///         Self::require_owner();
     ///
     ///         // ...
     ///     }
