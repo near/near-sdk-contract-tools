@@ -3,6 +3,7 @@ use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
     env, near_bindgen,
 };
+use serde::Deserialize;
 
 #[derive(BorshDeserialize, BorshSerialize, Debug)]
 #[near_bindgen]
@@ -19,7 +20,7 @@ impl Old {
 }
 
 #[derive(Migrate, BorshSerialize, BorshDeserialize)]
-#[migrate(from = "Old", allow = "true")]
+#[migrate(from = "Old", allow_if = "true")]
 #[near_bindgen]
 struct NewDefaultFrom {
     pub bar: u64,
@@ -32,7 +33,7 @@ impl From<Old> for NewDefaultFrom {
 }
 
 #[derive(Migrate, BorshSerialize, BorshDeserialize)]
-#[migrate(from = "Old", allow = "true", convert = "custom_convert_no_args")]
+#[migrate(from = "Old", allow_if = "true", convert = "custom_convert_no_args")]
 #[near_bindgen]
 struct NewNoArgs {
     pub bar: u64,
@@ -46,7 +47,7 @@ fn custom_convert_no_args(old: Old) -> NewNoArgs {
 #[derive(Migrate, BorshSerialize, BorshDeserialize)]
 #[migrate(
     from = "Old",
-    allow = "true",
+    allow_if = "true",
     convert_with_args = "custom_convert_with_args"
 )]
 #[near_bindgen]
@@ -55,8 +56,17 @@ struct NewWithArgs {
 }
 
 fn custom_convert_with_args(old: Old, args: String) -> NewWithArgs {
-    near_sdk::log!(format!("custom_convert_with_args: {args}"));
-    NewWithArgs { bar: old.foo }
+    #[derive(Debug, Deserialize)]
+    struct CustomArgs {
+        pub add: u64,
+    }
+
+    let args: CustomArgs = serde_json::from_str(&args).unwrap();
+
+    near_sdk::log!(format!("custom_convert_with_args: {args:?}"));
+    NewWithArgs {
+        bar: old.foo + args.add,
+    }
 }
 
 #[test]
@@ -76,6 +86,7 @@ fn default_from() {
 #[test]
 fn no_args() {
     let old = Old::new(99);
+    env::state_write(&old);
 
     assert_eq!(old.foo, 99);
 
@@ -87,12 +98,13 @@ fn no_args() {
 #[test]
 fn with_args() {
     let old = Old::new(99);
+    env::state_write(&old);
 
     assert_eq!(old.foo, 99);
 
-    let migrated = NewWithArgs::migrate("hello".to_string());
+    let migrated = NewWithArgs::migrate(r#"{"add":1}"#.to_string());
 
-    assert_eq!(migrated.bar, 99);
+    assert_eq!(migrated.bar, 100);
 }
 
 // impl near_contract_tools::migrate::MigrateController for Contract {

@@ -69,6 +69,27 @@ pub fn derive_rbac(input: TokenStream) -> TokenStream {
     make_derive(input, rbac::expand)
 }
 
+/// Migrate a contract's default struct from one schema to another.
+///
+/// Fields may be specified in the `#[migrate(...)]` attribute.
+///
+/// Fields include:
+///  - `from` Old default struct type to convert from. (required)
+///  - `to` New default struct type to convert into. (optional, default: `Self`)
+///  - `convert` Identifier of a function that converts from the old schema to
+///     the new schema. Mutually exclusive with `convert_with_args`. (optional,
+///     default: `<Self::NewSchema as From<Self::OldSchema>>::from`)
+///  - `convert_with_args` Identifier of a function that converts from the old
+///     schema to the new schema and accepts a single `String` argument.
+///     Mutually exclusive with `convert`. (optional)
+///  - `allow` Expression to evaluate before allowing
+/// 
+
+// pub from: syn::Type,
+// pub to: Option<syn::Type>,
+// pub convert: Option<syn::ExprPath>,
+// pub convert_with_args: Option<syn::ExprPath>,
+// pub allow: syn::Expr,
 #[proc_macro_derive(Migrate, attributes(migrate))]
 pub fn derive_migrate(input: TokenStream) -> TokenStream {
     make_derive(input, migrate::expand)

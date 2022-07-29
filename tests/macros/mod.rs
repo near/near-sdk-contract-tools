@@ -96,7 +96,7 @@ impl Integration {
 }
 
 #[derive(Migrate, Owner, Pause, Rbac, BorshSerialize, BorshDeserialize)]
-#[migrate(from = "Integration", allow = "Self::require_owner()")]
+#[migrate(from = "Integration", allow = "Self::require_owner")]
 #[owner(storage_key = "StorageKey::Owner")]
 #[pause(storage_key = "StorageKey::Pause")]
 #[rbac(storage_key = "StorageKey::Rbac", roles = "Role")]
