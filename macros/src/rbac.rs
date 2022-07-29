@@ -26,7 +26,7 @@ pub fn expand(meta: RbacMeta) -> Result<TokenStream, darling::Error> {
 
     Ok(TokenStream::from(quote! {
         impl near_contract_tools::rbac::Rbac<#roles> for #ident {
-            fn root(&self) -> near_contract_tools::slot::Slot<()> {
+            fn root() -> near_contract_tools::slot::Slot<()> {
                 near_contract_tools::slot::Slot::new(#storage_key)
             }
         }

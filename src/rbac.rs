@@ -10,11 +10,11 @@ where
     R: BorshSerialize + IntoStorageKey,
 {
     /// Storage slot namespace for items
-    fn root(&self) -> Slot<()>;
+    fn root() -> Slot<()>;
 
     /// Returns whether a given account has been given a certain role.
-    fn has_role(&self, account_id: &AccountId, role: &R) -> bool {
-        self.root()
+    fn has_role(account_id: &AccountId, role: &R) -> bool {
+        Self::root()
             .ns(role.try_to_vec().unwrap())
             .field(account_id.try_to_vec().unwrap())
             .read()
@@ -23,7 +23,7 @@ where
 
     /// Assigns a role to an account.
     fn add_role(&mut self, account_id: &AccountId, role: &R) {
-        self.root()
+        Self::root()
             .ns(role.try_to_vec().unwrap())
             .field(account_id.try_to_vec().unwrap())
             .write(&true);
@@ -31,7 +31,7 @@ where
 
     /// Removes a role from an account.
     fn remove_role(&mut self, account_id: &AccountId, role: &R) {
-        self.root()
+        Self::root()
             .ns(role.try_to_vec().unwrap())
             .field::<_, bool>(account_id.try_to_vec().unwrap())
             .remove();
@@ -40,7 +40,7 @@ where
     /// Requires transaction predecessor to have a given role.
     fn require_role(&self, role: &R) {
         let predecessor = env::predecessor_account_id();
-        require!(self.has_role(&predecessor, role), "Unauthorized");
+        require!(Self::has_role(&predecessor, role), "Unauthorized");
     }
 }
 
@@ -73,11 +73,10 @@ mod tests {
 
     #[test]
     pub fn empty() {
-        let r = Contract {};
         let a: AccountId = "account".parse().unwrap();
 
-        assert!(!r.has_role(&a, &Role::A));
-        assert!(!r.has_role(&a, &Role::B));
+        assert!(!Contract::has_role(&a, &Role::A));
+        assert!(!Contract::has_role(&a, &Role::B));
     }
 
     #[test]
@@ -87,8 +86,8 @@ mod tests {
 
         r.add_role(&a, &Role::A);
 
-        assert!(r.has_role(&a, &Role::A));
-        assert!(!r.has_role(&a, &Role::B));
+        assert!(Contract::has_role(&a, &Role::A));
+        assert!(!Contract::has_role(&a, &Role::B));
     }
 
     #[test]
@@ -99,13 +98,13 @@ mod tests {
         r.add_role(&a, &Role::B);
         r.add_role(&a, &Role::A);
 
-        assert!(r.has_role(&a, &Role::A));
-        assert!(r.has_role(&a, &Role::B));
+        assert!(Contract::has_role(&a, &Role::A));
+        assert!(Contract::has_role(&a, &Role::B));
 
         r.remove_role(&a, &Role::B);
 
-        assert!(r.has_role(&a, &Role::A));
-        assert!(!r.has_role(&a, &Role::B));
+        assert!(Contract::has_role(&a, &Role::A));
+        assert!(!Contract::has_role(&a, &Role::B));
     }
 
     #[test]
@@ -119,18 +118,18 @@ mod tests {
         r.add_role(&b, &Role::B);
         r.add_role(&b, &Role::A);
 
-        assert!(r.has_role(&a, &Role::A));
-        assert!(r.has_role(&a, &Role::B));
-        assert!(r.has_role(&b, &Role::A));
-        assert!(r.has_role(&b, &Role::B));
+        assert!(Contract::has_role(&a, &Role::A));
+        assert!(Contract::has_role(&a, &Role::B));
+        assert!(Contract::has_role(&b, &Role::A));
+        assert!(Contract::has_role(&b, &Role::B));
 
         r.remove_role(&a, &Role::B);
         r.remove_role(&b, &Role::A);
 
-        assert!(r.has_role(&a, &Role::A));
-        assert!(!r.has_role(&a, &Role::B));
-        assert!(!r.has_role(&b, &Role::A));
-        assert!(r.has_role(&b, &Role::B));
+        assert!(Contract::has_role(&a, &Role::A));
+        assert!(!Contract::has_role(&a, &Role::B));
+        assert!(!Contract::has_role(&b, &Role::A));
+        assert!(Contract::has_role(&b, &Role::B));
     }
 
     #[test]
