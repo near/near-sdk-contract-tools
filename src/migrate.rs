@@ -1,18 +1,16 @@
 use near_sdk::{
     borsh::{BorshDeserialize, BorshSerialize},
-    env, ext_contract,
+    env,
 };
 
 pub trait MigrateController {
     type OldSchema: BorshDeserialize;
-    type NewSchema: From<Self::OldSchema> + BorshSerialize;
+    type NewSchema: BorshSerialize;
 
-    fn convert_state() -> Self::NewSchema {
-        let old_state = env::state_read::<Self::OldSchema>()
-            .unwrap_or_else(|| env::panic_str("Failed to deserialize old state"));
-
-        let new_state = Self::NewSchema::from(old_state);
-
-        new_state
+    fn deserialize_old_schema() -> Self::OldSchema {
+        env::state_read::<Self::OldSchema>()
+            .unwrap_or_else(|| env::panic_str("Failed to deserialize old state"))
     }
+
+    fn convert(old_state: Self::OldSchema, _args: Option<String>) -> Self::NewSchema;
 }

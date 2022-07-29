@@ -3,9 +3,9 @@ use near_contract_tools::{
 };
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
-    near_bindgen,
+    env, near_bindgen,
     test_utils::VMContextBuilder,
-    testing_env, AccountId, BorshStorageKey, env,
+    testing_env, AccountId, BorshStorageKey,
 };
 use serde::Serialize;
 
@@ -50,7 +50,7 @@ impl Integration {
     pub fn new(owner_id: AccountId) -> Self {
         let mut contract = Self { value: 0 };
 
-        Owner::init(&contract, &owner_id);
+        Owner::init(&mut contract, &owner_id);
         contract.add_role(&owner_id, &Role::CanSetValue);
         contract.add_role(&owner_id, &Role::CanPause);
 
@@ -58,7 +58,7 @@ impl Integration {
     }
 
     pub fn add_value_setter(&mut self, account_id: AccountId) {
-        self.require_owner();
+        Self::require_owner();
 
         self.add_role(&account_id, &Role::CanSetValue);
 
@@ -95,8 +95,11 @@ impl Integration {
     }
 }
 
-#[derive(Migrate, BorshSerialize, BorshDeserialize)]
-#[migrate(from = "Integration")]
+#[derive(Migrate, Owner, Pause, Rbac, BorshSerialize, BorshDeserialize)]
+#[migrate(from = "Integration", allow = "Self::require_owner()")]
+#[owner(storage_key = "StorageKey::Owner")]
+#[pause(storage_key = "StorageKey::Pause")]
+#[rbac(storage_key = "StorageKey::Rbac", roles = "Role")]
 #[near_bindgen]
 struct MigrateIntegration {
     pub new_value: String,
@@ -109,6 +112,46 @@ impl From<Integration> for MigrateIntegration {
             new_value: "my string".to_string(),
             moved_value: old.value,
         }
+    }
+}
+
+#[near_bindgen]
+impl MigrateIntegration {
+    pub fn add_value_setter(&mut self, account_id: AccountId) {
+        Self::require_owner();
+
+        self.add_role(&account_id, &Role::CanSetValue);
+
+        MyEvent::PermissionGranted { to: account_id }.emit();
+    }
+
+    pub fn set_value(&mut self, value: u32) {
+        self.require_unpaused();
+        self.require_role(&Role::CanSetValue);
+
+        let old = self.moved_value;
+
+        self.moved_value = value;
+
+        MyEvent::ValueChanged {
+            from: old,
+            to: value,
+        }
+        .emit();
+    }
+
+    pub fn pause(&mut self) {
+        self.require_role(&Role::CanPause);
+        Pause::pause(self);
+    }
+
+    pub fn unpause(&mut self) {
+        self.require_role(&Role::CanPause);
+        Pause::unpause(self);
+    }
+
+    pub fn get_value(&self) -> u32 {
+        self.moved_value
     }
 }
 
@@ -152,12 +195,63 @@ fn integration() {
 
     assert_eq!(c.get_value(), 25);
 
+    // Perform migration
     env::state_write(&c);
 
-    let migrated = MigrateIntegration::migrate();
+    let mut migrated = MigrateIntegration::migrate();
 
     assert_eq!(migrated.moved_value, 25);
+    assert_eq!(migrated.get_value(), 25);
     assert_eq!(migrated.new_value, "my string");
+
+    let bob: AccountId = "bob_addr".parse().unwrap();
+
+    migrated.set_value(5);
+
+    assert_eq!(migrated.get_value(), 5);
+
+    // make sure alice still has permission
+    let context = VMContextBuilder::new()
+        .predecessor_account_id(alice.clone())
+        .build();
+
+    testing_env!(context);
+
+    migrated.set_value(256);
+
+    assert_eq!(migrated.get_value(), 256);
+
+    // add bob permissions
+    let context = VMContextBuilder::new()
+        .predecessor_account_id(owner.clone())
+        .build();
+
+    testing_env!(context);
+
+    migrated.add_value_setter(bob.clone());
+
+    let context = VMContextBuilder::new()
+        .predecessor_account_id(bob.clone())
+        .build();
+
+    testing_env!(context);
+
+    migrated.set_value(77);
+
+    assert_eq!(migrated.get_value(), 77);
+
+    let context = VMContextBuilder::new()
+        .predecessor_account_id(owner.clone())
+        .build();
+
+    testing_env!(context);
+
+    MigrateIntegration::pause(&mut migrated);
+    MigrateIntegration::unpause(&mut migrated);
+
+    migrated.set_value(8);
+
+    assert_eq!(migrated.get_value(), 8);
 }
 
 #[test]
@@ -195,4 +289,27 @@ fn integration_fail_paused() {
     Integration::pause(&mut c);
 
     c.set_value(5);
+}
+
+#[test]
+#[should_panic(expected = "Owner only")]
+fn integration_fail_migrate_allow() {
+    let owner: AccountId = "owner".parse().unwrap();
+    let alice: AccountId = "alice".parse().unwrap();
+    let context = VMContextBuilder::new()
+        .predecessor_account_id(owner.clone())
+        .build();
+
+    testing_env!(context);
+    let c = Integration::new(owner.clone());
+
+    env::state_write(&c);
+
+    let context = VMContextBuilder::new()
+        .predecessor_account_id(alice.clone())
+        .build();
+
+    testing_env!(context);
+
+    MigrateIntegration::migrate();
 }

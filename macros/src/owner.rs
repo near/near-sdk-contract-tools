@@ -13,7 +13,7 @@ pub struct OwnerMeta {
     pub ident: syn::Ident,
 }
 
-pub fn expand(meta: OwnerMeta) -> Result<TokenStream, syn::Error> {
+pub fn expand(meta: OwnerMeta) -> Result<TokenStream, darling::Error> {
     let OwnerMeta { storage_key, ident } = meta;
 
     let storage_key =
@@ -21,7 +21,7 @@ pub fn expand(meta: OwnerMeta) -> Result<TokenStream, syn::Error> {
 
     Ok(TokenStream::from(quote! {
         impl near_contract_tools::owner::Owner for #ident {
-            fn root(&self) -> near_contract_tools::slot::Slot<()> {
+            fn root() -> near_contract_tools::slot::Slot<()> {
                 near_contract_tools::slot::Slot::root(#storage_key)
             }
         }
@@ -29,11 +29,11 @@ pub fn expand(meta: OwnerMeta) -> Result<TokenStream, syn::Error> {
         #[near_sdk::near_bindgen]
         impl near_contract_tools::owner::OwnerExternal for #ident {
             fn own_get_owner(&self) -> Option<near_sdk::AccountId> {
-                near_contract_tools::owner::Owner::slot_owner(self).read()
+                <Self as near_contract_tools::owner::Owner>::slot_owner().read()
             }
 
             fn own_get_proposed_owner(&self) -> Option<near_sdk::AccountId> {
-                near_contract_tools::owner::Owner::slot_proposed_owner(self).read()
+                <Self as near_contract_tools::owner::Owner>::slot_proposed_owner().read()
             }
 
             #[payable]

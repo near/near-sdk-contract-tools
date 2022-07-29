@@ -11,18 +11,16 @@ mod rename;
 
 fn make_derive<T>(
     input: TokenStream,
-    expand: fn(T) -> Result<TokenStream, syn::Error>,
+    expand: fn(T) -> Result<TokenStream, darling::Error>,
 ) -> TokenStream
 where
     T: FromDeriveInput,
 {
     let input = parse_macro_input!(input as DeriveInput);
-    let meta: T = match FromDeriveInput::from_derive_input(&input) {
-        Err(e) => return e.write_errors().into(),
-        Ok(x) => x,
-    };
 
-    expand(meta).unwrap_or_else(|e| e.into_compile_error().into())
+    FromDeriveInput::from_derive_input(&input)
+        .and_then(expand)
+        .unwrap_or_else(|e| e.write_errors().into())
 }
 
 /// Derives an NEP-297-compatible event emitting implementation of `Event`.

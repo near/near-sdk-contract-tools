@@ -14,7 +14,7 @@ pub struct RbacMeta {
     pub ident: syn::Ident,
 }
 
-pub fn expand(meta: RbacMeta) -> Result<TokenStream, syn::Error> {
+pub fn expand(meta: RbacMeta) -> Result<TokenStream, darling::Error> {
     let RbacMeta {
         storage_key,
         roles,

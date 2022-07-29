@@ -13,7 +13,7 @@ pub struct PauseMeta {
     pub ident: syn::Ident,
 }
 
-pub fn expand(meta: PauseMeta) -> Result<TokenStream, syn::Error> {
+pub fn expand(meta: PauseMeta) -> Result<TokenStream, darling::Error> {
     let PauseMeta { storage_key, ident } = meta;
 
     let storage_key =

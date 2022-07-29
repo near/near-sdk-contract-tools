@@ -19,39 +19,48 @@ impl Old {
 }
 
 #[derive(Migrate, BorshSerialize, BorshDeserialize)]
-#[migrate(from = "Old")]
+#[migrate(from = "Old", allow = "true")]
 #[near_bindgen]
-struct NewNoArgs {
+struct NewDefaultFrom {
     pub bar: u64,
 }
 
-impl From<Old> for NewNoArgs {
+impl From<Old> for NewDefaultFrom {
     fn from(old: Old) -> Self {
         Self { bar: old.foo }
     }
 }
 
 #[derive(Migrate, BorshSerialize, BorshDeserialize)]
-#[migrate(from = "Old", hook = "NewWithArgs::migrate_hook", args = "String")]
+#[migrate(from = "Old", allow = "true", convert = "custom_convert_no_args")]
+#[near_bindgen]
+struct NewNoArgs {
+    pub bar: u64,
+}
+
+fn custom_convert_no_args(old: Old) -> NewNoArgs {
+    near_sdk::log!("custom_convert_no_args");
+    NewNoArgs { bar: old.foo }
+}
+
+#[derive(Migrate, BorshSerialize, BorshDeserialize)]
+#[migrate(
+    from = "Old",
+    allow = "true",
+    convert_with_args = "custom_convert_with_args"
+)]
 #[near_bindgen]
 struct NewWithArgs {
     pub bar: u64,
 }
 
-impl NewWithArgs {
-    pub fn migrate_hook(args: String) {
-        println!("migrate_hook: {args}");
-    }
-}
-
-impl From<Old> for NewWithArgs {
-    fn from(old: Old) -> Self {
-        Self { bar: old.foo }
-    }
+fn custom_convert_with_args(old: Old, args: String) -> NewWithArgs {
+    near_sdk::log!(format!("custom_convert_with_args: {args}"));
+    NewWithArgs { bar: old.foo }
 }
 
 #[test]
-fn no_args() {
+fn default_from() {
     let old = Old::new(99);
 
     // This is done automatically in real #[near_bindgen] WASM contracts
@@ -59,7 +68,29 @@ fn no_args() {
 
     assert_eq!(old.foo, 99);
 
+    let migrated = NewDefaultFrom::migrate();
+
+    assert_eq!(migrated.bar, 99);
+}
+
+#[test]
+fn no_args() {
+    let old = Old::new(99);
+
+    assert_eq!(old.foo, 99);
+
     let migrated = NewNoArgs::migrate();
+
+    assert_eq!(migrated.bar, 99);
+}
+
+#[test]
+fn with_args() {
+    let old = Old::new(99);
+
+    assert_eq!(old.foo, 99);
+
+    let migrated = NewWithArgs::migrate("hello".to_string());
 
     assert_eq!(migrated.bar, 99);
 }
