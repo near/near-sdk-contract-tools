@@ -15,7 +15,7 @@ mod rename;
 
 fn make_derive<T>(
     input: TokenStream,
-    expand: fn(T) -> Result<TokenStream, darling::Error>,
+    expand: fn(T) -> Result<proc_macro2::TokenStream, darling::Error>,
 ) -> TokenStream
 where
     T: FromDeriveInput,
@@ -24,6 +24,7 @@ where
 
     FromDeriveInput::from_derive_input(&input)
         .and_then(expand)
+        .map(Into::into)
         .unwrap_or_else(|e| e.write_errors().into())
 }
 
@@ -86,9 +87,9 @@ pub fn derive_nep141(input: TokenStream) -> TokenStream {
 
 /// Adds NEP-148 fungible token metadata functionality to a contract. Metadata
 /// is hardcoded into the contract code, and is therefore not stored in storage.
-/// 
+///
 /// Specify metadata using the `#[nep148(...)]` attribute.
-/// 
+///
 /// Fields:
 ///  - `name`
 ///  - `symbol`
@@ -104,7 +105,7 @@ pub fn derive_nep148(input: TokenStream) -> TokenStream {
 
 /// Implements NEP-141 and NEP-148 functionality, like
 /// `#[derive(Nep141, Nep148)]`.
-/// 
+///
 /// Attributes are the union of those for the constituent derive macros.
 /// Specify attributes with `#[fungible_token(...)]`.
 #[proc_macro_derive(FungibleToken, attributes(fungible_token))]

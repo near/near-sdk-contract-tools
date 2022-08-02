@@ -1,5 +1,5 @@
 use darling::{ast::Style, FromDeriveInput, FromVariant};
-use proc_macro::TokenStream;
+use proc_macro2::TokenStream;
 use quote::quote;
 
 use crate::rename::RenameStrategy;
@@ -72,7 +72,7 @@ pub fn expand(meta: EventMeta) -> Result<TokenStream, darling::Error> {
     )
     .collect::<Vec<_>>();
 
-    Ok(TokenStream::from(quote! {
+    Ok(quote! {
         impl #imp near_contract_tools::event::EventMetadata for #type_name #ty #wher {
             fn standard(&self) -> &'static str {
                 #standard
@@ -88,5 +88,5 @@ pub fn expand(meta: EventMeta) -> Result<TokenStream, darling::Error> {
                 }
             }
         }
-    }))
+    })
 }

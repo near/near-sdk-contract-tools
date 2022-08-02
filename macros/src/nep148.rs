@@ -1,5 +1,5 @@
 use darling::{FromDeriveInput, ToTokens};
-use proc_macro::TokenStream;
+use proc_macro2::TokenStream;
 use quote::quote;
 
 #[derive(Debug, FromDeriveInput)]
@@ -17,7 +17,7 @@ pub struct Nep148Meta {
     pub ident: syn::Ident,
 }
 
-fn optionize<T>(t: Option<T>) -> proc_macro2::TokenStream
+fn optionize<T>(t: Option<T>) -> TokenStream
 where
     T: ToTokens,
 {
@@ -58,7 +58,7 @@ pub fn expand(meta: Nep148Meta) -> Result<TokenStream, darling::Error> {
 
     let (imp, ty, wher) = generics.split_for_impl();
 
-    Ok(TokenStream::from(quote! {
+    Ok(quote! {
         #[near_sdk::near_bindgen]
         impl #imp near_contract_tools::standard::nep148::Nep148 for #ident #ty #wher {
             fn ft_metadata(&self) -> near_contract_tools::standard::nep148::FungibleTokenMetadata<'static> {
@@ -73,5 +73,5 @@ pub fn expand(meta: Nep148Meta) -> Result<TokenStream, darling::Error> {
                 }
             }
         }
-    }))
+    })
 }

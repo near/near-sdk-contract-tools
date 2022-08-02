@@ -1,5 +1,6 @@
 use darling::FromDeriveInput;
-use proc_macro::TokenStream;
+use proc_macro2::TokenStream;
+use quote::quote;
 use syn::Expr;
 
 #[derive(Debug, FromDeriveInput)]
@@ -62,16 +63,15 @@ pub fn expand(meta: FungibleTokenMeta) -> Result<TokenStream, darling::Error> {
         reference_hash,
         decimals,
 
-        generics: generics.clone(),
-        ident: ident.clone(),
+        generics,
+        ident,
     });
 
     match (expand_nep141, expand_nep148) {
-        (Ok(mut expand_nep141), Ok(expand_nep148)) => {
-            // Concatenate token streams
-            expand_nep141.extend(expand_nep148);
-            Ok(expand_nep141)
-        }
+        (Ok(expand_nep141), Ok(expand_nep148)) => Ok(quote! {
+            #expand_nep141
+            #expand_nep148
+        }),
         (Err(e), _) | (_, Err(e)) => Err(e),
     }
 }

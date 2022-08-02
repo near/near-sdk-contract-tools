@@ -1,5 +1,5 @@
 use darling::FromDeriveInput;
-use proc_macro::TokenStream;
+use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use syn::spanned::Spanned;
 
@@ -81,7 +81,7 @@ pub fn expand(meta: MigrateMeta) -> Result<TokenStream, darling::Error> {
         .map(|_| quote! { Some(args) })
         .unwrap_or_else(|| quote! { None });
 
-    Ok(TokenStream::from(quote! {
+    Ok(quote! {
         impl #imp near_contract_tools::migrate::MigrateController for #ident #ty #wh {
             type OldSchema = #from;
             type NewSchema = #to;
@@ -106,5 +106,5 @@ pub fn expand(meta: MigrateMeta) -> Result<TokenStream, darling::Error> {
                 )
             }
         }
-    }))
+    })
 }

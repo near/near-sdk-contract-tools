@@ -1,5 +1,5 @@
 use darling::FromDeriveInput;
-use proc_macro::TokenStream;
+use proc_macro2::TokenStream;
 use quote::quote;
 use syn::Expr;
 
@@ -32,17 +32,23 @@ pub fn expand(meta: Nep141Meta) -> Result<TokenStream, darling::Error> {
     let storage_key =
         storage_key.unwrap_or_else(|| syn::parse_str::<Expr>(DEFAULT_STORAGE_KEY).unwrap());
 
-    let on_transfer = on_transfer.map(|f| quote! {
-        #f(self, &sender_id, &receiver_id, amount, memo.as_deref());
+    let on_transfer = on_transfer.map(|f| {
+        quote! {
+            #f(self, &sender_id, &receiver_id, amount, memo.as_deref());
+        }
     });
-    let on_transfer_plain = on_transfer_plain.map(|f| quote! {
-        #f(self, &sender_id, &receiver_id, amount, memo.as_deref());
+    let on_transfer_plain = on_transfer_plain.map(|f| {
+        quote! {
+            #f(self, &sender_id, &receiver_id, amount, memo.as_deref());
+        }
     });
-    let on_transfer_call = on_transfer_call.map(|f| quote! {
-        #f(self, &sender_id, &receiver_id, amount, memo.as_deref(), &msg);
+    let on_transfer_call = on_transfer_call.map(|f| {
+        quote! {
+            #f(self, &sender_id, &receiver_id, amount, memo.as_deref(), &msg);
+        }
     });
 
-    Ok(TokenStream::from(quote! {
+    Ok(quote! {
         impl #imp near_contract_tools::standard::nep141::Nep141Controller for #ident #ty #wher {
             fn root(&self) -> near_contract_tools::slot::Slot<()> {
                 near_contract_tools::slot::Slot::root(#storage_key)
@@ -120,5 +126,5 @@ pub fn expand(meta: Nep141Meta) -> Result<TokenStream, darling::Error> {
                 near_contract_tools::standard::nep141::Nep141Controller::resolve_transfer(self, sender_id, receiver_id, amount.into()).into()
             }
         }
-    }))
+    })
 }
