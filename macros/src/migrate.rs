@@ -16,8 +16,7 @@ pub struct MigrateMeta {
     pub to: Option<syn::Type>,
     pub convert: Option<syn::ExprPath>,
     pub convert_with_args: Option<syn::ExprPath>,
-    pub guard: Option<syn::ExprPath>,
-    pub allow_if: Option<syn::Expr>,
+    pub on_migrate: syn::ExprPath,
     pub integrate: Option<IntegrationGuard>,
 
     pub ident: syn::Ident,
@@ -46,18 +45,6 @@ impl MigrateMeta {
             &self.convert_with_args,
             "`convert` and `convert_with_args` are mutually exclusive",
         );
-        mutually_exclusive(
-            &mut e,
-            &self.guard,
-            &self.allow_if,
-            "`guard` and `allow_if` are mutually exclusive",
-        );
-
-        if self.guard.is_none() && self.allow_if.is_none() {
-            e.push(darling::Error::missing_field(
-                "One of `guard` or `allow_if` is required",
-            ));
-        }
 
         e.finish_with(self)
     }
@@ -69,8 +56,7 @@ pub fn expand(meta: MigrateMeta) -> Result<TokenStream, darling::Error> {
         to,
         convert,
         convert_with_args,
-        guard,
-        allow_if,
+        on_migrate,
         integrate,
 
         ident,
@@ -95,18 +81,6 @@ pub fn expand(meta: MigrateMeta) -> Result<TokenStream, darling::Error> {
         .map(|_| quote! { Some(args) })
         .unwrap_or_else(|| quote! { None });
 
-    let guard_stmt = allow_if
-        .map(|allow_if| {
-            quote! {
-                near_sdk::require!(
-                    #allow_if,
-                    "Migration is not allowed",
-                )
-            }
-        })
-        .or_else(|| guard.map(|guard| quote! { #guard() }))
-        .unwrap(); // Guaranteed because of validate function
-
     Ok(TokenStream::from(quote! {
         impl #imp near_contract_tools::migrate::MigrateController for #ident #ty #wh {
             type OldSchema = #from;
@@ -122,7 +96,7 @@ pub fn expand(meta: MigrateMeta) -> Result<TokenStream, darling::Error> {
             #[init(ignore_state)]
             pub fn migrate(#args_sig) -> Self {
                 #integrate;
-                #guard_stmt;
+                #on_migrate();
 
                 let old_state = <#ident as near_contract_tools::migrate::MigrateController>::deserialize_old_schema();
 

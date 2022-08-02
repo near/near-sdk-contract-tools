@@ -19,8 +19,10 @@ impl Old {
     }
 }
 
+fn none() { }
+
 #[derive(Migrate, BorshSerialize, BorshDeserialize)]
-#[migrate(from = "Old", allow_if = "true")]
+#[migrate(from = "Old", on_migrate = "none")]
 #[near_bindgen]
 struct NewDefaultFrom {
     pub bar: u64,
@@ -33,7 +35,7 @@ impl From<Old> for NewDefaultFrom {
 }
 
 #[derive(Migrate, BorshSerialize, BorshDeserialize)]
-#[migrate(from = "Old", allow_if = "true", convert = "custom_convert_no_args")]
+#[migrate(from = "Old", on_migrate = "none", convert = "custom_convert_no_args")]
 #[near_bindgen]
 struct NewNoArgs {
     pub bar: u64,
@@ -47,7 +49,7 @@ fn custom_convert_no_args(old: Old) -> NewNoArgs {
 #[derive(Migrate, BorshSerialize, BorshDeserialize)]
 #[migrate(
     from = "Old",
-    allow_if = "true",
+    on_migrate = "none",
     convert_with_args = "custom_convert_with_args"
 )]
 #[near_bindgen]
