@@ -3,6 +3,8 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::Expr;
 
+use super::{nep141, nep148};
+
 #[derive(Debug, FromDeriveInput)]
 #[darling(attributes(fungible_token), supports(struct_named))]
 pub struct FungibleTokenMeta {
@@ -45,7 +47,7 @@ pub fn expand(meta: FungibleTokenMeta) -> Result<TokenStream, darling::Error> {
         ident,
     } = meta;
 
-    let expand_nep141 = crate::nep141::expand(crate::nep141::Nep141Meta {
+    let expand_nep141 = nep141::expand(nep141::Nep141Meta {
         storage_key,
         on_transfer,
         on_transfer_plain,
@@ -54,7 +56,7 @@ pub fn expand(meta: FungibleTokenMeta) -> Result<TokenStream, darling::Error> {
         ident: ident.clone(),
     });
 
-    let expand_nep148 = crate::nep148::expand(crate::nep148::Nep148Meta {
+    let expand_nep148 = nep148::expand(nep148::Nep148Meta {
         spec,
         name,
         symbol,
@@ -67,11 +69,13 @@ pub fn expand(meta: FungibleTokenMeta) -> Result<TokenStream, darling::Error> {
         ident,
     });
 
-    match (expand_nep141, expand_nep148) {
-        (Ok(expand_nep141), Ok(expand_nep148)) => Ok(quote! {
-            #expand_nep141
-            #expand_nep148
-        }),
-        (Err(e), _) | (_, Err(e)) => Err(e),
-    }
+    let mut e = darling::Error::accumulator();
+
+    let nep141 = e.handle(expand_nep141);
+    let nep148 = e.handle(expand_nep148);
+
+    e.finish_with(quote! {
+        #nep141
+        #nep148
+    })
 }

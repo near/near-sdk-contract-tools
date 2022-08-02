@@ -3,15 +3,13 @@ use proc_macro::TokenStream;
 use syn::{parse_macro_input, DeriveInput};
 
 mod event;
-mod fungible_token;
 mod integration;
 mod migrate;
-mod nep141;
-mod nep148;
 mod owner;
 mod pause;
 mod rbac;
 mod rename;
+mod standard;
 
 fn make_derive<T>(
     input: TokenStream,
@@ -82,7 +80,7 @@ pub fn derive_rbac(input: TokenStream) -> TokenStream {
 /// `"~$141"`) using `#[nep141(storage_key = "<expression>")]`.
 #[proc_macro_derive(Nep141, attributes(nep141))]
 pub fn derive_nep141(input: TokenStream) -> TokenStream {
-    make_derive(input, nep141::expand)
+    make_derive(input, standard::nep141::expand)
 }
 
 /// Adds NEP-148 fungible token metadata functionality to a contract. Metadata
@@ -100,7 +98,7 @@ pub fn derive_nep141(input: TokenStream) -> TokenStream {
 ///  - `reference_hash` (optional)
 #[proc_macro_derive(Nep148, attributes(nep148))]
 pub fn derive_nep148(input: TokenStream) -> TokenStream {
-    make_derive(input, nep148::expand)
+    make_derive(input, standard::nep148::expand)
 }
 
 /// Implements NEP-141 and NEP-148 functionality, like
@@ -110,7 +108,7 @@ pub fn derive_nep148(input: TokenStream) -> TokenStream {
 /// Specify attributes with `#[fungible_token(...)]`.
 #[proc_macro_derive(FungibleToken, attributes(fungible_token))]
 pub fn derive_fungible_token(input: TokenStream) -> TokenStream {
-    make_derive(input, fungible_token::expand)
+    make_derive(input, standard::fungible_token::expand)
 }
 
 /// Migrate a contract's default struct from one schema to another.
