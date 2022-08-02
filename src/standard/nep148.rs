@@ -1,5 +1,6 @@
 //! NEP-148 fungible token metadata implementation
 //! https://github.com/near/NEPs/blob/master/neps/nep-0148.md
+#![allow(missing_docs)] // ext_contract doesn't play nice with #![warn(missing_docs)]
 
 use std::borrow::Cow;
 
