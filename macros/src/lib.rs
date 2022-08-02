@@ -3,6 +3,7 @@ use proc_macro::TokenStream;
 use syn::{parse_macro_input, DeriveInput};
 
 mod event;
+mod integration;
 mod migrate;
 mod owner;
 mod pause;
@@ -83,13 +84,6 @@ pub fn derive_rbac(input: TokenStream) -> TokenStream {
 ///     schema to the new schema and accepts a single `String` argument.
 ///     Mutually exclusive with `convert`. (optional)
 ///  - `allow` Expression to evaluate before allowing
-/// 
-
-// pub from: syn::Type,
-// pub to: Option<syn::Type>,
-// pub convert: Option<syn::ExprPath>,
-// pub convert_with_args: Option<syn::ExprPath>,
-// pub allow: syn::Expr,
 #[proc_macro_derive(Migrate, attributes(migrate))]
 pub fn derive_migrate(input: TokenStream) -> TokenStream {
     make_derive(input, migrate::expand)

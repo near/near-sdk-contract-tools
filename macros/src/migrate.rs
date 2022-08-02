@@ -1,7 +1,9 @@
-use darling::{FromDeriveInput, ToTokens};
+use darling::FromDeriveInput;
 use proc_macro::TokenStream;
-use quote::quote;
+use quote::{quote, ToTokens};
 use syn::spanned::Spanned;
+
+use crate::integration::IntegrationGuard;
 
 #[derive(Debug, FromDeriveInput)]
 #[darling(
@@ -14,8 +16,9 @@ pub struct MigrateMeta {
     pub to: Option<syn::Type>,
     pub convert: Option<syn::ExprPath>,
     pub convert_with_args: Option<syn::ExprPath>,
-    pub allow: Option<syn::ExprPath>,
+    pub guard: Option<syn::ExprPath>,
     pub allow_if: Option<syn::Expr>,
+    pub integrate: Option<IntegrationGuard>,
 
     pub ident: syn::Ident,
     pub generics: syn::Generics,
@@ -45,14 +48,14 @@ impl MigrateMeta {
         );
         mutually_exclusive(
             &mut e,
-            &self.allow,
+            &self.guard,
             &self.allow_if,
-            "`allow` and `allow_if` are mutually exclusive",
+            "`guard` and `allow_if` are mutually exclusive",
         );
 
-        if self.allow.is_none() && self.allow_if.is_none() {
+        if self.guard.is_none() && self.allow_if.is_none() {
             e.push(darling::Error::missing_field(
-                "One of `allow` or `allow_if` is required",
+                "One of `guard` or `allow_if` is required",
             ));
         }
 
@@ -66,8 +69,10 @@ pub fn expand(meta: MigrateMeta) -> Result<TokenStream, darling::Error> {
         to,
         convert,
         convert_with_args,
-        allow,
+        guard,
         allow_if,
+        integrate,
+
         ident,
         generics,
     } = meta;
@@ -90,7 +95,7 @@ pub fn expand(meta: MigrateMeta) -> Result<TokenStream, darling::Error> {
         .map(|_| quote! { Some(args) })
         .unwrap_or_else(|| quote! { None });
 
-    let allow_stmt = allow_if
+    let guard_stmt = allow_if
         .map(|allow_if| {
             quote! {
                 near_sdk::require!(
@@ -99,7 +104,7 @@ pub fn expand(meta: MigrateMeta) -> Result<TokenStream, darling::Error> {
                 )
             }
         })
-        .or_else(|| allow.map(|allow| quote! { #allow() }))
+        .or_else(|| guard.map(|guard| quote! { #guard() }))
         .unwrap(); // Guaranteed because of validate function
 
     Ok(TokenStream::from(quote! {
@@ -116,7 +121,8 @@ pub fn expand(meta: MigrateMeta) -> Result<TokenStream, darling::Error> {
         impl #imp #ident #ty #wh {
             #[init(ignore_state)]
             pub fn migrate(#args_sig) -> Self {
-                #allow_stmt;
+                #integrate;
+                #guard_stmt;
 
                 let old_state = <#ident as near_contract_tools::migrate::MigrateController>::deserialize_old_schema();
 

@@ -12,7 +12,10 @@ Macros for `near-contract-tools`
 [dependencies]
 darling = "0.14"
 heck = "0.4"
+proc-macro2 = "1"
 quote = "1"
+strum = "0.24.1"
+strum_macros = "0.24.2"
 syn = "1"
 
 [lib]

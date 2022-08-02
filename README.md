@@ -44,7 +44,7 @@ impl Contract {
     }
 
     pub fn owner_only(&self) {
-        self.require_owner();
+        Self::require_owner();
 
         // ...
     }

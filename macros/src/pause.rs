@@ -21,7 +21,7 @@ pub fn expand(meta: PauseMeta) -> Result<TokenStream, darling::Error> {
 
     Ok(TokenStream::from(quote! {
         impl near_contract_tools::pause::Pause for #ident {
-            fn root(&self) -> near_contract_tools::slot::Slot<()> {
+            fn root() -> near_contract_tools::slot::Slot<()> {
                 near_contract_tools::slot::Slot::new(#storage_key)
             }
         }
@@ -29,7 +29,7 @@ pub fn expand(meta: PauseMeta) -> Result<TokenStream, darling::Error> {
         #[near_sdk::near_bindgen]
         impl near_contract_tools::pause::PauseExternal for #ident {
             fn paus_is_paused(&self) -> bool {
-                self.is_paused()
+                <Self as near_contract_tools::pause::Pause>::is_paused()
             }
         }
     }))

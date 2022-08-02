@@ -66,7 +66,7 @@ impl Integration {
     }
 
     pub fn set_value(&mut self, value: u32) {
-        self.require_unpaused();
+        Self::require_unpaused();
         self.require_role(&Role::CanSetValue);
 
         let old = self.value;
@@ -96,7 +96,7 @@ impl Integration {
 }
 
 #[derive(Migrate, Owner, Pause, Rbac, BorshSerialize, BorshDeserialize)]
-#[migrate(from = "Integration", allow = "Self::require_owner")]
+#[migrate(from = "Integration", guard = "Self::on_migrate")]
 #[owner(storage_key = "StorageKey::Owner")]
 #[pause(storage_key = "StorageKey::Pause")]
 #[rbac(storage_key = "StorageKey::Rbac", roles = "Role")]
@@ -115,6 +115,13 @@ impl From<Integration> for MigrateIntegration {
     }
 }
 
+impl MigrateIntegration {
+    fn on_migrate() {
+        Self::require_owner();
+        Self::require_unpaused();
+    }
+}
+
 #[near_bindgen]
 impl MigrateIntegration {
     pub fn add_value_setter(&mut self, account_id: AccountId) {
@@ -126,7 +133,7 @@ impl MigrateIntegration {
     }
 
     pub fn set_value(&mut self, value: u32) {
-        self.require_unpaused();
+        Self::require_unpaused();
         self.require_role(&Role::CanSetValue);
 
         let old = self.moved_value;
@@ -277,7 +284,7 @@ fn integration_fail_missing_role() {
 
 #[test]
 #[should_panic(expected = "Disallowed while contract is paused")]
-fn integration_fail_paused() {
+fn integration_fail_set_paused() {
     let owner: AccountId = "owner".parse().unwrap();
     let context = VMContextBuilder::new()
         .predecessor_account_id(owner.clone())
@@ -310,6 +317,22 @@ fn integration_fail_migrate_allow() {
         .build();
 
     testing_env!(context);
+
+    MigrateIntegration::migrate();
+}
+
+#[test]
+#[should_panic(expected = "Disallowed while contract is paused")]
+fn integration_fail_migrate_paused() {
+    let owner: AccountId = "owner".parse().unwrap();
+    let context = VMContextBuilder::new()
+        .predecessor_account_id(owner.clone())
+        .build();
+
+    testing_env!(context);
+    let mut c = Integration::new(owner.clone());
+
+    Integration::pause(&mut c);
 
     MigrateIntegration::migrate();
 }
