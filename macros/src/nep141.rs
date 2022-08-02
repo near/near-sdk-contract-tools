@@ -14,7 +14,7 @@ pub struct Nep141Meta {
     pub ident: syn::Ident,
 }
 
-pub fn expand(meta: Nep141Meta) -> Result<TokenStream, syn::Error> {
+pub fn expand(meta: Nep141Meta) -> Result<TokenStream, darling::Error> {
     let Nep141Meta {
         storage_key,
         generics,

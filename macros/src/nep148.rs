@@ -17,14 +17,14 @@ pub struct Nep148Meta {
     pub ident: syn::Ident,
 }
 
-fn optionize<T>(t: Option<T>) -> quote::__private::TokenStream
+fn optionize<T>(t: Option<T>) -> proc_macro2::TokenStream
 where
     T: ToTokens,
 {
     t.map_or_else(|| quote! { None }, |v| quote! { Some(#v) })
 }
 
-pub fn expand(meta: Nep148Meta) -> Result<TokenStream, syn::Error> {
+pub fn expand(meta: Nep148Meta) -> Result<TokenStream, darling::Error> {
     let Nep148Meta {
         generics,
         ident,

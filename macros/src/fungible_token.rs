@@ -20,7 +20,7 @@ pub struct FungibleTokenMeta {
     pub ident: syn::Ident,
 }
 
-pub fn expand(meta: FungibleTokenMeta) -> Result<TokenStream, syn::Error> {
+pub fn expand(meta: FungibleTokenMeta) -> Result<TokenStream, darling::Error> {
     let FungibleTokenMeta {
         storage_key,
 
