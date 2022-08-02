@@ -14,7 +14,7 @@ pub struct RbacMeta {
     pub ident: syn::Ident,
 }
 
-pub fn expand(meta: RbacMeta) -> Result<TokenStream, syn::Error> {
+pub fn expand(meta: RbacMeta) -> Result<TokenStream, darling::Error> {
     let RbacMeta {
         storage_key,
         roles,
@@ -26,7 +26,7 @@ pub fn expand(meta: RbacMeta) -> Result<TokenStream, syn::Error> {
 
     Ok(TokenStream::from(quote! {
         impl near_contract_tools::rbac::Rbac<#roles> for #ident {
-            fn root(&self) -> near_contract_tools::slot::Slot<()> {
+            fn root() -> near_contract_tools::slot::Slot<()> {
                 near_contract_tools::slot::Slot::new(#storage_key)
             }
         }

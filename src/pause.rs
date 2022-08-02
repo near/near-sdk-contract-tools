@@ -33,11 +33,11 @@ pub enum PauseEvent {
 /// #[near_bindgen]
 /// impl Contract {
 ///     pub fn only_when_unpaused(&self) {
-///         self.require_unpaused();
+///         Self::require_unpaused();
 ///     }
 ///
 ///     pub fn only_when_paused(&self) {
-///         self.require_paused();
+///         Self::require_paused();
 ///     }
 ///
 ///     pub fn emergency_shutdown(&mut self) {
@@ -51,28 +51,28 @@ pub enum PauseEvent {
 /// ```
 pub trait Pause {
     /// Storage root
-    fn root(&self) -> Slot<()>;
+    fn root() -> Slot<()>;
 
     /// Storage slot for pause state
-    fn slot_paused(&self) -> Slot<bool> {
-        unsafe { self.root().transmute() }
+    fn slot_paused() -> Slot<bool> {
+        unsafe { Self::root().transmute() }
     }
 
     /// Force the contract pause state in a particular direction.
     /// Does not emit events or check the current pause state.
     fn set_is_paused(&mut self, is_paused: bool) {
-        self.slot_paused().write(&is_paused);
+        Self::slot_paused().write(&is_paused);
     }
 
     /// Returns `true` if the contract is paused, `false` otherwise
-    fn is_paused(&self) -> bool {
-        self.slot_paused().read().unwrap_or(false)
+    fn is_paused() -> bool {
+        Self::slot_paused().read().unwrap_or(false)
     }
 
     /// Pauses the contract if it is currently unpaused, panics otherwise.
     /// Emits a `PauseEvent::Pause` event.
     fn pause(&mut self) {
-        self.require_unpaused();
+        Self::require_unpaused();
         self.set_is_paused(true);
         PauseEvent::Pause.emit();
     }
@@ -80,19 +80,19 @@ pub trait Pause {
     /// Unpauses the contract if it is currently paused, panics otherwise.
     /// Emits a `PauseEvent::Unpause` event.
     fn unpause(&mut self) {
-        self.require_paused();
+        Self::require_paused();
         self.set_is_paused(false);
         PauseEvent::Unpause.emit();
     }
 
     /// Rejects if the contract is unpaused
-    fn require_paused(&self) {
-        require!(self.is_paused(), "Disallowed while contract is unpaused");
+    fn require_paused() {
+        require!(Self::is_paused(), "Disallowed while contract is unpaused");
     }
 
     /// Rejects if the contract is paused
-    fn require_unpaused(&self) {
-        require!(!self.is_paused(), "Disallowed while contract is paused");
+    fn require_unpaused() {
+        require!(!Self::is_paused(), "Disallowed while contract is paused");
     }
 }
 

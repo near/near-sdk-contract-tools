@@ -30,26 +30,26 @@ pub enum OwnerEvent {
 /// A contract with an owner
 pub trait Owner {
     /// Storage root
-    fn root(&self) -> Slot<()>;
+    fn root() -> Slot<()>;
 
     /// Storage slot for initialization state
-    fn slot_is_initialized(&self) -> Slot<bool> {
-        self.root().field(b"i")
+    fn slot_is_initialized() -> Slot<bool> {
+        Self::root().field(b"i")
     }
 
     /// Storage slot for owner account ID
-    fn slot_owner(&self) -> Slot<AccountId> {
-        self.root().field(b"o")
+    fn slot_owner() -> Slot<AccountId> {
+        Self::root().field(b"o")
     }
 
     /// Storage slot for proposed owner account ID
-    fn slot_proposed_owner(&self) -> Slot<AccountId> {
-        self.root().field(b"p")
+    fn slot_proposed_owner() -> Slot<AccountId> {
+        Self::root().field(b"p")
     }
 
     /// Updates the current owner and emits relevant event
     fn update_owner(&mut self, new: Option<AccountId>) {
-        let mut owner = self.slot_owner();
+        let mut owner = Self::slot_owner();
         let old = owner.read();
         if old != new {
             OwnerEvent::Transfer {
@@ -63,7 +63,7 @@ pub trait Owner {
 
     /// Updates proposed owner and emits relevant event
     fn update_proposed(&mut self, new: Option<AccountId>) {
-        let mut proposed_owner = self.slot_proposed_owner();
+        let mut proposed_owner = Self::slot_proposed_owner();
         let old = proposed_owner.read();
         if old != new {
             OwnerEvent::Propose {
@@ -92,22 +92,22 @@ pub trait Owner {
     /// #[near_bindgen]
     /// impl Contract {
     ///     pub fn new(owner_id: AccountId) -> Self {
-    ///         let contract = Self {};
+    ///         let mut contract = Self {};
     ///
-    ///         Owner::init(&contract, &owner_id);
+    ///         Owner::init(&mut contract, &owner_id);
     ///
     ///         contract
     ///     }
     /// }
     /// ```
-    fn init(&self, owner_id: &AccountId) {
+    fn init(&mut self, owner_id: &AccountId) {
         require!(
-            !self.slot_is_initialized().exists(),
+            !Self::slot_is_initialized().exists(),
             "Owner already initialized",
         );
 
-        self.slot_is_initialized().write(&true);
-        self.slot_owner().write(owner_id);
+        Self::slot_is_initialized().write(&true);
+        Self::slot_owner().write(owner_id);
 
         OwnerEvent::Transfer {
             old: None,
@@ -131,17 +131,16 @@ pub trait Owner {
     /// #[near_bindgen]
     /// impl Contract {
     ///     pub fn owner_only(&self) {
-    ///         self.require_owner();
+    ///         Self::require_owner();
     ///
     ///         // ...
     ///     }
     /// }
     /// ```
-    fn require_owner(&self) {
+    fn require_owner() {
         require!(
             &env::predecessor_account_id()
-                == self
-                    .slot_owner()
+                == Self::slot_owner()
                     .read()
                     .as_ref()
                     .unwrap_or_else(|| env::panic_str("No owner")),
@@ -154,7 +153,7 @@ pub trait Owner {
     /// Emits an `OwnerEvent::Transfer` event, and an `OwnerEvent::Propose`
     /// event if there is a currently proposed owner.
     fn renounce_owner(&mut self) {
-        self.require_owner();
+        Self::require_owner();
 
         self.update_proposed(None);
         self.update_owner(None);
@@ -168,7 +167,7 @@ pub trait Owner {
     /// The currently proposed owner may be reset by calling this function with
     /// the argument `None`.
     fn propose_owner(&mut self, account_id: Option<AccountId>) {
-        self.require_owner();
+        Self::require_owner();
 
         self.update_proposed(account_id);
     }
@@ -179,8 +178,7 @@ pub trait Owner {
     /// Emits events corresponding to the transfer of ownership and reset of the
     /// proposed owner.
     fn accept_owner(&mut self) {
-        let proposed_owner = self
-            .slot_proposed_owner()
+        let proposed_owner = Self::slot_proposed_owner()
             .take()
             .unwrap_or_else(|| env::panic_str("No proposed owner"));
 
@@ -243,15 +241,15 @@ mod tests {
     impl Contract {
         #[init]
         pub fn new(owner_id: AccountId) -> Self {
-            let contract = Self {};
+            let mut contract = Self {};
 
-            Owner::init(&contract, &owner_id);
+            Owner::init(&mut contract, &owner_id);
 
             contract
         }
 
         pub fn owner_only(&self) {
-            self.require_owner();
+            Self::require_owner();
         }
     }
 

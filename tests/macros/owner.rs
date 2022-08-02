@@ -19,18 +19,18 @@ pub struct OwnedStructImplicitKey {
 impl OwnedStructImplicitKey {
     #[init]
     pub fn new() -> Self {
-        let contract = Self {
+        let mut contract = Self {
             permissioned_item: 0,
         };
 
         // This method can only be called once throughout the entire duration of the contract
-        Owner::init(&contract, &env::predecessor_account_id());
+        Owner::init(&mut contract, &env::predecessor_account_id());
 
         contract
     }
 
     pub fn set_permissioned_item(&mut self, value: u32) {
-        self.require_owner();
+        Self::require_owner();
 
         self.permissioned_item = value;
     }
@@ -56,23 +56,23 @@ pub struct OwnedStructExplicitKey {
 impl OwnedStructExplicitKey {
     #[init]
     pub fn new() -> Self {
-        let contract = Self {
+        let mut contract = Self {
             permissioned_item: 0,
         };
 
         // This method can only be called once throughout the entire duration of the contract
-        Owner::init(&contract, &env::predecessor_account_id());
+        Owner::init(&mut contract, &env::predecessor_account_id());
 
         contract
     }
 
-    pub fn try_init_again(&self) {
+    pub fn try_init_again(&mut self) {
         // Should fail
         Owner::init(self, &env::predecessor_account_id());
     }
 
     pub fn set_permissioned_item(&mut self, value: u32) {
-        self.require_owner();
+        Self::require_owner();
 
         self.permissioned_item = value;
     }
@@ -162,7 +162,7 @@ fn derive_owner_ex_init_again() {
         .build();
 
     testing_env!(context);
-    let c = OwnedStructExplicitKey::new();
+    let mut c = OwnedStructExplicitKey::new();
 
     c.try_init_again();
 }
