@@ -26,13 +26,13 @@ struct Contract {
 #[near_bindgen]
 impl Contract {
     pub fn only_when_unpaused(&mut self, value: u32) {
-        self.require_unpaused();
+        Self::require_unpaused();
 
         self.value = value;
     }
 
     pub fn only_when_paused(&mut self, value: u32) {
-        self.require_paused();
+        Self::require_paused();
 
         self.value = value;
     }
@@ -52,7 +52,7 @@ fn derive_pause() {
         "Initial state should be unpaused",
     );
 
-    contract.require_unpaused();
+    Contract::require_unpaused();
 
     contract.pause();
 
@@ -62,7 +62,7 @@ fn derive_pause() {
         "Pausing the contract works",
     );
 
-    contract.require_paused();
+    Contract::require_paused();
 
     contract.unpause();
 
@@ -72,7 +72,7 @@ fn derive_pause() {
         "Unpausing the contract works",
     );
 
-    contract.require_unpaused();
+    Contract::require_unpaused();
 }
 
 #[test]

@@ -24,7 +24,7 @@ pub struct EventVariantReceiver {
     pub name: Option<String>,
 }
 
-pub fn expand(meta: EventMeta) -> Result<TokenStream, syn::Error> {
+pub fn expand(meta: EventMeta) -> Result<TokenStream, darling::Error> {
     let EventMeta {
         standard,
         version,
