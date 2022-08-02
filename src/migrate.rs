@@ -17,7 +17,7 @@ pub trait MigrateController {
     type NewSchema: BorshSerialize;
 
     /// Deserializes the old schema from storage.
-    /// 
+    ///
     /// It is probably not necessary to override this function.
     fn deserialize_old_schema() -> Self::OldSchema {
         env::state_read::<Self::OldSchema>()

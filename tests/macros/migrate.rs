@@ -19,7 +19,7 @@ impl Old {
     }
 }
 
-fn none() { }
+fn none() {}
 
 #[derive(Migrate, BorshSerialize, BorshDeserialize)]
 #[migrate(from = "Old", on_migrate = "none")]
