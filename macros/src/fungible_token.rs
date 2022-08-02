@@ -5,7 +5,11 @@ use syn::Expr;
 #[derive(Debug, FromDeriveInput)]
 #[darling(attributes(fungible_token), supports(struct_named))]
 pub struct FungibleTokenMeta {
+    // NEP-141 fields
     pub storage_key: Option<Expr>,
+    pub on_transfer: Option<syn::ExprPath>,
+    pub on_transfer_plain: Option<syn::ExprPath>,
+    pub on_transfer_call: Option<syn::ExprPath>,
 
     // NEP-148 fields
     pub spec: Option<String>,
@@ -16,6 +20,7 @@ pub struct FungibleTokenMeta {
     pub reference_hash: Option<String>,
     pub decimals: u8,
 
+    // darling
     pub generics: syn::Generics,
     pub ident: syn::Ident,
 }
@@ -23,6 +28,9 @@ pub struct FungibleTokenMeta {
 pub fn expand(meta: FungibleTokenMeta) -> Result<TokenStream, darling::Error> {
     let FungibleTokenMeta {
         storage_key,
+        on_transfer,
+        on_transfer_plain,
+        on_transfer_call,
 
         spec,
         name,
@@ -38,6 +46,9 @@ pub fn expand(meta: FungibleTokenMeta) -> Result<TokenStream, darling::Error> {
 
     let expand_nep141 = crate::nep141::expand(crate::nep141::Nep141Meta {
         storage_key,
+        on_transfer,
+        on_transfer_plain,
+        on_transfer_call,
         generics: generics.clone(),
         ident: ident.clone(),
     });

@@ -1,5 +1,5 @@
-// TODO: Link to the standard
 //! NEP-148 fungible token metadata implementation
+//! https://github.com/near/NEPs/blob/master/neps/nep-0148.md
 
 use std::borrow::Cow;
 

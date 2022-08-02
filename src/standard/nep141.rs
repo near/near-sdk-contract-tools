@@ -1,5 +1,5 @@
-// TODO: Link to the standard
 //! NEP-141 fungible token core implementation
+//! https://github.com/near/NEPs/blob/master/neps/nep-0141.md
 
 use near_sdk::{
     borsh::{self, BorshSerialize},
