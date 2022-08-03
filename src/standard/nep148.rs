@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 pub const FT_METADATA_SPEC: &str = "ft-1.0.0";
 
 /// NEP-148-compatible metadata struct
-#[derive(BorshDeserialize, BorshSerialize, Clone, Deserialize, Serialize, Debug)]
+#[derive(BorshDeserialize, BorshSerialize, Deserialize, Serialize, Clone, PartialEq, Debug)]
 pub struct FungibleTokenMetadata<'a> {
     /// Version of the NEP-148 spec
     pub spec: Cow<'a, str>,
@@ -41,4 +41,59 @@ pub struct FungibleTokenMetadata<'a> {
 pub trait Nep148 {
     /// Returns the metadata struct for this contract.
     fn ft_metadata(&self) -> FungibleTokenMetadata<'static>;
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::standard::nep148::FungibleTokenMetadata;
+    use near_sdk::borsh::BorshSerialize;
+    use std::borrow::Cow;
+
+    #[test]
+    fn borsh_serialization_ignores_cow() {
+        let m1 = FungibleTokenMetadata {
+            spec: "spec".into(),
+            name: "name".into(),
+            symbol: "symbol".into(),
+            icon: Some("icon".into()),
+            reference: Some("reference".into()),
+            reference_hash: Some(Cow::Owned(b"reference_hash".to_vec().into())),
+            decimals: 18,
+        };
+
+        let m2 = FungibleTokenMetadata {
+            spec: "spec".to_owned().into(),
+            name: "name".to_owned().into(),
+            symbol: "symbol".to_owned().into(),
+            icon: Some("icon".to_owned().into()),
+            reference: Some("reference".to_owned().into()),
+            reference_hash: Some(Cow::Owned(b"reference_hash".to_vec().into())),
+            decimals: 18,
+        };
+
+        assert!(matches!(m1.spec, Cow::Borrowed(_)));
+        assert!(matches!(m2.spec, Cow::Owned(_)));
+
+        assert!(matches!(m1.name, Cow::Borrowed(_)));
+        assert!(matches!(m2.name, Cow::Owned(_)));
+
+        assert!(matches!(m1.symbol, Cow::Borrowed(_)));
+        assert!(matches!(m2.symbol, Cow::Owned(_)));
+
+        assert!(matches!(m1.icon, Some(Cow::Borrowed(_))));
+        assert!(matches!(m2.icon, Some(Cow::Owned(_))));
+
+        assert!(matches!(m1.reference, Some(Cow::Borrowed(_))));
+        assert!(matches!(m2.reference, Some(Cow::Owned(_))));
+
+        assert!(matches!(m1.reference_hash, Some(Cow::Borrowed(_))));
+        assert!(matches!(m2.reference_hash, Some(Cow::Owned(_))));
+
+        assert_eq!(m1, m2);
+
+        let m1_serialized = m1.try_to_vec().unwrap();
+        let m2_serialized = m2.try_to_vec().unwrap();
+
+        assert_eq!(m1_serialized, m2_serialized);
+    }
 }

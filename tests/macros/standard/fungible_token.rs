@@ -18,7 +18,7 @@ use near_sdk::{
     decimals = 18,
     icon = "https://example.com/icon.png",
     reference = "https://example.com/metadata.json",
-    reference_hash = "YXNkZg==",
+    reference_hash = "YXNkZg=="
 )]
 #[near_bindgen]
 struct FungibleToken {}
