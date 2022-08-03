@@ -86,9 +86,6 @@ mod tests {
         assert!(matches!(m1.reference, Some(Cow::Borrowed(_))));
         assert!(matches!(m2.reference, Some(Cow::Owned(_))));
 
-        assert!(matches!(m1.reference_hash, Some(Cow::Borrowed(_))));
-        assert!(matches!(m2.reference_hash, Some(Cow::Owned(_))));
-
         assert_eq!(m1, m2);
 
         let m1_serialized = m1.try_to_vec().unwrap();
