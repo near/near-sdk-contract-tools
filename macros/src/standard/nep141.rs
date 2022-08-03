@@ -9,9 +9,12 @@ const DEFAULT_STORAGE_KEY: &str = r#"(b"~$141" as &[u8])"#;
 #[darling(attributes(nep141), supports(struct_named))]
 pub struct Nep141Meta {
     pub storage_key: Option<Expr>,
-    pub on_transfer: Option<syn::ExprPath>,
-    pub on_transfer_plain: Option<syn::ExprPath>,
-    pub on_transfer_call: Option<syn::ExprPath>,
+    pub before_transfer: Option<syn::ExprPath>,
+    pub before_transfer_plain: Option<syn::ExprPath>,
+    pub before_transfer_call: Option<syn::ExprPath>,
+    pub after_transfer: Option<syn::ExprPath>,
+    pub after_transfer_plain: Option<syn::ExprPath>,
+    pub after_transfer_call: Option<syn::ExprPath>,
 
     pub generics: syn::Generics,
     pub ident: syn::Ident,
@@ -20,9 +23,12 @@ pub struct Nep141Meta {
 pub fn expand(meta: Nep141Meta) -> Result<TokenStream, darling::Error> {
     let Nep141Meta {
         storage_key,
-        on_transfer,
-        on_transfer_plain,
-        on_transfer_call,
+        before_transfer,
+        before_transfer_plain,
+        before_transfer_call,
+        after_transfer,
+        after_transfer_plain,
+        after_transfer_call,
         generics,
         ident,
     } = meta;
@@ -32,21 +38,39 @@ pub fn expand(meta: Nep141Meta) -> Result<TokenStream, darling::Error> {
     let storage_key =
         storage_key.unwrap_or_else(|| syn::parse_str::<Expr>(DEFAULT_STORAGE_KEY).unwrap());
 
-    let on_transfer = on_transfer.map(|f| {
-        quote! {
-            #f(self, &sender_id, &receiver_id, amount, memo.as_deref());
-        }
-    });
-    let on_transfer_plain = on_transfer_plain.map(|f| {
-        quote! {
-            #f(self, &sender_id, &receiver_id, amount, memo.as_deref());
-        }
-    });
-    let on_transfer_call = on_transfer_call.map(|f| {
-        quote! {
-            #f(self, &sender_id, &receiver_id, amount, memo.as_deref(), &msg);
-        }
-    });
+    fn wrap(f: Option<syn::ExprPath>) -> Option<TokenStream> {
+        f.map(|f| {
+            quote! {
+                #f(self, &sender_id, &receiver_id, amount, memo.as_deref());
+            }
+        })
+    }
+
+    fn wrap_call(f: Option<syn::ExprPath>) -> Option<TokenStream> {
+        f.map(|f| {
+            quote! {
+                #f(self, &sender_id, &receiver_id, amount, memo.as_deref(), &msg);
+            }
+        })
+    }
+
+    let before_transfer = wrap(before_transfer);
+    let before_transfer_plain = wrap(before_transfer_plain);
+    let before_transfer_call = wrap_call(before_transfer_call);
+
+    let should_clone_call = if after_transfer
+        .as_ref()
+        .or(after_transfer_call.as_ref())
+        .is_some()
+    {
+        Some(quote! { .clone() })
+    } else {
+        None
+    };
+
+    let after_transfer = wrap(after_transfer);
+    let after_transfer_plain = wrap(after_transfer_plain);
+    let after_transfer_call = wrap_call(after_transfer_call);
 
     Ok(quote! {
         impl #imp near_contract_tools::standard::nep141::Nep141Controller for #ident #ty #wher {
@@ -73,10 +97,13 @@ pub fn expand(meta: Nep141Meta) -> Result<TokenStream, darling::Error> {
                 let sender_id = near_sdk::env::predecessor_account_id();
                 let amount: u128 = amount.into();
 
-                #on_transfer_plain
-                #on_transfer
+                #before_transfer_plain
+                #before_transfer
 
                 Nep141Controller::transfer(self, &sender_id, &receiver_id, amount, memo.as_deref());
+
+                #after_transfer_plain
+                #after_transfer
             }
 
             #[payable]
@@ -91,18 +118,23 @@ pub fn expand(meta: Nep141Meta) -> Result<TokenStream, darling::Error> {
                 let sender_id = near_sdk::env::predecessor_account_id();
                 let amount: u128 = amount.into();
 
-                #on_transfer_call
-                #on_transfer
+                #before_transfer_call
+                #before_transfer
 
-                near_contract_tools::standard::nep141::Nep141Controller::transfer_call(
+                let r = near_contract_tools::standard::nep141::Nep141Controller::transfer_call(
                     self,
-                    sender_id,
-                    receiver_id,
+                    sender_id #should_clone_call,
+                    receiver_id #should_clone_call,
                     amount,
                     memo.as_deref(),
-                    msg,
+                    msg #should_clone_call,
                     near_sdk::env::prepaid_gas(),
-                )
+                );
+
+                #after_transfer_call
+                #after_transfer
+
+                r
             }
 
             fn ft_total_supply(&self) -> near_sdk::json_types::U128 {

@@ -17,14 +17,22 @@ struct TransferRecord {
 }
 
 #[derive(Nep141)]
-#[nep141(on_transfer = "Self::on_transfer")]
+#[nep141(
+    before_transfer = "Self::before_transfer",
+    before_transfer_plain = "Self::before_transfer_plain",
+    before_transfer_call = "Self::before_transfer_call",
+    after_transfer = "Self::after_transfer",
+    after_transfer_plain = "Self::after_transfer_plain",
+    after_transfer_call = "Self::after_transfer_call"
+)]
 #[near_bindgen]
 struct FungibleToken {
     pub transfers: Vector<TransferRecord>,
+    pub hooks: Vector<String>,
 }
 
 impl FungibleToken {
-    fn on_transfer(
+    fn before_transfer(
         &mut self,
         sender_id: &AccountId,
         receiver_id: &AccountId,
@@ -36,7 +44,43 @@ impl FungibleToken {
             receiver_id: receiver_id.clone(),
             amount,
             memo: memo.map(|s| s.to_string()),
-        })
+        });
+
+        self.hooks.push(&"before_transfer".to_string());
+    }
+
+    fn before_transfer_plain(&mut self, _: &AccountId, _: &AccountId, _: u128, _: Option<&str>) {
+        self.hooks.push(&"before_transfer_plain".to_string());
+    }
+
+    fn before_transfer_call(
+        &mut self,
+        _: &AccountId,
+        _: &AccountId,
+        _: u128,
+        _: Option<&str>,
+        _: &str,
+    ) {
+        self.hooks.push(&"before_transfer_call".to_string());
+    }
+
+    fn after_transfer(&mut self, _: &AccountId, _: &AccountId, _: u128, _: Option<&str>) {
+        self.hooks.push(&"after_transfer".to_string());
+    }
+
+    fn after_transfer_plain(&mut self, _: &AccountId, _: &AccountId, _: u128, _: Option<&str>) {
+        self.hooks.push(&"after_transfer_plain".to_string());
+    }
+
+    fn after_transfer_call(
+        &mut self,
+        _: &AccountId,
+        _: &AccountId,
+        _: u128,
+        _: Option<&str>,
+        _: &str,
+    ) {
+        self.hooks.push(&"after_transfer_call".to_string());
     }
 }
 
@@ -64,10 +108,13 @@ impl near_contract_tools::standard::nep141::Nep141Receiver for FungibleTokenRece
     }
 }
 
+// TODO: transfer_call testing (not possible without workspaces-rs or something
+//  like that, and workspaces-rs doesn't work on macOS)
 #[test]
 fn nep141_transfer() {
     let mut ft = FungibleToken {
         transfers: Vector::new(b"t"),
+        hooks: Vector::new(b"h"),
     };
 
     let alice: AccountId = "alice".parse().unwrap();
@@ -103,6 +150,16 @@ fn nep141_transfer() {
             memo: None
         })
     );
+
+    let expected_hook_execution_order = vec![
+        "before_transfer_plain",
+        "before_transfer",
+        "after_transfer_plain",
+        "after_transfer",
+    ];
+    let actual_hook_execution_order = ft.hooks.to_vec();
+    assert_eq!(expected_hook_execution_order, actual_hook_execution_order);
+
     assert_eq!(ft.ft_balance_of(alice.clone()).0, 50);
     assert_eq!(ft.ft_balance_of(bob.clone()).0, 70);
     assert_eq!(ft.ft_total_supply().0, 120);
