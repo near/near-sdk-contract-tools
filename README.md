@@ -9,12 +9,13 @@ This package is a collection of common tools and patterns in NEAR smart contract
 - Role-based access control
 - Pause (derive macro available)
 - Derive macro for [NEP-297 events](https://nomicon.io/Standards/EventsFormat)
+- Derive macro for [NEP-141](https://nomicon.io/Standards/Tokens/FungibleToken/Core) (and [NEP-148](https://nomicon.io/Standards/Tokens/FungibleToken/Metadata)) fungible tokens
 
 Not to be confused with [`near-contract-standards`](https://crates.io/crates/near-contract-standards), which contains official implementations of standardized NEPs. This crate is intended to be a complement to `near-contract-standards`.
 
 **WARNING:** This is still early software, and there may be breaking changes between versions. I'll try my best to keep the docs & changelogs up-to-date. Don't hesitate to create an issue if find anything wrong.
 
-## Example
+## Examples
 
 See also: [the full integration tests](tests/macros/mod.rs).
 
@@ -89,6 +90,28 @@ let my_event = Nep171::NftMint(vec![Nep171NftMintData {
 
 my_event.emit(); // Emits event to the blockchain
 ```
+
+### Fungible Token
+
+To create a contract that is compatible with the NEP-141 and NEP-148 standards, that emits standard-compliant (NEP-141, NEP-297) events.
+
+```rust
+use near_contract_tools::FungibleToken;
+use near_sdk::near_bindgen;
+
+#[derive(FungibleToken)]
+#[fungible_token(
+    name = "My Fungible Token",
+    symbol = "MYFT",
+    decimals = 18,
+)]
+#[near_bindgen]
+struct FungibleToken {
+    // ...
+}
+```
+
+Standalone macros for each individual standard also exist.
 
 ## Authors
 

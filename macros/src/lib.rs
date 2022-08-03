@@ -78,6 +78,20 @@ pub fn derive_rbac(input: TokenStream) -> TokenStream {
 ///
 /// The storage key prefix for the fields can be optionally specified (default:
 /// `"~$141"`) using `#[nep141(storage_key = "<expression>")]`.
+///
+/// Supports hooks into various invocations:
+/// - `before_transfer` Called before executing a token transfer initiated by
+///     an external `ft_transfer` or `ft_transfer_call` invocation.
+/// - `before_transfer_plain` Called before executing a token transfer initiated by
+///     an external `ft_transfer` invocation only.
+/// - `before_transfer_call` Called before executing a token transfer initiated by
+///     an external `ft_transfer_call` invocation only.
+/// - `after_transfer` Called after executing a token transfer initiated by
+///     an external `ft_transfer` or `ft_transfer_call` invocation.
+/// - `after_transfer_plain` Called after executing a token transfer initiated by
+///     an external `ft_transfer` invocation only.
+/// - `after_transfer_call` Called after executing a token transfer initiated by
+///     an external `ft_transfer_call` invocation only.
 #[proc_macro_derive(Nep141, attributes(nep141))]
 pub fn derive_nep141(input: TokenStream) -> TokenStream {
     make_derive(input, standard::nep141::expand)
