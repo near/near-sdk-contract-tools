@@ -2,6 +2,7 @@ use near_contract_tools::{standard::nep141::*, Nep141};
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
     collections::Vector,
+    env,
     json_types::U128,
     log, near_bindgen,
     test_utils::VMContextBuilder,
@@ -17,22 +18,50 @@ struct TransferRecord {
 }
 
 #[derive(Nep141)]
-#[nep141(
-    before_transfer = "Self::before_transfer",
-    before_transfer_plain = "Self::before_transfer_plain",
-    before_transfer_call = "Self::before_transfer_call",
-    after_transfer = "Self::after_transfer",
-    after_transfer_plain = "Self::after_transfer_plain",
-    after_transfer_call = "Self::after_transfer_call"
-)]
+// #[nep141(hook)]
 #[near_bindgen]
 struct FungibleToken {
     pub transfers: Vector<TransferRecord>,
-    pub hooks: Vector<String>,
 }
 
 impl FungibleToken {
-    fn before_transfer(
+    fn hook_vector() -> Vector<String> {
+        env::storage_read(b"h")
+            .map(|s| Vector::<String>::try_from_slice(&s).unwrap())
+            .unwrap_or_else(|| Vector::new(b"h" as &[u8]))
+    }
+
+    fn push_hook(hook: &str) {
+        let mut v = Self::hook_vector();
+        v.push(&hook.to_string());
+        env::storage_write(b"h", &v.try_to_vec().unwrap());
+    }
+
+    fn before_transfer() {
+        Self::push_hook("before_transfer");
+    }
+
+    fn before_transfer_plain() {
+        Self::push_hook("before_transfer_plain");
+    }
+
+    fn before_transfer_call() {
+        Self::push_hook("before_transfer_call");
+    }
+
+    fn after_transfer() {
+        Self::push_hook("after_transfer");
+    }
+
+    fn after_transfer_plain() {
+        Self::push_hook("after_transfer_plain");
+    }
+
+    fn after_transfer_call() {
+        Self::push_hook("after_transfer_call");
+    }
+
+    fn before_transfer_args(
         &mut self,
         sender_id: &AccountId,
         receiver_id: &AccountId,
@@ -46,14 +75,20 @@ impl FungibleToken {
             memo: memo.map(|s| s.to_string()),
         });
 
-        self.hooks.push(&"before_transfer".to_string());
+        Self::push_hook("before_transfer_args");
     }
 
-    fn before_transfer_plain(&mut self, _: &AccountId, _: &AccountId, _: u128, _: Option<&str>) {
-        self.hooks.push(&"before_transfer_plain".to_string());
+    fn before_transfer_plain_args(
+        &mut self,
+        _: &AccountId,
+        _: &AccountId,
+        _: u128,
+        _: Option<&str>,
+    ) {
+        Self::push_hook("before_transfer_plain_args");
     }
 
-    fn before_transfer_call(
+    fn before_transfer_call_args(
         &mut self,
         _: &AccountId,
         _: &AccountId,
@@ -61,18 +96,24 @@ impl FungibleToken {
         _: Option<&str>,
         _: &str,
     ) {
-        self.hooks.push(&"before_transfer_call".to_string());
+        Self::push_hook("before_transfer_call_args");
     }
 
-    fn after_transfer(&mut self, _: &AccountId, _: &AccountId, _: u128, _: Option<&str>) {
-        self.hooks.push(&"after_transfer".to_string());
+    fn after_transfer_args(&mut self, _: &AccountId, _: &AccountId, _: u128, _: Option<&str>) {
+        Self::push_hook("after_transfer_args");
     }
 
-    fn after_transfer_plain(&mut self, _: &AccountId, _: &AccountId, _: u128, _: Option<&str>) {
-        self.hooks.push(&"after_transfer_plain".to_string());
+    fn after_transfer_plain_args(
+        &mut self,
+        _: &AccountId,
+        _: &AccountId,
+        _: u128,
+        _: Option<&str>,
+    ) {
+        Self::push_hook("after_transfer_plain_args");
     }
 
-    fn after_transfer_call(
+    fn after_transfer_call_args(
         &mut self,
         _: &AccountId,
         _: &AccountId,
@@ -80,7 +121,7 @@ impl FungibleToken {
         _: Option<&str>,
         _: &str,
     ) {
-        self.hooks.push(&"after_transfer_call".to_string());
+        Self::push_hook("after_transfer_call_args");
     }
 }
 
@@ -114,7 +155,6 @@ impl near_contract_tools::standard::nep141::Nep141Receiver for FungibleTokenRece
 fn nep141_transfer() {
     let mut ft = FungibleToken {
         transfers: Vector::new(b"t"),
-        hooks: Vector::new(b"h"),
     };
 
     let alice: AccountId = "alice".parse().unwrap();
@@ -152,12 +192,16 @@ fn nep141_transfer() {
     );
 
     let expected_hook_execution_order = vec![
+        "before_transfer_plain_args",
+        "before_transfer_args",
         "before_transfer_plain",
         "before_transfer",
+        "after_transfer_plain_args",
+        "after_transfer_args",
         "after_transfer_plain",
         "after_transfer",
     ];
-    let actual_hook_execution_order = ft.hooks.to_vec();
+    let actual_hook_execution_order = FungibleToken::hook_vector().to_vec();
     assert_eq!(expected_hook_execution_order, actual_hook_execution_order);
 
     assert_eq!(ft.ft_balance_of(alice.clone()).0, 50);

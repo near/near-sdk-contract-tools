@@ -1,4 +1,4 @@
-use darling::FromDeriveInput;
+use darling::{util::Override, FromDeriveInput};
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::Expr;
@@ -9,12 +9,7 @@ const DEFAULT_STORAGE_KEY: &str = r#"(b"~$141" as &[u8])"#;
 #[darling(attributes(nep141), supports(struct_named))]
 pub struct Nep141Meta {
     pub storage_key: Option<Expr>,
-    pub before_transfer: Option<syn::ExprPath>,
-    pub before_transfer_plain: Option<syn::ExprPath>,
-    pub before_transfer_call: Option<syn::ExprPath>,
-    pub after_transfer: Option<syn::ExprPath>,
-    pub after_transfer_plain: Option<syn::ExprPath>,
-    pub after_transfer_call: Option<syn::ExprPath>,
+    pub hook: Option<Override<syn::TypePath>>,
 
     pub generics: syn::Generics,
     pub ident: syn::Ident,
@@ -23,12 +18,8 @@ pub struct Nep141Meta {
 pub fn expand(meta: Nep141Meta) -> Result<TokenStream, darling::Error> {
     let Nep141Meta {
         storage_key,
-        before_transfer,
-        before_transfer_plain,
-        before_transfer_call,
-        after_transfer,
-        after_transfer_plain,
-        after_transfer_call,
+        hook,
+
         generics,
         ident,
     } = meta;
@@ -38,7 +29,32 @@ pub fn expand(meta: Nep141Meta) -> Result<TokenStream, darling::Error> {
     let storage_key =
         storage_key.unwrap_or_else(|| syn::parse_str::<Expr>(DEFAULT_STORAGE_KEY).unwrap());
 
+    let impl_empty_hook = if hook.is_none() {
+        Some(quote! {
+            impl #imp near_contract_tools::standard::nep141::Nep141Hook for #ident #ty #wher {}
+        })
+    } else {
+        None
+    };
+
+    let hook = hook
+        .map(|hook| match hook {
+            Override::Inherit => quote! { Self }, // Nep141Hook implemented on Self
+            Override::Explicit(t) => quote! { #t }, // Nep141Hook implemented on t
+        })
+        .unwrap_or_else(|| quote! { Self }); // implicit Nep141 implementation (no hooks)
+
+    let hook = quote! { <#hook as near_contract_tools::standard::nep141::Nep141Hook> };
+
     fn wrap(f: Option<syn::ExprPath>) -> Option<TokenStream> {
+        f.map(|f| {
+            quote! {
+                #f();
+            }
+        })
+    }
+
+    fn wrap_args(f: Option<syn::ExprPath>) -> Option<TokenStream> {
         f.map(|f| {
             quote! {
                 #f(self, &sender_id, &receiver_id, amount, memo.as_deref());
@@ -46,7 +62,7 @@ pub fn expand(meta: Nep141Meta) -> Result<TokenStream, darling::Error> {
         })
     }
 
-    fn wrap_call(f: Option<syn::ExprPath>) -> Option<TokenStream> {
+    fn wrap_call_args(f: Option<syn::ExprPath>) -> Option<TokenStream> {
         f.map(|f| {
             quote! {
                 #f(self, &sender_id, &receiver_id, amount, memo.as_deref(), &msg);
@@ -54,25 +70,9 @@ pub fn expand(meta: Nep141Meta) -> Result<TokenStream, darling::Error> {
         })
     }
 
-    let before_transfer = wrap(before_transfer);
-    let before_transfer_plain = wrap(before_transfer_plain);
-    let before_transfer_call = wrap_call(before_transfer_call);
-
-    let should_clone_call = if after_transfer
-        .as_ref()
-        .or(after_transfer_call.as_ref())
-        .is_some()
-    {
-        Some(quote! { .clone() })
-    } else {
-        None
-    };
-
-    let after_transfer = wrap(after_transfer);
-    let after_transfer_plain = wrap(after_transfer_plain);
-    let after_transfer_call = wrap_call(after_transfer_call);
-
     Ok(quote! {
+        #impl_empty_hook
+
         impl #imp near_contract_tools::standard::nep141::Nep141Controller for #ident #ty #wher {
             fn root(&self) -> near_contract_tools::slot::Slot<()> {
                 near_contract_tools::slot::Slot::root(#storage_key)
@@ -97,13 +97,21 @@ pub fn expand(meta: Nep141Meta) -> Result<TokenStream, darling::Error> {
                 let sender_id = near_sdk::env::predecessor_account_id();
                 let amount: u128 = amount.into();
 
-                #before_transfer_plain
-                #before_transfer
+                #hook::before_transfer();
+
+                // #before_transfer_plain_args
+                // #before_transfer_args
+
+                // #before_transfer_plain
+                // #before_transfer
 
                 Nep141Controller::transfer(self, &sender_id, &receiver_id, amount, memo.as_deref());
 
-                #after_transfer_plain
-                #after_transfer
+                // #after_transfer_plain_args
+                // #after_transfer_args
+
+                // #after_transfer_plain
+                // #after_transfer
             }
 
             #[payable]
@@ -118,21 +126,27 @@ pub fn expand(meta: Nep141Meta) -> Result<TokenStream, darling::Error> {
                 let sender_id = near_sdk::env::predecessor_account_id();
                 let amount: u128 = amount.into();
 
-                #before_transfer_call
-                #before_transfer
+                // #before_transfer_call_args
+                // #before_transfer_args
+
+                // #before_transfer_call
+                // #before_transfer
 
                 let r = near_contract_tools::standard::nep141::Nep141Controller::transfer_call(
                     self,
-                    sender_id #should_clone_call,
-                    receiver_id #should_clone_call,
+                    sender_id,
+                    receiver_id,
                     amount,
                     memo.as_deref(),
-                    msg #should_clone_call,
+                    msg,
                     near_sdk::env::prepaid_gas(),
                 );
 
-                #after_transfer_call
-                #after_transfer
+                // #after_transfer_call_args
+                // #after_transfer_args
+
+                // #after_transfer_call
+                // #after_transfer
 
                 r
             }

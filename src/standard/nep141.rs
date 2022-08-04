@@ -66,6 +66,10 @@ enum StorageKey {
     Account(AccountId),
 }
 
+pub trait Nep141Hook {
+    fn before_transfer() { }
+}
+
 /// Non-public implementations of functions for managing a fungible token.
 pub trait Nep141Controller {
     /// Root storage slot

@@ -113,6 +113,14 @@ struct FungibleToken {
 
 Standalone macros for each individual standard also exist.
 
+### Macro Combinations
+
+One may wish to combine the features of multiple macros in one contract. All of the macros are written such that they will work in a standalone manner, so this should largely work without issue. However, sometimes it may be desirable for the macros to work in _combination_ with each other. For example, to make a fungible token pausable:
+
+```rust
+
+```
+
 ## Authors
 
 - Jacob Lindahl [@sudo_build](https://twitter.com/sudo_build)

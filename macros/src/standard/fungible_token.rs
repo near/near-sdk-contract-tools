@@ -10,12 +10,7 @@ use super::{nep141, nep148};
 pub struct FungibleTokenMeta {
     // NEP-141 fields
     pub storage_key: Option<Expr>,
-    pub before_transfer: Option<syn::ExprPath>,
-    pub before_transfer_plain: Option<syn::ExprPath>,
-    pub before_transfer_call: Option<syn::ExprPath>,
-    pub after_transfer: Option<syn::ExprPath>,
-    pub after_transfer_plain: Option<syn::ExprPath>,
-    pub after_transfer_call: Option<syn::ExprPath>,
+    pub hook: Option<darling::util::Override<syn::TypePath>>,
 
     // NEP-148 fields
     pub spec: Option<String>,
@@ -34,12 +29,7 @@ pub struct FungibleTokenMeta {
 pub fn expand(meta: FungibleTokenMeta) -> Result<TokenStream, darling::Error> {
     let FungibleTokenMeta {
         storage_key,
-        before_transfer,
-        before_transfer_plain,
-        before_transfer_call,
-        after_transfer,
-        after_transfer_plain,
-        after_transfer_call,
+        hook,
 
         spec,
         name,
@@ -55,12 +45,7 @@ pub fn expand(meta: FungibleTokenMeta) -> Result<TokenStream, darling::Error> {
 
     let expand_nep141 = nep141::expand(nep141::Nep141Meta {
         storage_key,
-        before_transfer,
-        before_transfer_plain,
-        before_transfer_call,
-        after_transfer,
-        after_transfer_plain,
-        after_transfer_call,
+        hook,
 
         generics: generics.clone(),
         ident: ident.clone(),
