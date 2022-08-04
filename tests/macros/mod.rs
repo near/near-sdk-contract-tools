@@ -353,11 +353,7 @@ mod pausable_fungible_token {
     };
 
     #[derive(FungibleToken, Pause, BorshDeserialize, BorshSerialize)]
-    #[fungible_token(
-        name = "Pausable Fungible Token",
-        symbol = "PFT",
-        decimals = 18,
-    )]
+    #[fungible_token(name = "Pausable Fungible Token", symbol = "PFT", decimals = 18)]
     #[near_bindgen]
     struct Contract {
         pub storage_usage: u64,

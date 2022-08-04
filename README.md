@@ -104,6 +104,7 @@ use near_sdk::near_bindgen;
     name = "My Fungible Token",
     symbol = "MYFT",
     decimals = 18,
+    no_hooks
 )]
 #[near_bindgen]
 struct FungibleToken {
@@ -115,11 +116,29 @@ Standalone macros for each individual standard also exist.
 
 ### Macro Combinations
 
-One may wish to combine the features of multiple macros in one contract. All of the macros are written such that they will work in a standalone manner, so this should largely work without issue. However, sometimes it may be desirable for the macros to work in _combination_ with each other. For example, to make a fungible token pausable:
+One may wish to combine the features of multiple macros in one contract. All of the macros are written such that they will work in a standalone manner, so this should largely work without issue. However, sometimes it may be desirable for the macros to work in _combination_ with each other. For example, to make a fungible token pausable, use the fungible token hooks to require that a contract be unpaused before making a token transfer:
 
 ```rust
+use near_contract_tools::{
+    pause::Pause,
+    standard::nep141::{Nep141Hook, Nep141Transfer},
+    FungibleToken, Pause,
+};
+use near_sdk::near_bindgen;
 
+#[derive(FungibleToken, Pause)]
+#[fungible_token(name = "Pausable Fungible Token", symbol = "PFT", decimals = 18)]
+#[near_bindgen]
+struct Contract {}
+
+impl Nep141Hook for Contract {
+    fn before_transfer(&mut self, _transfer: &Nep141Transfer) {
+        Contract::require_unpaused();
+    }
+}
 ```
+
+Note: Hooks can be disabled using `#[nep141(no_hooks)]` or `#[fungible_token(no_hooks)]`.
 
 ## Authors
 

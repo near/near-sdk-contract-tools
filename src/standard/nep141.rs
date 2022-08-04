@@ -66,23 +66,45 @@ enum StorageKey {
     Account(AccountId),
 }
 
+/// Contracts may implement this trait to inject code into NEP-141 functions.
+///
+/// `T` is an optional value for passing state between different lifecycle
+/// hooks. This may be useful for charging callers for storage usage, for
+/// example.
 pub trait Nep141Hook<T: Default = ()> {
+    /// Executed before a token transfer is conducted
+    ///
+    /// May return an optional state value which will be passed along to the
+    /// following `after_transfer`.
     fn before_transfer(&mut self, _transfer: &Nep141Transfer) -> T {
         Default::default()
     }
+
+    /// Executed after a token transfer is conducted
+    ///
+    /// Receives the state value returned by `before_transfer`.
     fn after_transfer(&mut self, _transfer: &Nep141Transfer, _state: T) {}
 }
 
+/// Transfer metadata generic over both types of transfer (`ft_transfer` and
+/// `ft_transfer_call`).
 #[derive(Serialize, Deserialize, BorshSerialize, BorshDeserialize, PartialEq, Clone, Debug)]
 pub struct Nep141Transfer {
+    /// Sender's account ID
     pub sender_id: AccountId,
+    /// Receiver's account ID
     pub receiver_id: AccountId,
+    /// Transferred amount
     pub amount: u128,
+    /// Optional memo string
     pub memo: Option<String>,
+    /// Message passed to contract located at `receiver_id`
     pub msg: Option<String>,
 }
 
 impl Nep141Transfer {
+    /// Returns `true` if this transfer comes from a `ft_transfer_call`
+    /// call, `false` otherwise
     pub fn is_transfer_call(&self) -> bool {
         self.msg.is_some()
     }
