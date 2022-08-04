@@ -66,9 +66,11 @@ enum StorageKey {
     Account(AccountId),
 }
 
-pub trait Nep141Hook<T> {
-    fn before_transfer(&mut self, _contract: &mut T, _transfer: &Nep141Transfer) {}
-    fn after_transfer(&mut self, _contract: &mut T, _transfer: &Nep141Transfer) {}
+pub trait Nep141Hook<T: Default = ()> {
+    fn before_transfer(&mut self, _transfer: &Nep141Transfer) -> T {
+        Default::default()
+    }
+    fn after_transfer(&mut self, _transfer: &Nep141Transfer, _state: T) {}
 }
 
 #[derive(Serialize, Deserialize, BorshSerialize, BorshDeserialize, PartialEq, Clone, Debug)]

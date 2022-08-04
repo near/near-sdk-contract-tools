@@ -1,7 +1,7 @@
-use darling::FromDeriveInput;
+use darling::{util::Flag, FromDeriveInput};
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{Expr, TypePath};
+use syn::Expr;
 
 use super::{nep141, nep148};
 
@@ -10,7 +10,7 @@ use super::{nep141, nep148};
 pub struct FungibleTokenMeta {
     // NEP-141 fields
     pub storage_key: Option<Expr>,
-    pub hook: Option<TypePath>,
+    pub no_hooks: Flag,
 
     // NEP-148 fields
     pub spec: Option<String>,
@@ -29,7 +29,7 @@ pub struct FungibleTokenMeta {
 pub fn expand(meta: FungibleTokenMeta) -> Result<TokenStream, darling::Error> {
     let FungibleTokenMeta {
         storage_key,
-        hook,
+        no_hooks,
 
         spec,
         name,
@@ -45,7 +45,7 @@ pub fn expand(meta: FungibleTokenMeta) -> Result<TokenStream, darling::Error> {
 
     let expand_nep141 = nep141::expand(nep141::Nep141Meta {
         storage_key,
-        hook,
+        no_hooks,
 
         generics: generics.clone(),
         ident: ident.clone(),

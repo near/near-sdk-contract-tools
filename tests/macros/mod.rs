@@ -357,7 +357,6 @@ mod pausable_fungible_token {
         name = "Pausable Fungible Token",
         symbol = "PFT",
         decimals = 18,
-        hook = "HookState"
     )]
     #[near_bindgen]
     struct Contract {
@@ -369,17 +368,19 @@ mod pausable_fungible_token {
         pub storage_usage_start: u64,
     }
 
-    impl Nep141Hook<Contract> for HookState {
-        fn before_transfer(&mut self, _contract: &mut Contract, _transfer: &Nep141Transfer) {
+    impl Nep141Hook<HookState> for Contract {
+        fn before_transfer(&mut self, _transfer: &Nep141Transfer) -> HookState {
             Contract::require_unpaused();
-            self.storage_usage_start = env::storage_usage();
+            HookState {
+                storage_usage_start: env::storage_usage(),
+            }
         }
 
-        fn after_transfer(&mut self, contract: &mut Contract, _transfer: &Nep141Transfer) {
-            let storage_delta = env::storage_usage() - self.storage_usage_start;
+        fn after_transfer(&mut self, _transfer: &Nep141Transfer, state: HookState) {
+            let storage_delta = env::storage_usage() - state.storage_usage_start;
             println!("Storage delta: {storage_delta}",);
 
-            contract.storage_usage = storage_delta;
+            self.storage_usage = storage_delta;
         }
     }
 

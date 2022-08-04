@@ -10,7 +10,6 @@ use near_sdk::{
 };
 
 #[derive(Nep141, BorshDeserialize, BorshSerialize)]
-#[nep141(hook = "HookState")]
 #[near_bindgen]
 struct FungibleToken {
     pub transfers: Vector<Nep141Transfer>,
@@ -22,18 +21,21 @@ struct HookState {
     pub storage_usage_start: u64,
 }
 
-impl Nep141Hook<FungibleToken> for HookState {
-    fn before_transfer(&mut self, contract: &mut FungibleToken, transfer: &Nep141Transfer) {
-        contract.transfers.push(transfer);
-        contract.hooks.push(&"before_transfer".to_string());
-        self.storage_usage_start = env::storage_usage();
+impl Nep141Hook<HookState> for FungibleToken {
+    fn before_transfer(&mut self, transfer: &Nep141Transfer) -> HookState {
+        self.transfers.push(transfer);
+        self.hooks.push(&"before_transfer".to_string());
+
+        HookState {
+            storage_usage_start: env::storage_usage(),
+        }
     }
 
-    fn after_transfer(&mut self, contract: &mut FungibleToken, _transfer: &Nep141Transfer) {
-        contract.hooks.push(&"after_transfer".to_string());
+    fn after_transfer(&mut self, _transfer: &Nep141Transfer, state: HookState) {
+        self.hooks.push(&"after_transfer".to_string());
         println!(
             "Storage delta: {}",
-            env::storage_usage() - self.storage_usage_start
+            env::storage_usage() - state.storage_usage_start
         );
     }
 }

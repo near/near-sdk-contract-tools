@@ -1,7 +1,9 @@
-use darling::FromDeriveInput;
+use std::ops::Not;
+
+use darling::{util::Flag, FromDeriveInput};
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{Expr, TypePath};
+use syn::Expr;
 
 const DEFAULT_STORAGE_KEY: &str = r#"(b"~$141" as &[u8])"#;
 
@@ -9,7 +11,7 @@ const DEFAULT_STORAGE_KEY: &str = r#"(b"~$141" as &[u8])"#;
 #[darling(attributes(nep141), supports(struct_named))]
 pub struct Nep141Meta {
     pub storage_key: Option<Expr>,
-    pub hook: Option<TypePath>,
+    pub no_hooks: Flag,
     pub generics: syn::Generics,
     pub ident: syn::Ident,
 }
@@ -17,7 +19,7 @@ pub struct Nep141Meta {
 pub fn expand(meta: Nep141Meta) -> Result<TokenStream, darling::Error> {
     let Nep141Meta {
         storage_key,
-        hook,
+        no_hooks,
         generics,
         ident,
     } = meta;
@@ -27,17 +29,15 @@ pub fn expand(meta: Nep141Meta) -> Result<TokenStream, darling::Error> {
     let storage_key =
         storage_key.unwrap_or_else(|| syn::parse_str::<Expr>(DEFAULT_STORAGE_KEY).unwrap());
 
-    let before_transfer = hook.as_ref().map(|hook| {
+    let before_transfer = no_hooks.is_present().not().then(|| {
         quote! {
-            let mut hook: #hook = Default::default();
-
-            near_contract_tools::standard::nep141::Nep141Hook::<#ident>::before_transfer(&mut hook, self, &transfer);
+            let hook_state = <Self as near_contract_tools::standard::nep141::Nep141Hook::<_>>::before_transfer(self, &transfer);
         }
     });
 
-    let after_transfer = hook.is_some().then(|| {
+    let after_transfer = no_hooks.is_present().not().then(|| {
         quote! {
-            near_contract_tools::standard::nep141::Nep141Hook::<#ident>::after_transfer(&mut hook, self, &transfer);
+            <Self as near_contract_tools::standard::nep141::Nep141Hook::<_>>::after_transfer(self, &transfer, hook_state);
         }
     });
 

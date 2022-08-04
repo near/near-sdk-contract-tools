@@ -5,7 +5,10 @@ use near_contract_tools::{
     },
     FungibleToken,
 };
-use near_sdk::{near_bindgen, test_utils::VMContextBuilder, testing_env, AccountId};
+use near_sdk::{
+    json_types::Base64VecU8, near_bindgen, test_utils::VMContextBuilder, testing_env, AccountId,
+};
+use std::borrow::Cow;
 
 #[derive(FungibleToken)]
 #[fungible_token(
@@ -14,7 +17,8 @@ use near_sdk::{near_bindgen, test_utils::VMContextBuilder, testing_env, AccountI
     decimals = 18,
     icon = "https://example.com/icon.png",
     reference = "https://example.com/metadata.json",
-    reference_hash = "YXNkZg=="
+    reference_hash = "YXNkZg==",
+    no_hooks
 )]
 #[near_bindgen]
 struct FungibleToken {}
@@ -51,28 +55,21 @@ fn fungible_token_transfer() {
     assert_eq!(ft.ft_total_supply().0, 120);
 }
 
-#[cfg(test)]
-mod tests {
-    use super::{FungibleToken, Nep148};
-    use near_sdk::json_types::Base64VecU8;
-    use std::borrow::Cow;
+#[test]
+fn metadata() {
+    let ft = FungibleToken {};
+    let meta = ft.ft_metadata();
 
-    #[test]
-    fn metadata() {
-        let ft = FungibleToken {};
-        let meta = ft.ft_metadata();
-
-        assert_eq!(meta.decimals, 18);
-        assert_eq!(meta.name, "My Fungible Token");
-        assert_eq!(meta.symbol, "MYFT");
-        assert_eq!(meta.icon, Some("https://example.com/icon.png".into()));
-        assert_eq!(
-            meta.reference,
-            Some("https://example.com/metadata.json".into())
-        );
-        assert_eq!(
-            meta.reference_hash,
-            Some(Cow::Owned(Base64VecU8::from([97, 115, 100, 102].to_vec())))
-        );
-    }
+    assert_eq!(meta.decimals, 18);
+    assert_eq!(meta.name, "My Fungible Token");
+    assert_eq!(meta.symbol, "MYFT");
+    assert_eq!(meta.icon, Some("https://example.com/icon.png".into()));
+    assert_eq!(
+        meta.reference,
+        Some("https://example.com/metadata.json".into())
+    );
+    assert_eq!(
+        meta.reference_hash,
+        Some(Cow::Owned(Base64VecU8::from([97, 115, 100, 102].to_vec())))
+    );
 }
