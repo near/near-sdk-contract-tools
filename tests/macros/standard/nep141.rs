@@ -10,12 +10,11 @@ use near_sdk::{
 };
 
 #[derive(Nep141, BorshDeserialize, BorshSerialize)]
+#[nep141(hook = "HookState")]
 #[near_bindgen]
 struct FungibleToken {
     pub transfers: Vector<Nep141Transfer>,
     pub hooks: Vector<String>,
-    #[borsh_skip]
-    nep141_hook: HookState,
 }
 
 #[derive(Default)]
@@ -24,17 +23,17 @@ struct HookState {
 }
 
 impl Nep141Hook<FungibleToken> for HookState {
-    fn before_transfer(contract: &mut FungibleToken, transfer: &Nep141Transfer) {
+    fn before_transfer(&mut self, contract: &mut FungibleToken, transfer: &Nep141Transfer) {
         contract.transfers.push(transfer);
         contract.hooks.push(&"before_transfer".to_string());
-        contract.nep141_hook.storage_usage_start = env::storage_usage();
+        self.storage_usage_start = env::storage_usage();
     }
 
-    fn after_transfer(contract: &mut FungibleToken, _transfer: &Nep141Transfer) {
+    fn after_transfer(&mut self, contract: &mut FungibleToken, _transfer: &Nep141Transfer) {
         contract.hooks.push(&"after_transfer".to_string());
         println!(
             "Storage delta: {}",
-            env::storage_usage() - contract.nep141_hook.storage_usage_start
+            env::storage_usage() - self.storage_usage_start
         );
     }
 }
@@ -70,7 +69,6 @@ fn nep141_transfer() {
     let mut ft = FungibleToken {
         transfers: Vector::new(b"t"),
         hooks: Vector::new(b"h"),
-        nep141_hook: Default::default(),
     };
 
     let alice: AccountId = "alice".parse().unwrap();

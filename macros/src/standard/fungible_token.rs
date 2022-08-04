@@ -1,15 +1,16 @@
 use darling::FromDeriveInput;
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::Expr;
+use syn::{Expr, TypePath};
 
-use super::{nep141::{self, Nep141Receiver}, nep148};
+use super::{nep141, nep148};
 
 #[derive(Debug, FromDeriveInput)]
 #[darling(attributes(fungible_token), supports(struct_named))]
 pub struct FungibleTokenMeta {
     // NEP-141 fields
     pub storage_key: Option<Expr>,
+    pub hook: Option<TypePath>,
 
     // NEP-148 fields
     pub spec: Option<String>,
@@ -23,12 +24,12 @@ pub struct FungibleTokenMeta {
     // darling
     pub generics: syn::Generics,
     pub ident: syn::Ident,
-    pub data: darling::ast::Data<(), Nep141Receiver>,
 }
 
 pub fn expand(meta: FungibleTokenMeta) -> Result<TokenStream, darling::Error> {
     let FungibleTokenMeta {
         storage_key,
+        hook,
 
         spec,
         name,
@@ -40,15 +41,14 @@ pub fn expand(meta: FungibleTokenMeta) -> Result<TokenStream, darling::Error> {
 
         generics,
         ident,
-        data,
     } = meta;
 
     let expand_nep141 = nep141::expand(nep141::Nep141Meta {
         storage_key,
+        hook,
 
         generics: generics.clone(),
         ident: ident.clone(),
-        data,
     });
 
     let expand_nep148 = nep148::expand(nep148::Nep148Meta {

@@ -1,7 +1,7 @@
-use darling::{FromDeriveInput, FromField};
+use darling::FromDeriveInput;
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::Expr;
+use syn::{Expr, TypePath};
 
 const DEFAULT_STORAGE_KEY: &str = r#"(b"~$141" as &[u8])"#;
 
@@ -9,23 +9,17 @@ const DEFAULT_STORAGE_KEY: &str = r#"(b"~$141" as &[u8])"#;
 #[darling(attributes(nep141), supports(struct_named))]
 pub struct Nep141Meta {
     pub storage_key: Option<Expr>,
+    pub hook: Option<TypePath>,
     pub generics: syn::Generics,
     pub ident: syn::Ident,
-    pub data: darling::ast::Data<(), Nep141Receiver>,
-}
-
-#[derive(Debug, FromField)]
-pub struct Nep141Receiver {
-    pub ident: Option<syn::Ident>,
-    pub ty: syn::Type,
 }
 
 pub fn expand(meta: Nep141Meta) -> Result<TokenStream, darling::Error> {
     let Nep141Meta {
         storage_key,
+        hook,
         generics,
         ident,
-        data,
     } = meta;
 
     let (imp, ty, wher) = generics.split_for_impl();
@@ -33,21 +27,17 @@ pub fn expand(meta: Nep141Meta) -> Result<TokenStream, darling::Error> {
     let storage_key =
         storage_key.unwrap_or_else(|| syn::parse_str::<Expr>(DEFAULT_STORAGE_KEY).unwrap());
 
-    // unwraps are safe because of #[darling(supports(struct_named))]
-    let hook = data.take_struct().unwrap().into_iter().find_map(|f| {
-        let i = f.ident.unwrap();
-        (i.to_string() == "nep141_hook").then(|| f.ty)
-    });
-
     let before_transfer = hook.as_ref().map(|hook| {
         quote! {
-            <#hook as near_contract_tools::standard::nep141::Nep141Hook<#ident>>::before_transfer(self, &transfer);
+            let mut hook: #hook = Default::default();
+
+            near_contract_tools::standard::nep141::Nep141Hook::<#ident>::before_transfer(&mut hook, self, &transfer);
         }
     });
 
-    let after_transfer = hook.as_ref().map(|hook| {
+    let after_transfer = hook.is_some().then(|| {
         quote! {
-            <#hook as near_contract_tools::standard::nep141::Nep141Hook<#ident>>::after_transfer(self, &transfer);
+            near_contract_tools::standard::nep141::Nep141Hook::<#ident>::after_transfer(&mut hook, self, &transfer);
         }
     });
 
