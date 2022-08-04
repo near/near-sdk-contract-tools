@@ -3,12 +3,12 @@
 #![allow(missing_docs)] // ext_contract doesn't play nice with #![warn(missing_docs)]
 
 use near_sdk::{
-    borsh::{self, BorshSerialize},
+    borsh::{self, BorshDeserialize, BorshSerialize},
     env, ext_contract,
     json_types::U128,
     require, AccountId, BorshStorageKey, Gas, Promise, PromiseOrValue, PromiseResult,
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::{event::Event, slot::Slot};
 use crate::{near_contract_tools, Event};
@@ -66,8 +66,24 @@ enum StorageKey {
     Account(AccountId),
 }
 
-pub trait Nep141Hook {
-    fn before_transfer() { }
+pub trait Nep141Hook<T> {
+    fn before_transfer(_contract: &mut T, _transfer: &Nep141Transfer) {}
+    fn after_transfer(_contract: &mut T, _transfer: &Nep141Transfer) {}
+}
+
+#[derive(Serialize, Deserialize, BorshSerialize, BorshDeserialize, PartialEq, Clone, Debug)]
+pub struct Nep141Transfer {
+    pub sender_id: AccountId,
+    pub receiver_id: AccountId,
+    pub amount: u128,
+    pub memo: Option<String>,
+    pub msg: Option<String>,
+}
+
+impl Nep141Transfer {
+    pub fn is_transfer_call(&self) -> bool {
+        self.msg.is_some()
+    }
 }
 
 /// Non-public implementations of functions for managing a fungible token.
