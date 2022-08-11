@@ -1,5 +1,5 @@
 use darling::{ast::Style, FromDeriveInput, FromVariant};
-use proc_macro::TokenStream;
+use proc_macro2::TokenStream;
 use quote::quote;
 
 use crate::rename::RenameStrategy;
@@ -12,6 +12,7 @@ pub struct EventMeta {
     pub rename_all: Option<RenameStrategy>,
 
     pub ident: syn::Ident,
+    pub generics: syn::Generics,
     pub data: darling::ast::Data<EventVariantReceiver, ()>,
 }
 
@@ -30,8 +31,11 @@ pub fn expand(meta: EventMeta) -> Result<TokenStream, darling::Error> {
         version,
         rename_all,
         ident: type_name,
+        generics,
         data,
     } = meta;
+
+    let (imp, ty, wher) = generics.split_for_impl();
 
     // Variant attributes
     let arms = match &data {
@@ -68,8 +72,8 @@ pub fn expand(meta: EventMeta) -> Result<TokenStream, darling::Error> {
     )
     .collect::<Vec<_>>();
 
-    Ok(TokenStream::from(quote! {
-        impl near_contract_tools::event::EventMetadata for #type_name {
+    Ok(quote! {
+        impl #imp near_contract_tools::event::EventMetadata for #type_name #ty #wher {
             fn standard(&self) -> &'static str {
                 #standard
             }
@@ -84,5 +88,5 @@ pub fn expand(meta: EventMeta) -> Result<TokenStream, darling::Error> {
                 }
             }
         }
-    }))
+    })
 }

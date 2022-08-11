@@ -1,5 +1,5 @@
 use darling::FromDeriveInput;
-use proc_macro::TokenStream;
+use proc_macro2::TokenStream;
 use quote::quote;
 use syn::Expr;
 
@@ -19,7 +19,7 @@ pub fn expand(meta: OwnerMeta) -> Result<TokenStream, darling::Error> {
     let storage_key =
         storage_key.unwrap_or_else(|| syn::parse_str::<Expr>(DEFAULT_STORAGE_KEY).unwrap());
 
-    Ok(TokenStream::from(quote! {
+    Ok(quote! {
         impl near_contract_tools::owner::Owner for #ident {
             fn root() -> near_contract_tools::slot::Slot<()> {
                 near_contract_tools::slot::Slot::root(#storage_key)
@@ -54,5 +54,5 @@ pub fn expand(meta: OwnerMeta) -> Result<TokenStream, darling::Error> {
                 self.accept_owner();
             }
         }
-    }))
+    })
 }

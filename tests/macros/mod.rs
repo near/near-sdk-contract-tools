@@ -13,6 +13,7 @@ mod event;
 mod migrate;
 mod owner;
 mod pause;
+mod standard;
 
 #[derive(Serialize, Event)]
 #[event(standard = "x-myevent", version = "1.0.0", rename_all = "snake_case")]
@@ -335,4 +336,90 @@ fn integration_fail_migrate_paused() {
     Integration::pause(&mut c);
 
     MigrateIntegration::migrate();
+}
+
+#[cfg(test)]
+mod pausable_fungible_token {
+    use near_contract_tools::{
+        pause::Pause,
+        standard::nep141::{Nep141, Nep141Controller, Nep141Hook, Nep141Transfer},
+        FungibleToken, Pause,
+    };
+    use near_sdk::{
+        borsh::{self, BorshDeserialize, BorshSerialize},
+        env, near_bindgen,
+        test_utils::VMContextBuilder,
+        testing_env, AccountId,
+    };
+
+    #[derive(FungibleToken, Pause, BorshDeserialize, BorshSerialize)]
+    #[fungible_token(name = "Pausable Fungible Token", symbol = "PFT", decimals = 18)]
+    #[near_bindgen]
+    struct Contract {
+        pub storage_usage: u64,
+    }
+
+    #[derive(Default)]
+    struct HookState {
+        pub storage_usage_start: u64,
+    }
+
+    impl Nep141Hook<HookState> for Contract {
+        fn before_transfer(&mut self, _transfer: &Nep141Transfer) -> HookState {
+            Contract::require_unpaused();
+            HookState {
+                storage_usage_start: env::storage_usage(),
+            }
+        }
+
+        fn after_transfer(&mut self, _transfer: &Nep141Transfer, state: HookState) {
+            let storage_delta = env::storage_usage() - state.storage_usage_start;
+            println!("Storage delta: {storage_delta}",);
+
+            self.storage_usage = storage_delta;
+        }
+    }
+
+    #[test]
+    fn hooks_modify_state() {
+        let alice: AccountId = "alice".parse().unwrap();
+        let bob: AccountId = "bob_account".parse().unwrap();
+
+        let mut c = Contract { storage_usage: 0 };
+
+        c.internal_deposit(&alice, 100);
+
+        let context = VMContextBuilder::new()
+            .attached_deposit(1)
+            .predecessor_account_id(alice.clone())
+            .build();
+
+        testing_env!(context);
+
+        c.ft_transfer(bob.clone(), 50.into(), None);
+
+        assert_ne!(c.storage_usage, 0);
+    }
+
+    #[test]
+    #[should_panic(expected = "Disallowed while contract is paused")]
+    fn hooks_can_terminate_on_error() {
+        let alice: AccountId = "alice".parse().unwrap();
+        let bob: AccountId = "bob_account".parse().unwrap();
+
+        let mut c = Contract { storage_usage: 0 };
+
+        c.internal_deposit(&alice, 100);
+
+        let context = VMContextBuilder::new()
+            .attached_deposit(1)
+            .predecessor_account_id(alice.clone())
+            .build();
+
+        testing_env!(context);
+
+        Pause::pause(&mut c);
+
+        c.ft_transfer(bob.clone(), 50.into(), None);
+    }
 }
