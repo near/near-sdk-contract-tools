@@ -15,6 +15,17 @@ Not to be confused with [`near-contract-standards`](https://crates.io/crates/nea
 
 **WARNING:** This is still early software, and there may be breaking changes between versions. I'll try my best to keep the docs & changelogs up-to-date. Don't hesitate to create an issue if find anything wrong.
 
+## Build and test
+
+```
+cargo build --target wasm32-unknown-unknown --release
+cd workspaces-tests
+cargo build --target wasm32-unknown-unknown --release
+cd ..
+cargo install cargo-make
+cargo make test
+```
+
 ## Examples
 
 See also: [the full integration tests](tests/macros/mod.rs).
