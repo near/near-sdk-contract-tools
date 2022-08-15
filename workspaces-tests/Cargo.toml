@@ -1,0 +1,15 @@
+[package]
+name = "workspaces-tests"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+near-contract-tools = { path = "../" }
+near-sdk = "4.0.0"
+
+[dev-dependencies]
+tokio = "1"
+workspaces = "0.4"
