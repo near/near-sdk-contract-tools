@@ -17,12 +17,17 @@ Not to be confused with [`near-contract-standards`](https://crates.io/crates/nea
 
 ## Build and test
 
-```
-cargo build --target wasm32-unknown-unknown --release
-cd workspaces-tests
-cargo build --target wasm32-unknown-unknown --release
-cd ..
+Install `cargo-make` if it is not installed already:
+
+```txt
 cargo install cargo-make
+```
+
+Run tests:
+
+```
+cargo test
+cd workspaces-tests
 cargo make test
 ```
 
