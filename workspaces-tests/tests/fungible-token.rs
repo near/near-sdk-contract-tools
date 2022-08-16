@@ -2,7 +2,7 @@ use near_sdk::{json_types::U128, serde_json::json};
 use workspaces::{prelude::*, Account, AccountId, Contract, Network, Worker};
 
 const WASM: &[u8] =
-    include_bytes!("../../target/wasm32-unknown-unknown/release/workspaces_tests.wasm");
+    include_bytes!("../../target/wasm32-unknown-unknown/release/fungible-token.wasm");
 
 async fn balance(worker: &Worker<impl Network>, contract: &Contract, account: &AccountId) -> u128 {
     contract

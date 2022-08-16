@@ -2,9 +2,10 @@
 name = "workspaces-tests"
 version = "0.1.0"
 edition = "2021"
+autobins = false
 
-[lib]
-crate-type = ["cdylib"]
+[[bin]]
+name = "fungible-token"
 
 [dependencies]
 near-contract-tools = { path = "../" }
