@@ -3,8 +3,6 @@ use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use syn::spanned::Spanned;
 
-use crate::integration::IntegrationGuard;
-
 #[derive(Debug, FromDeriveInput)]
 #[darling(
     attributes(migrate),
@@ -17,7 +15,6 @@ pub struct MigrateMeta {
     pub convert: Option<syn::ExprPath>,
     pub convert_with_args: Option<syn::ExprPath>,
     pub on_migrate: syn::ExprPath,
-    pub integrate: Option<IntegrationGuard>,
 
     pub ident: syn::Ident,
     pub generics: syn::Generics,
@@ -57,7 +54,6 @@ pub fn expand(meta: MigrateMeta) -> Result<TokenStream, darling::Error> {
         convert,
         convert_with_args,
         on_migrate,
-        integrate,
 
         ident,
         generics,
@@ -95,7 +91,6 @@ pub fn expand(meta: MigrateMeta) -> Result<TokenStream, darling::Error> {
         impl #imp #ident #ty #wh {
             #[init(ignore_state)]
             pub fn migrate(#args_sig) -> Self {
-                #integrate;
                 #on_migrate();
 
                 let old_state = <#ident as near_contract_tools::migrate::MigrateController>::deserialize_old_schema();
