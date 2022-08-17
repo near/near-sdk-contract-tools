@@ -140,7 +140,7 @@ impl Nep141Hook for Contract {
 
 Note: Hooks can be disabled using `#[nep141(no_hooks)]` or `#[fungible_token(no_hooks)]`.
 
-## Development
+## Contributing
 
 ### Getting Started
 
