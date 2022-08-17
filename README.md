@@ -15,10 +15,6 @@ Not to be confused with [`near-contract-standards`](https://crates.io/crates/nea
 
 **WARNING:** This is still early software, and there may be breaking changes between versions. I'll try my best to keep the docs & changelogs up-to-date. Don't hesitate to create an issue if find anything wrong.
 
-# Getting Started
-
-First, run `git config core.hooksPath hooks/` to install the hooks of this directory (without affecting how git hooks work for other projects). 
-
 ## Examples
 
 See also: [the full integration tests](tests/macros/mod.rs).
@@ -143,6 +139,12 @@ impl Nep141Hook for Contract {
 ```
 
 Note: Hooks can be disabled using `#[nep141(no_hooks)]` or `#[fungible_token(no_hooks)]`.
+
+## Development
+
+### Getting Started
+
+First, run `git config core.hooksPath hooks/` to install the hooks of this directory (without affecting how git hooks work for other projects).
 
 ## Authors
 
