@@ -25,7 +25,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Check formatting
-        run: |
+        run: >
           out=$(cargo fmt -- --check);
           retval=$?;
           if [[ ${retval} -ne 0 ]]; then
