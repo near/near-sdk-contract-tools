@@ -16,7 +16,7 @@ RESET='\033[0m' # No Color
 
 if [[ ${result} -ne 0 ]] ; then
     printf "${RED}Please run \`cargo fmt\` before committing code. Here is the current result of \`cargo fmt -- --check\`:\n${RESET}"
-    echo $diff
+    echo "$diff"
     exit 1
 fi
 
