@@ -26,8 +26,8 @@ jobs:
       - uses: actions/checkout@v3
       - name: Run formatting checker
         run: >
-          diff=$(cargo fmt -- --check);
-          retval=$?;
+          echo "diff=$(cargo fmt -- --check)" >> $GITHUB_ENV;
+          echo "retval=$?" >> $GITHUB_ENV;
       - name: Check formatting result
         run: >
           if [[ ${retval} -ne 0 ]]; then
