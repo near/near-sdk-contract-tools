@@ -342,7 +342,7 @@ fn integration_fail_migrate_paused() {
 mod pausable_fungible_token {
     use near_contract_tools::{
         pause::Pause,
-        standard::nep141::{Nep141, Nep141Controller, Nep141Hook, Nep141Transfer},
+        standard::nep141::{Nep141Hook, Nep141Transfer},
         FungibleToken, Pause,
     };
     use near_sdk::{
