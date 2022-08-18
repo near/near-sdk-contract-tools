@@ -1,0 +1,26 @@
+name: Check Formatting
+
+on:
+  push:
+    branches: ['main', 'develop']
+  pull_request:
+    branches: ['main', 'develop']
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Check formatting
+        run: out=$(cargo fmt -- --check);
+          retval=$?;
+          echo "$out";
+          if [[ ${retval} -ne 0 ]]; then
+          false;
+          else
+          true;
+          fi
