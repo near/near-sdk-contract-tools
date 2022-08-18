@@ -25,11 +25,15 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Check formatting
-        run: out=$(cargo fmt -- --check);
+        run: |
+          out=$(cargo fmt -- --check);
           retval=$?;
-          echo "$out";
           if [[ ${retval} -ne 0 ]]; then
-          false;
+            echo "::echo::on"
+            echo "::group::Incorrectly formatted code";
+            echo "$out";
+            echo "::endgroup::";
+            false;
           else
-          true;
+            true;
           fi
