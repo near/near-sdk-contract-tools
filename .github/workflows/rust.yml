@@ -24,18 +24,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
-      - name: Run formatting checker
+      - name: Check formatting
         run: >
-          echo "diff=$(cargo fmt -- --check)" >> $GITHUB_ENV;
-          echo "retval=$?" >> $GITHUB_ENV;
-      - name: Check formatting result
-        run: >
-          if [[ ${retval} -ne 0 ]]; then
-            echo "::echo::on";
-            echo "::group::Incorrectly formatted code";
-            echo "$diff";
-            echo "::endgroup::";
-            false;
-          else
-            true;
-          fi
+          echo "::echo::on";
+          cargo fmt -- --check;
