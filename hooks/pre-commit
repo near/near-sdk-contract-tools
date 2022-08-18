@@ -1,10 +1,24 @@
 #!/bin/bash
 #
-# An example hook script to verify what is about to be committed.
-# The hook should exit with non-zero status after issuing an appropriate message if it wants to prevent the commit.
-#
-# In the project directory, run `git config core.hooksPath hooks/` to install the hooks of this 
-# directory (without affecting how git hooks work for other projects).
+# In the project directory, run `git config core.hooksPath hooks/` to install the hooks of this directory (without affecting how git hooks work for other projects).
+
+# To avoid having this pre-commit hook block your commits, configure your VSCode like this:
+
+# {
+#   "editor.formatOnPaste": true,
+#   "editor.formatOnSave": true,
+#   "editor.formatOnType": true,
+#   "editor.codeActionsOnSave": {
+#     "source.fixAll.eslint": true
+#   },
+#   "[rust]": {
+#     "editor.formatOnSave": true,
+#     "editor.defaultFormatter": "rust-lang.rust-analyzer"
+#   },
+#   //...
+# }
+
+
 # https://www.atlassian.com/git/tutorials/git-hooks#local-hooks
 # https://near-foundation.atlassian.net/browse/ENG-149
 
@@ -15,7 +29,7 @@ RED='\033[0;31m'
 RESET='\033[0m' # No Color
 
 if [[ ${result} -ne 0 ]] ; then
-    printf "${RED}Please run \`cargo fmt\` before committing code. Here is the current result of \`cargo fmt -- --check\`:\n${RESET}"
+    printf "${RED}Formatting / style errors.${RESET}\n\n  Please read the comments at hooks/pre-commit to see how to configure VSC to avoid this problem.\n\n  Alternatively, you can always run \`cargo fmt\` before committing code. Here is the current result of \`cargo fmt -- --check\`:\n\n"
     echo "$diff"
     exit 1
 fi
