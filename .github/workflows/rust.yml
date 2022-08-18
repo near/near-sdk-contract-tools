@@ -24,7 +24,5 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
-      - name: echo test
-        run: echo "Test echo"
       - name: Check formatting
-        run: out=$(cargo fmt -- --check); retval=$?; if [[ ${retval} -ne 0 ]]; then echo "::echo::on"; echo "::group::Incorrectly formatted code"; echo "$out"; echo "::endgroup::"; false; else true; fi
+        run: out=$(cargo fmt -- --check); retval=$?; if [[ ${retval} -ne 0 ]]; then echo "::echo::on"; echo "::group::Incorrectly formatted code"; echo "$out"; echo "::endgroup::"; exit 2; else exit 0; fi
