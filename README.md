@@ -140,6 +140,12 @@ impl Nep141Hook for Contract {
 
 Note: Hooks can be disabled using `#[nep141(no_hooks)]` or `#[fungible_token(no_hooks)]`.
 
+## Contributing
+
+### Getting Started
+
+First, run `git config core.hooksPath hooks/` to install the hooks of this directory (without affecting how git hooks work for other projects).
+
 ## Authors
 
 - Jacob Lindahl [@sudo_build](https://twitter.com/sudo_build)
