@@ -42,6 +42,12 @@ where
         let predecessor = env::predecessor_account_id();
         require!(Self::has_role(&predecessor, role), "Unauthorized");
     }
+
+    /// Requires transaction predecessor to not have a given role.
+    fn prohibit_role(&self, role: &R) {
+        let predecessor = env::predecessor_account_id();
+        require!(!Self::has_role(&predecessor, role), "Prohibited");
+    }
 }
 
 #[cfg(test)]
@@ -166,5 +172,41 @@ mod tests {
         testing_env!(VMContextBuilder::new().predecessor_account_id(a).build());
 
         r.require_role(&Role::B);
+    }
+
+
+    #[test]
+    #[should_panic = "Prohibited"]
+    pub fn prohibit_role_fail() {
+        let mut r = Contract {};
+        let a: AccountId = "account".parse().unwrap();
+
+        r.add_role(&a, &Role::A);
+
+        testing_env!(VMContextBuilder::new().predecessor_account_id(a).build());
+
+        r.prohibit_role(&Role::A);
+    }
+
+    #[test]
+    pub fn prohibit_role_success_diff_role() {
+        let mut r = Contract {};
+        let a: AccountId = "account".parse().unwrap();
+
+        r.add_role(&a, &Role::A);
+
+        testing_env!(VMContextBuilder::new().predecessor_account_id(a).build());
+
+        r.prohibit_role(&Role::B);
+    }
+
+    #[test]
+    pub fn prohibit_role_success_no_role() {
+        let r = Contract {};
+        let a: AccountId = "account".parse().unwrap();
+
+        testing_env!(VMContextBuilder::new().predecessor_account_id(a).build());
+
+        r.prohibit_role(&Role::B);
     }
 }
