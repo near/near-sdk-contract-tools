@@ -174,7 +174,6 @@ mod tests {
         r.require_role(&Role::B);
     }
 
-
     #[test]
     #[should_panic = "Prohibited"]
     pub fn prohibit_role_fail() {
