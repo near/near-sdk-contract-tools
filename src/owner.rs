@@ -75,6 +75,18 @@ pub trait Owner {
         }
     }
 
+    /// Updates the current owner without any checks or emitting events
+    fn update_owner_unchecked(&mut self, new: Option<AccountId>) {
+        let mut owner = Self::slot_owner();
+        owner.set(new.as_ref());
+    }
+
+    /// Updates proposed owner without any checks or emitting events 
+    fn update_proposed_unchecked(&mut self, new: Option<AccountId>) {
+        let mut proposed_owner = Self::slot_proposed_owner();
+        proposed_owner.set(new.as_ref());
+    }
+
     /// Initializes the contract owner. Can only be called once.
     ///
     /// Emits an `OwnerEvent::Transfer` event.
