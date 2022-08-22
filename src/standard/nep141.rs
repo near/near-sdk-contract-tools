@@ -88,7 +88,7 @@ pub trait Nep141Hook<T: Default = ()> {
 
 /// Transfer metadata generic over both types of transfer (`ft_transfer` and
 /// `ft_transfer_call`).
-#[derive(Serialize, Deserialize, BorshSerialize, BorshDeserialize, PartialEq, Clone, Debug)]
+#[derive(Serialize, Deserialize, BorshSerialize, BorshDeserialize, PartialEq, Eq, Clone, Debug)]
 pub struct Nep141Transfer {
     /// Sender's account ID
     pub sender_id: AccountId,
