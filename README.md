@@ -15,6 +15,18 @@ Not to be confused with [`near-contract-standards`](https://crates.io/crates/nea
 
 **WARNING:** This is still early software, and there may be breaking changes between versions. I'll try my best to keep the docs & changelogs up-to-date. Don't hesitate to create an issue if find anything wrong.
 
+## Benefits
+
+- requires fewer lines of code
+  - Without near-contract-tools, implementing fungible token events (mint, transfer, and burn) takes ~100 lines of code. Using near-contract-tools, you can [implement them in ~40 lines](https://youtu.be/kJzes_UP5j0?t=1058).
+- is more readable
+- follows a consistent pattern
+  - Every time you use the events macro, it will [implement events in the same way](https://youtu.be/kJzes_UP5j0?t=1150). Without it, you’d need to ensure that `emit`, `emit_many`, etc all work (and work the same).
+- is more thorough
+  - near-contract-standards is also not implementing traits, so that’s another improvement that near-contract-tools offers. 
+
+You can think of this collection of common tools and patterns (mostly in the form of [derive macros](https://doc.rust-lang.org/reference/procedural-macros.html#derive-macros)) as sort of an OpenZeppelin for NEAR.
+
 ## Build and test
 
 Install `cargo-make` if it is not installed already:
@@ -155,6 +167,46 @@ impl Nep141Hook for Contract {
 ```
 
 Note: Hooks can be disabled using `#[nep141(no_hooks)]` or `#[fungible_token(no_hooks)]`.
+
+
+## Other Tips
+
+### [Internal vs External Methods](https://youtu.be/kJzes_UP5j0?t=2172)
+
+Internal methods are not available to be callable via the blockchain. External ones are public and can be called by other contracts.
+
+### [Proposal Pattern](https://youtu.be/kJzes_UP5j0?t=2213)
+
+Proposing ownership (rather than transferring directly) is a generally good practice because it prevents you from accidentally transferring ownership to an account that nobody has access to (which would kill the contract).
+
+### [Expand](https://youtu.be/kJzes_UP5j0?t=1790)
+
+`cargo expand` will generate one huge Rust file with all of the macros generated:
+
+```
+cargo install cargo-expand
+cargo expand > expanded.rs
+``` 
+
+### [Owner trait](https://youtu.be/kJzes_UP5j0?t=2520)
+
+In order to implement the owner trait, you only have to implement one function: “root”.
+
+### [Slots](https://youtu.be/kJzes_UP5j0?t=2527)
+
+See [src/slot.rs](src/slot.rs) They are very thin wrappers over a storage key. It provides a sort of namespacing / key-combining functionality and also functionality such as "read", "write", "exists", "remove", etc.
+
+### Reminders about NEAR functionality
+
+- [assert_one_yocto()](https://youtu.be/kJzes_UP5j0?t=2989)
+
+    `assert_one_yocto()` in near_sdk is a function that requires a full access key (by requiring a deposit of one yoctonear, the smallest possible unit of NEAR). 
+
+    Why is this important?
+
+    If a user connects their NEAR account to a dapp and gives the dapp permissions to call functions on this smart contract on their behalf, the dapp *still* will not be able to call *this function* (i.e. any function that calls `assert_one_yocto()`) on their behalf.
+
+    The only way to add this requirement (to force the transaction to be signed by a full access key) is to require some non-zero transfer.
 
 ## Contributing
 
