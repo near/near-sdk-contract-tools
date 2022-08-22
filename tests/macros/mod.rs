@@ -387,7 +387,7 @@ mod pausable_fungible_token {
 
         let mut c = Contract { storage_usage: 0 };
 
-        c.internal_deposit(&alice, 100);
+        c.unchecked_deposit(&alice, 100);
 
         let context = VMContextBuilder::new()
             .attached_deposit(1)
@@ -409,7 +409,7 @@ mod pausable_fungible_token {
 
         let mut c = Contract { storage_usage: 0 };
 
-        c.internal_deposit(&alice, 100);
+        c.unchecked_deposit(&alice, 100);
 
         let context = VMContextBuilder::new()
             .attached_deposit(1)

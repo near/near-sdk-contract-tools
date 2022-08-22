@@ -142,7 +142,7 @@ pub trait Nep141Controller {
     ///
     /// Panics if the current balance of `account_id` is less than `amount` or
     /// if `total_supply` is less than `amount`.
-    fn internal_withdraw(&mut self, account_id: &AccountId, amount: u128) {
+    fn unchecked_withdraw(&mut self, account_id: &AccountId, amount: u128) {
         if amount != 0 {
             let balance = self.balance_of(account_id);
             if let Some(balance) = balance.checked_sub(amount) {
@@ -167,7 +167,7 @@ pub trait Nep141Controller {
     ///
     /// Panics if the balance of `account_id` plus `amount` >= `u128::MAX`, or
     /// if the total supply plus `amount` >= `u128::MAX`.
-    fn internal_deposit(&mut self, account_id: &AccountId, amount: u128) {
+    fn unchecked_deposit(&mut self, account_id: &AccountId, amount: u128) {
         if amount != 0 {
             let balance = self.balance_of(account_id);
             if let Some(balance) = balance.checked_add(amount) {
@@ -193,7 +193,7 @@ pub trait Nep141Controller {
     ///
     /// Panics if the balance of `sender_account_id` < `amount` or if the
     /// balance of `receiver_account_id` plus `amount` >= `u128::MAX`.
-    fn internal_transfer(
+    fn unchecked_transfer(
         &mut self,
         sender_account_id: &AccountId,
         receiver_account_id: &AccountId,
@@ -219,7 +219,7 @@ pub trait Nep141Controller {
     ///
     /// # Panics
     ///
-    /// See: `Nep141Controller::internal_transfer`
+    /// See: `Nep141Controller::unchecked_transfer`
     fn transfer(
         &mut self,
         sender_account_id: &AccountId,
@@ -227,7 +227,7 @@ pub trait Nep141Controller {
         amount: u128,
         memo: Option<&str>,
     ) {
-        self.internal_transfer(sender_account_id, receiver_account_id, amount);
+        self.unchecked_transfer(sender_account_id, receiver_account_id, amount);
 
         Nep141Event::FtTransfer {
             old_owner_id: sender_account_id,
@@ -242,9 +242,9 @@ pub trait Nep141Controller {
     ///
     /// # Panics
     ///
-    /// See: `Nep141Controller::internal_deposit`
+    /// See: `Nep141Controller::unchecked_deposit`
     fn mint(&mut self, account_id: &AccountId, amount: u128, memo: Option<&str>) {
-        self.internal_deposit(account_id, amount);
+        self.unchecked_deposit(account_id, amount);
 
         Nep141Event::FtMint {
             owner_id: account_id,
@@ -258,9 +258,9 @@ pub trait Nep141Controller {
     ///
     /// # Panics
     ///
-    /// See: `Nep141Controller::internal_withdraw`
+    /// See: `Nep141Controller::unchecked_withdraw`
     fn burn(&mut self, account_id: &AccountId, amount: u128, memo: Option<&str>) {
-        self.internal_withdraw(account_id, amount);
+        self.unchecked_withdraw(account_id, amount);
 
         Nep141Event::FtBurn {
             owner_id: account_id,
