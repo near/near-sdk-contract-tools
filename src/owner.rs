@@ -81,7 +81,7 @@ pub trait Owner {
         owner.set(new.as_ref());
     }
 
-    /// Updates proposed owner without any checks or emitting events 
+    /// Updates proposed owner without any checks or emitting events
     fn update_proposed_unchecked(&mut self, new: Option<AccountId>) {
         let mut proposed_owner = Self::slot_proposed_owner();
         proposed_owner.set(new.as_ref());
