@@ -49,7 +49,7 @@ pub trait Owner {
 
     /// Updates the current owner and emits relevant event
     fn update_owner(&mut self, new: Option<AccountId>) {
-        let mut owner = Self::slot_owner();
+        let owner = Self::slot_owner();
         let old = owner.read();
         if old != new {
             OwnerEvent::Transfer {
@@ -57,13 +57,13 @@ pub trait Owner {
                 new: new.clone(),
             }
             .emit();
-            owner.set(new.as_ref());
+            self.update_owner_unchecked(new);
         }
     }
 
     /// Updates proposed owner and emits relevant event
     fn update_proposed(&mut self, new: Option<AccountId>) {
-        let mut proposed_owner = Self::slot_proposed_owner();
+        let proposed_owner = Self::slot_proposed_owner();
         let old = proposed_owner.read();
         if old != new {
             OwnerEvent::Propose {
@@ -71,7 +71,7 @@ pub trait Owner {
                 new: new.clone(),
             }
             .emit();
-            proposed_owner.set(new.as_ref());
+            self.update_proposed_unchecked(new);
         }
     }
 
@@ -431,5 +431,32 @@ mod tests {
             .build());
 
         contract.own_accept_owner();
+    }
+
+    #[test]
+    fn update_owner_unchecked() {
+        let owner_id: AccountId = "owner".parse().unwrap();
+
+        let mut contract = Contract::new(owner_id.clone());
+
+        let new_owner: AccountId = "new_owner".parse().unwrap();
+
+        contract.update_owner_unchecked(Some(new_owner.clone()));
+
+        assert_eq!(contract.own_get_owner(), Some(new_owner));
+        assert_eq!(contract.own_get_proposed_owner(), None);
+    }
+    #[test]
+    fn update_proposed_unchecked() {
+        let owner_id: AccountId = "owner".parse().unwrap();
+
+        let mut contract = Contract::new(owner_id.clone());
+
+        let proposed_owner: AccountId = "proposed".parse().unwrap();
+
+        contract.update_proposed_unchecked(Some(proposed_owner.clone()));
+
+        assert_eq!(contract.own_get_owner(), Some(owner_id));
+        assert_eq!(contract.own_get_proposed_owner(), Some(proposed_owner));
     }
 }
