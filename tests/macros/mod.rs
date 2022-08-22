@@ -1,5 +1,10 @@
 use near_contract_tools::{
-    event::Event, owner::Owner, pause::Pause, rbac::Rbac, Event, Migrate, Owner, Pause, Rbac,
+    event::Event,
+    migrate::{MigrateExternal, MigrateHook},
+    owner::Owner,
+    pause::Pause,
+    rbac::Rbac,
+    Event, Migrate, Owner, Pause, Rbac,
 };
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
@@ -97,7 +102,7 @@ impl Integration {
 }
 
 #[derive(Migrate, Owner, Pause, Rbac, BorshSerialize, BorshDeserialize)]
-#[migrate(from = "Integration", on_migrate = "Self::on_migrate")]
+#[migrate(from = "Integration")]
 #[owner(storage_key = "StorageKey::Owner")]
 #[pause(storage_key = "StorageKey::Pause")]
 #[rbac(storage_key = "StorageKey::Rbac", roles = "Role")]
@@ -107,19 +112,15 @@ struct MigrateIntegration {
     pub moved_value: u32,
 }
 
-impl From<Integration> for MigrateIntegration {
-    fn from(old: Integration) -> Self {
+impl MigrateHook for MigrateIntegration {
+    fn migrate(old: Integration, _args: Option<String>) -> Self {
+        Self::require_owner();
+        Self::require_unpaused();
+
         Self {
             new_value: "my string".to_string(),
             moved_value: old.value,
         }
-    }
-}
-
-impl MigrateIntegration {
-    fn on_migrate() {
-        Self::require_owner();
-        Self::require_unpaused();
     }
 }
 
@@ -206,7 +207,7 @@ fn integration() {
     // Perform migration
     env::state_write(&c);
 
-    let mut migrated = MigrateIntegration::migrate();
+    let mut migrated = <MigrateIntegration as MigrateExternal>::migrate(None);
 
     assert_eq!(migrated.moved_value, 25);
     assert_eq!(migrated.get_value(), 25);
@@ -319,7 +320,7 @@ fn integration_fail_migrate_allow() {
 
     testing_env!(context);
 
-    MigrateIntegration::migrate();
+    <MigrateIntegration as MigrateExternal>::migrate(None);
 }
 
 #[test]
@@ -335,7 +336,9 @@ fn integration_fail_migrate_paused() {
 
     Integration::pause(&mut c);
 
-    MigrateIntegration::migrate();
+    env::state_write(&c);
+
+    <MigrateIntegration as MigrateExternal>::migrate(None);
 }
 
 #[cfg(test)]
