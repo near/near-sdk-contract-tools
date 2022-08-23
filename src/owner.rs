@@ -1,7 +1,8 @@
 //! Owner pattern
+#![allow(missing_docs)] // #[ext_contract(...)] does not play nicely with clippy
 
 use near_contract_tools_macros::Event;
-use near_sdk::{env, require, AccountId};
+use near_sdk::{env, ext_contract, require, AccountId};
 use serde::Serialize;
 
 use crate::{event::Event, near_contract_tools, slot::Slot};
@@ -216,6 +217,7 @@ pub trait Owner {
 }
 
 /// Externally-accessible functions for `Owner`
+#[ext_contract(ext_owner)]
 pub trait OwnerExternal {
     /// Returns the account ID of the current owner
     fn own_get_owner(&self) -> Option<AccountId>;

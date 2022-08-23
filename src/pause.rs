@@ -1,8 +1,9 @@
 //! Contract method pausing/unpausing
+#![allow(missing_docs)] // #[ext_contract(...)] does not play nicely with clippy
 
 use crate::{event::Event, near_contract_tools, slot::Slot};
 use near_contract_tools_macros::Event;
-use near_sdk::require;
+use near_sdk::{ext_contract, require};
 use serde::Serialize;
 
 const UNPAUSED_FAIL_MESSAGE: &str = "Disallowed while contract is unpaused";
@@ -100,6 +101,7 @@ pub trait Pause {
 }
 
 /// External methods for `Pause`
+#[ext_contract(ext_pause)]
 pub trait PauseExternal {
     /// Returns `true` if the contract is paused, `false` otherwise
     fn paus_is_paused(&self) -> bool;
