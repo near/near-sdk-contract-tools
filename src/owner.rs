@@ -6,6 +6,12 @@ use serde::Serialize;
 
 use crate::{event::Event, near_contract_tools, slot::Slot};
 
+const ONLY_OWNER_FAIL_MESSAGE: &str = "Owner only";
+const OWNER_INIT_FAIL_MESSAGE: &str = "Owner already initialized";
+const NO_OWNER_FAIL_MESSAGE: &str = "No owner";
+const ONLY_PROPOSED_OWNER_FAIL_MESSAGE: &str = "Proposed owner only";
+const NO_PROPOSED_OWNER_FAIL_MESSAGE: &str = "No proposed owner";
+
 /// Events emitted by function calls on an ownable contract
 #[derive(Event, Serialize)]
 #[event(standard = "x-own", version = "1.0.0", rename_all = "snake_case")]
@@ -115,7 +121,7 @@ pub trait Owner {
     fn init(&mut self, owner_id: &AccountId) {
         require!(
             !Self::slot_is_initialized().exists(),
-            "Owner already initialized",
+            OWNER_INIT_FAIL_MESSAGE,
         );
 
         Self::slot_is_initialized().write(&true);
@@ -155,8 +161,8 @@ pub trait Owner {
                 == Self::slot_owner()
                     .read()
                     .as_ref()
-                    .unwrap_or_else(|| env::panic_str("No owner")),
-            "Owner only",
+                    .unwrap_or_else(|| env::panic_str(NO_OWNER_FAIL_MESSAGE)),
+            ONLY_OWNER_FAIL_MESSAGE,
         );
     }
 
@@ -192,11 +198,11 @@ pub trait Owner {
     fn accept_owner(&mut self) {
         let proposed_owner = Self::slot_proposed_owner()
             .take()
-            .unwrap_or_else(|| env::panic_str("No proposed owner"));
+            .unwrap_or_else(|| env::panic_str(NO_PROPOSED_OWNER_FAIL_MESSAGE));
 
         require!(
             env::predecessor_account_id() == proposed_owner,
-            "Proposed owner only",
+            ONLY_PROPOSED_OWNER_FAIL_MESSAGE,
         );
 
         OwnerEvent::Propose {

@@ -5,6 +5,9 @@ use near_contract_tools_macros::Event;
 use near_sdk::require;
 use serde::Serialize;
 
+const UNPAUSED_FAIL_MESSAGE: &str = "Disallowed while contract is unpaused";
+const PAUSED_FAIL_MESSAGE: &str = "Disallowed while contract is paused";
+
 /// Events emitted when contract pause state is changed
 #[derive(Event, Serialize)]
 #[event(standard = "x-paus", version = "1.0.0", rename_all = "snake_case")]
@@ -87,12 +90,12 @@ pub trait Pause {
 
     /// Rejects if the contract is unpaused
     fn require_paused() {
-        require!(Self::is_paused(), "Disallowed while contract is unpaused");
+        require!(Self::is_paused(), UNPAUSED_FAIL_MESSAGE);
     }
 
     /// Rejects if the contract is paused
     fn require_unpaused() {
-        require!(!Self::is_paused(), "Disallowed while contract is paused");
+        require!(!Self::is_paused(), PAUSED_FAIL_MESSAGE);
     }
 }
 
