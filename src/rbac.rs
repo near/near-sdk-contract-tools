@@ -4,6 +4,9 @@ use near_sdk::{borsh::BorshSerialize, env, require, AccountId, IntoStorageKey};
 
 use crate::slot::Slot;
 
+const REQUIRE_ROLE_FAIL_MESSAGE: &str = "Unauthorized role";
+const PROHIBIT_ROLE_FAIL_MESSAGE: &str = "Prohibited role";
+
 /// Role-based access control
 pub trait Rbac<R>
 where
@@ -40,13 +43,19 @@ where
     /// Requires transaction predecessor to have a given role.
     fn require_role(&self, role: &R) {
         let predecessor = env::predecessor_account_id();
-        require!(Self::has_role(&predecessor, role), "Unauthorized");
+        require!(
+            Self::has_role(&predecessor, role),
+            REQUIRE_ROLE_FAIL_MESSAGE
+        );
     }
 
     /// Requires transaction predecessor to not have a given role.
     fn prohibit_role(&self, role: &R) {
         let predecessor = env::predecessor_account_id();
-        require!(!Self::has_role(&predecessor, role), "Prohibited");
+        require!(
+            !Self::has_role(&predecessor, role),
+            PROHIBIT_ROLE_FAIL_MESSAGE
+        );
     }
 }
 
@@ -151,7 +160,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic = "Unauthorized"]
+    #[should_panic = "Unauthorized role"]
     pub fn require_role_fail_wrong_role() {
         let mut r = Contract {};
         let a: AccountId = "account".parse().unwrap();
@@ -164,7 +173,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic = "Unauthorized"]
+    #[should_panic = "Unauthorized role"]
     pub fn require_role_fail_no_role() {
         let r = Contract {};
         let a: AccountId = "account".parse().unwrap();
@@ -175,7 +184,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic = "Prohibited"]
+    #[should_panic = "Prohibited role"]
     pub fn prohibit_role_fail() {
         let mut r = Contract {};
         let a: AccountId = "account".parse().unwrap();

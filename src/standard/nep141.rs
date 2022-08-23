@@ -18,6 +18,8 @@ pub const GAS_FOR_RESOLVE_TRANSFER: Gas = Gas(5_000_000_000_000);
 /// Gas value required for ft_transfer_call calls (includes gas for )
 pub const GAS_FOR_FT_TRANSFER_CALL: Gas = Gas(25_000_000_000_000 + GAS_FOR_RESOLVE_TRANSFER.0);
 
+const MORE_GAS_FAIL_MESSAGE: &str = "More gas is required";
+
 /// NEP-141 standard events for minting, burning, and transferring tokens
 #[derive(Serialize, Event)]
 #[event(standard = "nep141", version = "1.0.0", rename_all = "snake_case")]
@@ -288,7 +290,7 @@ pub trait Nep141Controller {
     ) -> Promise {
         require!(
             gas_allowance >= GAS_FOR_FT_TRANSFER_CALL,
-            "More gas is required",
+            MORE_GAS_FAIL_MESSAGE,
         );
 
         self.transfer(&sender_account_id, &receiver_account_id, amount, memo);
