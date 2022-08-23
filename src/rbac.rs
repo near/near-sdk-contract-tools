@@ -45,7 +45,7 @@ where
         let predecessor = env::predecessor_account_id();
         require!(
             Self::has_role(&predecessor, role),
-            &REQUIRE_ROLE_FAIL_MESSAGE
+            REQUIRE_ROLE_FAIL_MESSAGE
         );
     }
 
@@ -54,7 +54,7 @@ where
         let predecessor = env::predecessor_account_id();
         require!(
             !Self::has_role(&predecessor, role),
-            &PROHIBIT_ROLE_FAIL_MESSAGE
+            PROHIBIT_ROLE_FAIL_MESSAGE
         );
     }
 }
