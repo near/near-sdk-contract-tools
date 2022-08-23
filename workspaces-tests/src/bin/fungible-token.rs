@@ -22,6 +22,6 @@ impl Contract {
     }
 
     pub fn mint(&mut self, amount: U128) {
-        self.unchecked_deposit(&env::predecessor_account_id(), amount.into());
+        self.deposit_unchecked(&env::predecessor_account_id(), amount.into());
     }
 }

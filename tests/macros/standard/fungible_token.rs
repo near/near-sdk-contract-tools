@@ -28,8 +28,8 @@ fn fungible_token_transfer() {
     assert_eq!(ft.ft_balance_of(bob.clone()).0, 0);
     assert_eq!(ft.ft_total_supply().0, 0);
 
-    ft.unchecked_deposit(&alice, 100);
-    ft.unchecked_deposit(&bob, 20);
+    ft.deposit_unchecked(&alice, 100);
+    ft.deposit_unchecked(&bob, 20);
 
     assert_eq!(ft.ft_balance_of(alice.clone()).0, 100);
     assert_eq!(ft.ft_balance_of(bob.clone()).0, 20);
