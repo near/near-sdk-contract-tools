@@ -4,7 +4,7 @@
 
 pub mod standard;
 
-pub mod confirmations;
+pub mod approval;
 pub mod event;
 pub mod migrate;
 pub mod owner;
