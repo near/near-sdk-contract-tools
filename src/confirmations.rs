@@ -1,3 +1,5 @@
+//! Queue and approve actions
+
 use std::collections::HashMap;
 
 use near_sdk::{
@@ -6,33 +8,61 @@ use near_sdk::{
 };
 use serde::{Deserialize, Serialize};
 
+/// Actions can be executed after they are confirmed
 pub trait Action {
+    /// Return type of the action. Useful if the action creates a `Promise`, for example.
     type Output;
+    /// Perform the action. One time only.
     fn execute(self) -> Self::Output;
 }
 
+/// The confirmation state determines whether an action request has achieved
+/// sufficient confirmations. For example, multisig confirmation state would
+/// keep track of who has approved an action request so far.
 pub trait ConfirmationState<C> {
+    /// Whether the current state represents full confirmation. Note that this
+    /// function is called immediately before attempting to execute an action,
+    /// so it is possible for this function to respond to externalities (i.e.
+    /// changes to contract state other than calls to confirm or reject)
     fn is_confirmed(&self, config: &C) -> bool;
+
+    /// Try to improve the confirmation state. Additional arguments may be
+    /// provided, e.g. from the initiating function call
     fn attempt_confirmation(&mut self, args: Option<String>, config: &C);
+
+    /// Try to worsen the confirmation state. Additional arguments may be
+    /// provided, e.g. from the initiating function call
     fn attempt_rejection(&mut self, _args: Option<String>, _config: &C) -> bool {
         false
     }
 }
 
+/// An action request is composed of an action that will be executed when the
+/// associated confirmation state is satisfied
 #[derive(Serialize, Deserialize, BorshSerialize, BorshDeserialize, Debug)]
 pub struct ActionRequest<A, S> {
+    /// The action that will be executed when the confirmation state is
+    /// fulfilled
     pub action: A,
+    /// The associated confirmation state
     pub confirmation_state: S,
 }
 
+/// Collection of action requests that manages their confirmation state and
+/// execution
 #[derive(Serialize, Deserialize, BorshSerialize, BorshDeserialize, Default)]
 pub struct Confirmations<A, S, C> {
+    /// Because requests will be deleted from the requests collection,
+    /// maintain a simple counter to guarantee unique IDs
     pub next_request_id: u32,
+    /// Current list of pending action requests.
     pub requests: HashMap<u32, ActionRequest<A, S>>,
+    /// Confirmation context included in relevant confirmation-related calls
     pub config: C,
 }
 
 impl<A, S, C> Confirmations<A, S, C> {
+    /// Creates a new instance of the struct with the given config
     pub fn new(config: C) -> Self {
         Self {
             next_request_id: 0,
@@ -41,6 +71,8 @@ impl<A, S, C> Confirmations<A, S, C> {
         }
     }
 
+    /// Creates a new action request initialized with the given confirmation
+    /// state
     pub fn add_request_with_state(&mut self, action: A, confirmation_state: S) -> u32 {
         let request_id = self.next_request_id;
         self.next_request_id += 1;
@@ -58,6 +90,7 @@ impl<A, S, C> Confirmations<A, S, C> {
 }
 
 impl<A, S: Default, C> Confirmations<A, S, C> {
+    /// Creates a new action request with the default confirmation state
     pub fn add_request(&mut self, action: A) -> u32 {
         let request_id = self.next_request_id;
         self.next_request_id += 1;
@@ -75,6 +108,8 @@ impl<A, S: Default, C> Confirmations<A, S, C> {
 }
 
 impl<A: Action, S: ConfirmationState<C>, C> Confirmations<A, S, C> {
+    /// Executes an action request and removes it from the collection if the
+    /// confirmation state of the request is fulfilled. Panics otherwise.
     pub fn attempt_execution(&mut self, request_id: u32) -> A::Output {
         require!(
             self.is_confirmed(request_id),
@@ -89,6 +124,8 @@ impl<A: Action, S: ConfirmationState<C>, C> Confirmations<A, S, C> {
 }
 
 impl<A, S: ConfirmationState<C>, C> Confirmations<A, S, C> {
+    /// Returns `true` if the given request ID exists and is confirmed (that
+    /// is, the action request may be executed), `false` otherwise.
     pub fn is_confirmed(&self, request_id: u32) -> bool {
         self.requests
             .get(&request_id)
@@ -96,23 +133,24 @@ impl<A, S: ConfirmationState<C>, C> Confirmations<A, S, C> {
             .unwrap_or(false)
     }
 
+    /// Tries to confirm the action request designated by the given request ID
+    /// with the given arguments. Panics if the request ID does not exist.
     pub fn attempt_confirmation(&mut self, request_id: u32, args: Option<String>) {
-        if let Some(ref mut request) = self.requests.get_mut(&request_id) {
-            request
-                .confirmation_state
-                .attempt_confirmation(args, &self.config);
-        }
+        self.requests
+            .get_mut(&request_id)
+            .unwrap()
+            .confirmation_state
+            .attempt_confirmation(args, &self.config);
     }
 
+    /// Tries to reject the action request designated by the given request ID
+    /// with the given arguments. Panics if the request ID does not exist.
     pub fn attempt_rejection(&mut self, request_id: u32, args: Option<String>) {
         self.requests
             .get_mut(&request_id)
-            .map(|request| {
-                request
-                    .confirmation_state
-                    .attempt_rejection(args, &self.config)
-            })
-            .unwrap_or(false)
+            .unwrap()
+            .confirmation_state
+            .attempt_rejection(args, &self.config)
             .then(|| {
                 self.requests.remove(&request_id);
             });
@@ -132,7 +170,7 @@ mod tests {
     use crate::near_contract_tools;
     use crate::{confirmations::ConfirmationState, rbac::Rbac};
 
-    use super::{Action, ActionRequest, Confirmations};
+    use super::{Action, Confirmations};
 
     #[derive(BorshSerialize, BorshStorageKey)]
     enum Role {
@@ -191,7 +229,7 @@ mod tests {
                 >= config.threshold as usize
         }
 
-        fn attempt_confirmation(&mut self, args: Option<String>, config: &MultisigConfig) {
+        fn attempt_confirmation(&mut self, _args: Option<String>, _config: &MultisigConfig) {
             let predecessor = env::predecessor_account_id();
             require!(
                 Contract::has_role(&predecessor, &Role::Multisig),
