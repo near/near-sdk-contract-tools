@@ -8,6 +8,8 @@ use near_sdk::{
 };
 use serde::{Deserialize, Serialize};
 
+pub mod simple_multisig;
+
 /// Actions can be executed after they are approved
 pub trait Action {
     /// Return type of the action. Useful if the action creates a `Promise`, for example.
