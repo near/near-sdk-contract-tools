@@ -1,3 +1,5 @@
+#![cfg(not(windows))]
+
 use near_sdk::{json_types::U128, serde_json::json};
 use workspaces::{prelude::*, Account, AccountId, Contract, Network, Worker};
 
