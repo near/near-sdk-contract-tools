@@ -5,7 +5,7 @@ name = "workspaces-tests"
 version = "0.1.0"
 
 [[bin]]
-name = "fungible-token"
+name = "fungible_token"
 
 [dependencies]
 near-contract-tools = {path = "../"}
