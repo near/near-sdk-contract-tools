@@ -13,4 +13,6 @@ near-sdk = "4.0.0"
 
 [dev-dependencies]
 tokio = "1"
+
+[target.'cfg(not(windows))'.dev-dependencies]
 workspaces = "0.4"

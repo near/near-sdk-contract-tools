@@ -6,6 +6,12 @@ use serde::Serialize;
 
 use crate::{event::Event, near_contract_tools, slot::Slot};
 
+const ONLY_OWNER_FAIL_MESSAGE: &str = "Owner only";
+const OWNER_INIT_FAIL_MESSAGE: &str = "Owner already initialized";
+const NO_OWNER_FAIL_MESSAGE: &str = "No owner";
+const ONLY_PROPOSED_OWNER_FAIL_MESSAGE: &str = "Proposed owner only";
+const NO_PROPOSED_OWNER_FAIL_MESSAGE: &str = "No proposed owner";
+
 /// Events emitted by function calls on an ownable contract
 #[derive(Event, Serialize)]
 #[event(standard = "x-own", version = "1.0.0", rename_all = "snake_case")]
@@ -49,7 +55,7 @@ pub trait Owner {
 
     /// Updates the current owner and emits relevant event
     fn update_owner(&mut self, new: Option<AccountId>) {
-        let mut owner = Self::slot_owner();
+        let owner = Self::slot_owner();
         let old = owner.read();
         if old != new {
             OwnerEvent::Transfer {
@@ -57,13 +63,13 @@ pub trait Owner {
                 new: new.clone(),
             }
             .emit();
-            owner.set(new.as_ref());
+            self.update_owner_unchecked(new);
         }
     }
 
     /// Updates proposed owner and emits relevant event
     fn update_proposed(&mut self, new: Option<AccountId>) {
-        let mut proposed_owner = Self::slot_proposed_owner();
+        let proposed_owner = Self::slot_proposed_owner();
         let old = proposed_owner.read();
         if old != new {
             OwnerEvent::Propose {
@@ -71,7 +77,7 @@ pub trait Owner {
                 new: new.clone(),
             }
             .emit();
-            proposed_owner.set(new.as_ref());
+            self.update_proposed_unchecked(new);
         }
     }
 
@@ -115,7 +121,7 @@ pub trait Owner {
     fn init(&mut self, owner_id: &AccountId) {
         require!(
             !Self::slot_is_initialized().exists(),
-            "Owner already initialized",
+            OWNER_INIT_FAIL_MESSAGE,
         );
 
         Self::slot_is_initialized().write(&true);
@@ -155,8 +161,8 @@ pub trait Owner {
                 == Self::slot_owner()
                     .read()
                     .as_ref()
-                    .unwrap_or_else(|| env::panic_str("No owner")),
-            "Owner only",
+                    .unwrap_or_else(|| env::panic_str(NO_OWNER_FAIL_MESSAGE)),
+            ONLY_OWNER_FAIL_MESSAGE,
         );
     }
 
@@ -192,11 +198,11 @@ pub trait Owner {
     fn accept_owner(&mut self) {
         let proposed_owner = Self::slot_proposed_owner()
             .take()
-            .unwrap_or_else(|| env::panic_str("No proposed owner"));
+            .unwrap_or_else(|| env::panic_str(NO_PROPOSED_OWNER_FAIL_MESSAGE));
 
         require!(
             env::predecessor_account_id() == proposed_owner,
-            "Proposed owner only",
+            ONLY_PROPOSED_OWNER_FAIL_MESSAGE,
         );
 
         OwnerEvent::Propose {
@@ -431,5 +437,32 @@ mod tests {
             .build());
 
         contract.own_accept_owner();
+    }
+
+    #[test]
+    fn update_owner_unchecked() {
+        let owner_id: AccountId = "owner".parse().unwrap();
+
+        let mut contract = Contract::new(owner_id.clone());
+
+        let new_owner: AccountId = "new_owner".parse().unwrap();
+
+        contract.update_owner_unchecked(Some(new_owner.clone()));
+
+        assert_eq!(contract.own_get_owner(), Some(new_owner));
+        assert_eq!(contract.own_get_proposed_owner(), None);
+    }
+    #[test]
+    fn update_proposed_unchecked() {
+        let owner_id: AccountId = "owner".parse().unwrap();
+
+        let mut contract = Contract::new(owner_id.clone());
+
+        let proposed_owner: AccountId = "proposed".parse().unwrap();
+
+        contract.update_proposed_unchecked(Some(proposed_owner.clone()));
+
+        assert_eq!(contract.own_get_owner(), Some(owner_id));
+        assert_eq!(contract.own_get_proposed_owner(), Some(proposed_owner));
     }
 }
