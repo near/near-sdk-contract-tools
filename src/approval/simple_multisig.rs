@@ -8,8 +8,26 @@ use serde::{Deserialize, Serialize};
 
 use crate::approval::{Approval, ApprovalState};
 
-pub type SimpleMultisig<Action, Approver> =
-    Approval<Action, SimpleMultisigApprovalState, SimpleMultisigConfig<Approver>>;
+pub trait SimpleMultisig<A: super::Action, P: SimpleMultisigApprover> {
+    fn root() -> crate::slot::Slot<()>;
+    fn init(config: SimpleMultisigConfig<P>)
+    where
+        Self: Sized,
+    {
+        <Self as Approval<A, SimpleMultisigApprovalState, SimpleMultisigConfig<P>>>::init(config);
+    }
+}
+
+impl<A, P, T> Approval<A, SimpleMultisigApprovalState, SimpleMultisigConfig<P>> for T
+where
+    A: super::Action,
+    P: SimpleMultisigApprover,
+    T: SimpleMultisig<A, P>,
+{
+    fn root() -> crate::slot::Slot<()> {
+        T::root()
+    }
+}
 
 pub trait SimpleMultisigApprover {
     fn approve(account_id: &AccountId) -> Result<(), Cow<str>>;
@@ -32,7 +50,7 @@ impl<A: SimpleMultisigApprover> SimpleMultisigConfig<A> {
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(BorshSerialize, BorshDeserialize, Default, Debug)]
 pub struct SimpleMultisigApprovalState {
     pub approved_by: Vec<AccountId>,
 }
@@ -77,7 +95,6 @@ impl<A: SimpleMultisigApprover> ApprovalState<SimpleMultisigConfig<A>>
     }
 }
 
-#[cfg(test)]
 mod tests {
     use near_sdk::{
         borsh::{self, BorshDeserialize, BorshSerialize},
@@ -86,7 +103,7 @@ mod tests {
         testing_env, AccountId, BorshStorageKey,
     };
 
-    use crate::{approval::Approval, near_contract_tools, rbac::Rbac, Rbac};
+    use crate::{approval::Approval, near_contract_tools, rbac::Rbac, slot::Slot, Rbac};
 
     use super::{SimpleMultisig, SimpleMultisigApprover, SimpleMultisigConfig};
 
@@ -112,11 +129,15 @@ mod tests {
         Multisig,
     }
 
-    #[derive(Rbac)]
+    #[derive(Rbac, Debug)]
     #[rbac(roles = "Role")]
     #[near_bindgen]
-    struct Contract {
-        pub approval: SimpleMultisig<Action, Self>,
+    struct Contract {}
+
+    impl SimpleMultisig<Action, Self> for Contract {
+        fn root() -> Slot<()> {
+            Slot::new(b"m")
+        }
     }
 
     impl SimpleMultisigApprover for Contract {
@@ -133,9 +154,8 @@ mod tests {
     impl Contract {
         #[init]
         pub fn new() -> Self {
-            Self {
-                approval: Approval::new(SimpleMultisigConfig::new(2)),
-            }
+            <Self as SimpleMultisig<_, _>>::init(SimpleMultisigConfig::new(2));
+            Self {}
         }
 
         pub fn obtain_multisig_permission(&mut self) {
@@ -151,21 +171,21 @@ mod tests {
                 Action::SayGoodbye
             };
 
-            let request_id = self.approval.add_request(action);
+            let request_id = self.add_request(action);
 
             request_id
         }
 
         pub fn approve(&mut self, request_id: u32) {
-            self.approval.attempt_approval(request_id, None);
+            self.attempt_approval(request_id, None);
         }
 
         pub fn reject(&mut self, request_id: u32) {
-            self.approval.attempt_rejection(request_id, None);
+            self.attempt_rejection(request_id, None);
         }
 
         pub fn execute(&mut self, request_id: u32) -> &'static str {
-            self.approval.attempt_execution(request_id)
+            self.attempt_execution(request_id)
         }
     }
 
@@ -193,17 +213,27 @@ mod tests {
         let request_id = contract.create(true);
 
         assert_eq!(request_id, 0);
-        assert!(!contract.approval.is_approved(request_id));
+        assert!(!Contract::is_approved(request_id));
 
         predecessor(&alice);
         contract.approve(request_id);
 
-        assert!(!contract.approval.is_approved(request_id));
+        assert!(!Contract::is_approved(request_id));
 
         predecessor(&charlie);
         contract.approve(request_id);
 
-        assert!(contract.approval.is_approved(request_id));
+        assert!(Contract::is_approved(request_id));
+
+        predecessor(&alice);
+        contract.reject(request_id);
+
+        assert!(!Contract::is_approved(request_id));
+
+        predecessor(&bob);
+        contract.approve(request_id);
+
+        assert!(Contract::is_approved(request_id));
 
         assert_eq!(contract.execute(request_id), "hello");
     }

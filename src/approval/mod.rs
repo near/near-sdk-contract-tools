@@ -1,7 +1,5 @@
 //! Queue and approve actions
 
-use std::fmt::Debug;
-
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
     require, BorshStorageKey,
@@ -14,7 +12,7 @@ use crate::slot::Slot;
 pub mod simple_multisig;
 
 /// Actions can be executed after they are approved
-pub trait Action: Debug + BorshSerialize + BorshDeserialize {
+pub trait Action: BorshSerialize + BorshDeserialize {
     /// Return type of the action. Useful if the action creates a `Promise`, for example.
     type Output;
     /// Perform the action. One time only.
@@ -24,7 +22,7 @@ pub trait Action: Debug + BorshSerialize + BorshDeserialize {
 /// The approval state determines whether an action request has achieved
 /// sufficient approvals. For example, multisig confirmation state would keep
 /// track of who has approved an action request so far.
-pub trait ApprovalState<C>: Debug + Default + BorshSerialize + BorshDeserialize {
+pub trait ApprovalState<C>: Default + BorshSerialize + BorshDeserialize {
     /// Whether the current state represents full approval. Note that this
     /// function is called immediately before attempting to execute an action,
     /// so it is possible for this function to respond to externalities (i.e.
