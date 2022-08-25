@@ -8,6 +8,7 @@ use near_sdk::{
 };
 use serde::{Deserialize, Serialize};
 
+pub mod expire_multisig;
 pub mod simple_multisig;
 
 /// Actions can be executed after they are approved
