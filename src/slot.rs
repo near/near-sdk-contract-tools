@@ -130,7 +130,7 @@ impl<T: BorshDeserialize> Slot<T> {
 
 impl<T: BorshSerialize + BorshDeserialize> Slot<T> {
     /// Writes a value to storage and returns the evicted value, if present.
-    pub fn swap(&mut self, value: T) -> Option<T> {
+    pub fn swap(&mut self, value: &T) -> Option<T> {
         if self.write_raw(&value.try_to_vec().unwrap()) {
             // unwrap should be safe because write_raw returned true
             Some(T::try_from_slice(&env::storage_get_evicted().unwrap()).unwrap())
