@@ -66,7 +66,7 @@ impl<A: SimpleMultisigApprover> ApprovalState<SimpleMultisigConfig<A>>
             >= config.threshold as usize
     }
 
-    fn attempt_approval(&mut self, _args: Option<String>, _config: &SimpleMultisigConfig<A>) {
+    fn try_approve(&mut self, _args: Option<String>, _config: &SimpleMultisigConfig<A>) {
         let predecessor = env::predecessor_account_id();
 
         A::approve(&predecessor).unwrap_or_else(|e| env::panic_str(&e));
@@ -79,11 +79,7 @@ impl<A: SimpleMultisigApprover> ApprovalState<SimpleMultisigConfig<A>>
         self.approved_by.push(predecessor);
     }
 
-    fn attempt_rejection(
-        &mut self,
-        _args: Option<String>,
-        _config: &SimpleMultisigConfig<A>,
-    ) -> bool {
+    fn try_reject(&mut self, _args: Option<String>, _config: &SimpleMultisigConfig<A>) -> bool {
         let predecessor = env::predecessor_account_id();
 
         A::approve(&predecessor).unwrap_or_else(|e| env::panic_str(&e));
@@ -95,6 +91,7 @@ impl<A: SimpleMultisigApprover> ApprovalState<SimpleMultisigConfig<A>>
     }
 }
 
+#[cfg(test)]
 mod tests {
     use near_sdk::{
         borsh::{self, BorshDeserialize, BorshSerialize},
@@ -177,15 +174,15 @@ mod tests {
         }
 
         pub fn approve(&mut self, request_id: u32) {
-            self.attempt_approval(request_id, None);
+            self.try_approve(request_id, None);
         }
 
         pub fn reject(&mut self, request_id: u32) {
-            self.attempt_rejection(request_id, None);
+            self.try_reject(request_id, None);
         }
 
         pub fn execute(&mut self, request_id: u32) -> &'static str {
-            self.attempt_execution(request_id)
+            self.try_execute(request_id)
         }
     }
 

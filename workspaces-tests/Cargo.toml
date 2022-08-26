@@ -7,6 +7,9 @@ version = "0.1.0"
 [[bin]]
 name = "fungible_token"
 
+[[bin]]
+name = "simple_multisig"
+
 [dependencies]
 near-contract-tools = {path = "../"}
 near-sdk = "4.0.0"

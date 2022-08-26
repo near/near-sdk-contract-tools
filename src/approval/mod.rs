@@ -1,12 +1,18 @@
 //! Queue and approve actions
 
+// TODO: Use Result instead of panicking in try_* functions
+// TODO: Extract error strings into constants
+
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
-    require, BorshStorageKey,
+    env, require, BorshStorageKey,
 };
 use serde::{Deserialize, Serialize};
 
 use crate::slot::Slot;
+
+pub const NOT_INITIALIZED: &str = "Approve::init must be called before use";
+pub const ALREADY_INITIALIZED: &str = "Approve::init can only be called once";
 
 // pub mod expire_multisig;
 pub mod simple_multisig;
@@ -31,11 +37,11 @@ pub trait ApprovalState<C>: Default + BorshSerialize + BorshDeserialize {
 
     /// Try to improve the approval state. Additional arguments may be
     /// provided, e.g. from the initiating function call
-    fn attempt_approval(&mut self, args: Option<String>, config: &C);
+    fn try_approve(&mut self, args: Option<String>, config: &C);
 
     /// Try to worsen the approval state. Additional arguments may be
     /// provided, e.g. from the initiating function call
-    fn attempt_rejection(&mut self, _args: Option<String>, _config: &C) -> bool {
+    fn try_reject(&mut self, _args: Option<String>, _config: &C) -> bool {
         false
     }
 }
@@ -80,6 +86,14 @@ where
         Self::root().field(ApprovalStorageKey::Config)
     }
 
+    /// Reads config from storage. Panics if the component has not been
+    /// initialized.
+    fn config() -> C {
+        Self::slot_config()
+            .read()
+            .unwrap_or_else(|| env::panic_str(NOT_INITIALIZED))
+    }
+
     /// Current list of pending action requests.
     fn slot_request(request_id: u32) -> Slot<ActionRequest<A, S>> {
         Self::root().field(ApprovalStorageKey::Request(request_id))
@@ -90,7 +104,7 @@ where
     fn init(config: C) {
         require!(
             Self::slot_config().swap(&config).is_none(),
-            "Already initialized",
+            ALREADY_INITIALIZED,
         );
     }
 
@@ -122,7 +136,7 @@ where
 
     /// Executes an action request and removes it from the collection if the
     /// approval state of the request is fulfilled. Panics otherwise.
-    fn attempt_execution(&mut self, request_id: u32) -> A::Output {
+    fn try_execute(&mut self, request_id: u32) -> A::Output {
         require!(
             Self::is_approved(request_id),
             "Request must be approved before it can be executed",
@@ -140,7 +154,7 @@ where
         Self::slot_request(request_id)
             .read()
             .map(|request| {
-                let config = Self::slot_config().read().unwrap();
+                let config = Self::config();
                 request.approval_state.is_approved(&config)
             })
             .unwrap_or(false)
@@ -148,26 +162,22 @@ where
 
     /// Tries to approve the action request designated by the given request ID
     /// with the given arguments. Panics if the request ID does not exist.
-    fn attempt_approval(&mut self, request_id: u32, args: Option<String>) {
+    fn try_approve(&mut self, request_id: u32, args: Option<String>) {
         let mut request_slot = Self::slot_request(request_id);
         let mut request = request_slot.read().unwrap();
 
-        request
-            .approval_state
-            .attempt_approval(args, &Self::slot_config().read().unwrap());
+        request.approval_state.try_approve(args, &Self::config());
 
         request_slot.write(&request);
     }
 
     /// Tries to reject the action request designated by the given request ID
     /// with the given arguments. Panics if the request ID does not exist.
-    fn attempt_rejection(&mut self, request_id: u32, args: Option<String>) {
+    fn try_reject(&mut self, request_id: u32, args: Option<String>) {
         let mut request_slot = Self::slot_request(request_id);
         let mut request = request_slot.read().unwrap();
 
-        let completely_rejected = request
-            .approval_state
-            .attempt_rejection(args, &Self::slot_config().read().unwrap());
+        let completely_rejected = request.approval_state.try_reject(args, &Self::config());
 
         if completely_rejected {
             request_slot.remove();
@@ -265,7 +275,7 @@ mod tests {
                 >= config.threshold as usize
         }
 
-        fn attempt_approval(&mut self, _args: Option<String>, _config: &MultisigConfig) {
+        fn try_approve(&mut self, _args: Option<String>, _config: &MultisigConfig) {
             let predecessor = env::predecessor_account_id();
             require!(
                 Contract::has_role(&predecessor, &Role::Multisig),
@@ -279,7 +289,7 @@ mod tests {
             self.approved_by.push(predecessor);
         }
 
-        fn attempt_rejection(&mut self, _args: Option<String>, _config: &MultisigConfig) -> bool {
+        fn try_reject(&mut self, _args: Option<String>, _config: &MultisigConfig) -> bool {
             let predecessor = env::predecessor_account_id();
             require!(
                 Contract::has_role(&predecessor, &Role::Multisig),
@@ -317,16 +327,16 @@ mod tests {
         assert!(!Contract::is_approved(request_id));
 
         predecessor(&alice);
-        contract.attempt_approval(request_id, None);
+        contract.try_approve(request_id, None);
 
         assert!(!Contract::is_approved(request_id));
 
         predecessor(&charlie);
-        contract.attempt_approval(request_id, None);
+        contract.try_approve(request_id, None);
 
         assert!(Contract::is_approved(request_id));
 
-        assert_eq!(contract.attempt_execution(request_id), "hello",);
+        assert_eq!(contract.try_execute(request_id), "hello",);
     }
 
     #[test]
@@ -341,9 +351,9 @@ mod tests {
         let request_id = contract.add_request(MyAction::SayHello);
 
         predecessor(&alice);
-        contract.attempt_approval(request_id, None);
+        contract.try_approve(request_id, None);
 
-        contract.attempt_approval(request_id, None);
+        contract.try_approve(request_id, None);
     }
 
     #[test]
@@ -358,9 +368,9 @@ mod tests {
         let request_id = contract.add_request(MyAction::SayHello);
 
         predecessor(&alice);
-        contract.attempt_approval(request_id, None);
+        contract.try_approve(request_id, None);
 
-        contract.attempt_execution(request_id);
+        contract.try_execute(request_id);
     }
 
     #[test]
@@ -378,10 +388,10 @@ mod tests {
         let request_id = contract.add_request(MyAction::SayGoodbye);
 
         predecessor(&alice);
-        contract.attempt_approval(request_id, None);
+        contract.try_approve(request_id, None);
 
         predecessor(&bob);
-        contract.attempt_approval(request_id, None);
+        contract.try_approve(request_id, None);
 
         assert!(Contract::is_approved(request_id));
 
@@ -390,7 +400,7 @@ mod tests {
         assert!(!Contract::is_approved(request_id));
 
         predecessor(&charlie);
-        contract.attempt_approval(request_id, None);
+        contract.try_approve(request_id, None);
 
         assert!(Contract::is_approved(request_id));
     }
