@@ -6,28 +6,7 @@ use near_sdk::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::approval::{Approval, ApprovalState};
-
-pub trait SimpleMultisig<A: super::Action, P: SimpleMultisigApprover> {
-    fn root() -> crate::slot::Slot<()>;
-    fn init(config: SimpleMultisigConfig<P>)
-    where
-        Self: Sized,
-    {
-        <Self as Approval<A, SimpleMultisigApprovalState, SimpleMultisigConfig<P>>>::init(config);
-    }
-}
-
-impl<A, P, T> Approval<A, SimpleMultisigApprovalState, SimpleMultisigConfig<P>> for T
-where
-    A: super::Action,
-    P: SimpleMultisigApprover,
-    T: SimpleMultisig<A, P>,
-{
-    fn root() -> crate::slot::Slot<()> {
-        T::root()
-    }
-}
+use crate::approval::ApprovalState;
 
 pub trait SimpleMultisigApprover {
     fn approve(account_id: &AccountId) -> Result<(), Cow<str>>;
@@ -102,7 +81,7 @@ mod tests {
 
     use crate::{approval::Approval, near_contract_tools, rbac::Rbac, slot::Slot, Rbac};
 
-    use super::{SimpleMultisig, SimpleMultisigApprover, SimpleMultisigConfig};
+    use super::{SimpleMultisigApprovalState, SimpleMultisigApprover, SimpleMultisigConfig};
 
     #[derive(BorshSerialize, BorshDeserialize)]
     enum Action {
@@ -126,12 +105,12 @@ mod tests {
         Multisig,
     }
 
-    #[derive(Rbac, Debug)]
+    #[derive(Rbac, Debug, BorshSerialize, BorshDeserialize)]
     #[rbac(roles = "Role")]
     #[near_bindgen]
     struct Contract {}
 
-    impl SimpleMultisig<Action, Self> for Contract {
+    impl Approval<Action, SimpleMultisigApprovalState, SimpleMultisigConfig<Self>> for Contract {
         fn root() -> Slot<()> {
             Slot::new(b"m")
         }
@@ -151,7 +130,7 @@ mod tests {
     impl Contract {
         #[init]
         pub fn new() -> Self {
-            <Self as SimpleMultisig<_, _>>::init(SimpleMultisigConfig::new(2));
+            <Self as Approval<_, _, _>>::init(SimpleMultisigConfig::new(2));
             Self {}
         }
 

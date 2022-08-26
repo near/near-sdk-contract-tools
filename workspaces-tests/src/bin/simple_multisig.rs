@@ -6,7 +6,9 @@ use std::borrow::Cow;
 use near_contract_tools::{
     approval::{
         self,
-        simple_multisig::{SimpleMultisig, SimpleMultisigApprover, SimpleMultisigConfig},
+        simple_multisig::{
+            SimpleMultisigApprovalState, SimpleMultisigApprover, SimpleMultisigConfig,
+        },
         Approval,
     },
     rbac::Rbac,
@@ -52,7 +54,7 @@ pub struct Contract {}
 
 // This single function implementation completely implements simple multisig on
 // the contract
-impl SimpleMultisig<MyAction, Self> for Contract {
+impl Approval<MyAction, SimpleMultisigApprovalState, SimpleMultisigConfig<Self>> for Contract {
     fn root() -> Slot<()> {
         Slot::new(StorageKey::SimpleMultisig)
     }

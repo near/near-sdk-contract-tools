@@ -73,7 +73,7 @@ async fn successful_request() {
         .unwrap();
 
     let is_approved = || async {
-        let r = contract
+        contract
             .view(
                 &worker,
                 "is_approved",
@@ -82,10 +82,10 @@ async fn successful_request() {
                     .as_bytes()
                     .to_vec(),
             )
-            .await;
-
-        dbg!(&r);
-        r.unwrap().json::<bool>().unwrap()
+            .await
+            .unwrap()
+            .json::<bool>()
+            .unwrap()
     };
 
     assert!(!is_approved().await);
@@ -142,8 +142,6 @@ async fn unauthorized_account() {
     } = setup_roles(3).await;
 
     let alice = &accounts[0];
-    let bob = &accounts[1];
-    let charlie = &accounts[2];
     let unauthorized_account = &accounts[3];
 
     let request_id = alice
@@ -155,24 +153,6 @@ async fn unauthorized_account() {
         .unwrap()
         .json::<u32>()
         .unwrap();
-
-    let is_approved = || async {
-        let r = contract
-            .view(
-                &worker,
-                "is_approved",
-                json!({ "request_id": request_id })
-                    .to_string()
-                    .as_bytes()
-                    .to_vec(),
-            )
-            .await;
-
-        dbg!(&r);
-        r.unwrap().json::<bool>().unwrap()
-    };
-
-    assert!(!is_approved().await);
 
     unauthorized_account
         .call(&worker, contract.id(), "approve")
