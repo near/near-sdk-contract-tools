@@ -3,6 +3,12 @@ clear = true
 script = """
 #!/usr/bin/env bash
 set -e
-cargo build --target wasm32-unknown-unknown --release --all
-cargo test
+
+if [[ -n $1 ]]; then
+    cargo build --target wasm32-unknown-unknown --release --bin "$1"
+    cargo test --package workspaces-tests --test "$1" -- --nocapture
+else
+    cargo build --target wasm32-unknown-unknown --release --all
+    cargo test
+fi
 """
