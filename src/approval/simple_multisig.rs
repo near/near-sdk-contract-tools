@@ -57,17 +57,6 @@ impl<A: SimpleMultisigApprover> ApprovalState<SimpleMultisigConfig<A>>
 
         self.approved_by.push(predecessor);
     }
-
-    fn try_reject(&mut self, _args: Option<String>, _config: &SimpleMultisigConfig<A>) -> bool {
-        let predecessor = env::predecessor_account_id();
-
-        A::approve(&predecessor).unwrap_or_else(|e| env::panic_str(&e));
-
-        self.approved_by
-            .retain(|signatory| signatory != &predecessor);
-
-        self.approved_by.len() == 0
-    }
 }
 
 #[cfg(test)]
@@ -156,10 +145,6 @@ mod tests {
             self.try_approve(request_id, None);
         }
 
-        pub fn reject(&mut self, request_id: u32) {
-            self.try_reject(request_id, None);
-        }
-
         pub fn execute(&mut self, request_id: u32) -> &'static str {
             self.try_execute(request_id)
         }
@@ -200,11 +185,6 @@ mod tests {
         contract.approve(request_id);
 
         assert!(Contract::is_approved(request_id));
-
-        predecessor(&alice);
-        contract.reject(request_id);
-
-        assert!(!Contract::is_approved(request_id));
 
         predecessor(&bob);
         contract.approve(request_id);

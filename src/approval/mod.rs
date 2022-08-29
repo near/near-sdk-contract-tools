@@ -38,12 +38,6 @@ pub trait ApprovalState<C>: Default + BorshSerialize + BorshDeserialize {
     /// Try to improve the approval state. Additional arguments may be
     /// provided, e.g. from the initiating function call
     fn try_approve(&mut self, args: Option<String>, config: &C);
-
-    /// Try to worsen the approval state. Additional arguments may be
-    /// provided, e.g. from the initiating function call
-    fn try_reject(&mut self, _args: Option<String>, _config: &C) -> bool {
-        false
-    }
 }
 
 /// An action request is composed of an action that will be executed when the
@@ -170,21 +164,6 @@ where
 
         request_slot.write(&request);
     }
-
-    /// Tries to reject the action request designated by the given request ID
-    /// with the given arguments. Panics if the request ID does not exist.
-    fn try_reject(&mut self, request_id: u32, args: Option<String>) {
-        let mut request_slot = Self::slot_request(request_id);
-        let mut request = request_slot.read().unwrap();
-
-        let completely_rejected = request.approval_state.try_reject(args, &Self::config());
-
-        if completely_rejected {
-            request_slot.remove();
-        } else {
-            request_slot.write(&request);
-        }
-    }
 }
 
 #[cfg(test)]
@@ -287,19 +266,6 @@ mod tests {
             );
 
             self.approved_by.push(predecessor);
-        }
-
-        fn try_reject(&mut self, _args: Option<String>, _config: &MultisigConfig) -> bool {
-            let predecessor = env::predecessor_account_id();
-            require!(
-                Contract::has_role(&predecessor, &Role::Multisig),
-                "Must have multisig role",
-            );
-
-            self.approved_by
-                .retain(|signatory| signatory != &predecessor);
-
-            self.approved_by.len() == 0
         }
     }
 

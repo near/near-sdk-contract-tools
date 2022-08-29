@@ -83,17 +83,4 @@ impl<A: ExpireMultisigApprover> ApprovalState<ExpireMultisigConfig<A>>
             block_height: env::block_height(),
         });
     }
-
-    fn try_reject(&mut self, _args: Option<String>, _config: &ExpireMultisigConfig<A>) -> bool {
-        let predecessor = env::predecessor_account_id();
-
-        A::approve(&predecessor).unwrap_or_else(|e| env::panic_str(&e));
-
-        self.approvals.retain(|record| {
-            let DatedApprovalRecord { account_id, .. } = record;
-            account_id != &predecessor
-        });
-
-        self.approvals.len() == 0
-    }
 }

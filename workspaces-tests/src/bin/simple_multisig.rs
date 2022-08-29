@@ -105,10 +105,6 @@ impl Contract {
         self.try_approve(request_id, None);
     }
 
-    pub fn reject(&mut self, request_id: u32) {
-        self.try_reject(request_id, None);
-    }
-
     pub fn is_approved(&self, request_id: u32) -> bool {
         <Contract as Approval<_, _, _>>::is_approved(request_id)
     }
