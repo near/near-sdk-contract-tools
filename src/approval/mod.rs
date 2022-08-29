@@ -14,7 +14,7 @@ use crate::slot::Slot;
 pub const NOT_INITIALIZED: &str = "Approve::init must be called before use";
 pub const ALREADY_INITIALIZED: &str = "Approve::init can only be called once";
 
-// pub mod expire_multisig;
+pub mod expire_multisig;
 pub mod simple_multisig;
 
 /// Actions can be executed after they are approved
