@@ -44,7 +44,7 @@ pub enum ApprovalError<E> {
 impl<E: Display> Display for ApprovalError<E> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::AlreadyApprovedByAccount => write!(f, "Already approved by account"),
+            Self::AlreadyApprovedByAccount => write!(f, "Already approved by this account"),
             Self::ApproverError(e) => write!(f, "Approver error: {e}"),
         }
     }

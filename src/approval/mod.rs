@@ -264,7 +264,7 @@ mod tests {
                 "{}",
                 match self {
                     Self::MissingRole => "Missing required role",
-                    Self::AlreadyApprovedByAccount => "Already approved by account",
+                    Self::AlreadyApprovedByAccount => "Already approved by this account",
                 }
             )
         }
