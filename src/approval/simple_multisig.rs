@@ -1,26 +1,27 @@
-use std::{borrow::Cow, marker::PhantomData};
+use std::{fmt::Display, marker::PhantomData};
 
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
-    env, require, AccountId,
+    env, AccountId,
 };
 use serde::{Deserialize, Serialize};
 
-use crate::approval::ApprovalState;
+use crate::approval::Approval;
 
-pub trait SimpleMultisigApprover {
-    fn approve(account_id: &AccountId) -> Result<(), Cow<str>>;
+pub trait Approver {
+    type Error;
+    fn approve(account_id: &AccountId) -> Result<(), Self::Error>;
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize, Debug)]
-pub struct SimpleMultisigConfig<A: SimpleMultisigApprover> {
+pub struct Configuration<A: Approver> {
     pub threshold: u8,
     #[borsh_skip]
     #[serde(skip)]
     __approver: PhantomData<A>,
 }
 
-impl<A: SimpleMultisigApprover> SimpleMultisigConfig<A> {
+impl<A: Approver> Configuration<A> {
     pub fn new(threshold: u8) -> Self {
         Self {
             threshold,
@@ -29,15 +30,30 @@ impl<A: SimpleMultisigApprover> SimpleMultisigConfig<A> {
     }
 }
 
-#[derive(BorshSerialize, BorshDeserialize, Default, Debug)]
-pub struct SimpleMultisigApprovalState {
+#[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize, Default, Debug)]
+pub struct ApprovalState {
     pub approved_by: Vec<AccountId>,
 }
 
-impl<A: SimpleMultisigApprover> ApprovalState<SimpleMultisigConfig<A>>
-    for SimpleMultisigApprovalState
-{
-    fn is_approved(&self, config: &SimpleMultisigConfig<A>) -> bool {
+#[derive(Debug)]
+pub enum ApprovalError<E> {
+    AlreadyApprovedByAccount,
+    ApproverError(E),
+}
+
+impl<E: Display> Display for ApprovalError<E> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::AlreadyApprovedByAccount => write!(f, "Already approved by account"),
+            Self::ApproverError(e) => write!(f, "Approver error: {e}"),
+        }
+    }
+}
+
+impl<A: Approver> Approval<Configuration<A>> for ApprovalState {
+    type Error = ApprovalError<A::Error>;
+
+    fn is_fulfilled(&self, config: &Configuration<A>) -> bool {
         self.approved_by
             .iter()
             .filter(|account_id| A::approve(account_id).is_ok())
@@ -45,17 +61,24 @@ impl<A: SimpleMultisigApprover> ApprovalState<SimpleMultisigConfig<A>>
             >= config.threshold as usize
     }
 
-    fn try_approve(&mut self, _args: Option<String>, _config: &SimpleMultisigConfig<A>) {
+    fn try_approve(
+        &mut self,
+        _args: Option<String>,
+        _config: &Configuration<A>,
+    ) -> Result<(), Self::Error> {
         let predecessor = env::predecessor_account_id();
 
-        A::approve(&predecessor).unwrap_or_else(|e| env::panic_str(&e));
+        if let Err(e) = A::approve(&predecessor) {
+            return Err(ApprovalError::ApproverError(e));
+        }
 
-        require!(
-            !self.approved_by.contains(&predecessor),
-            "Already approved by this account",
-        );
+        if self.approved_by.contains(&predecessor) {
+            return Err(ApprovalError::AlreadyApprovedByAccount);
+        }
 
         self.approved_by.push(predecessor);
+
+        Ok(())
     }
 }
 
@@ -68,9 +91,9 @@ mod tests {
         testing_env, AccountId, BorshStorageKey,
     };
 
-    use crate::{approval::Approval, near_contract_tools, rbac::Rbac, slot::Slot, Rbac};
+    use crate::{approval::ApprovalManager, near_contract_tools, rbac::Rbac, slot::Slot, Rbac};
 
-    use super::{SimpleMultisigApprovalState, SimpleMultisigApprover, SimpleMultisigConfig};
+    use super::{ApprovalState, Approver, Configuration};
 
     #[derive(BorshSerialize, BorshDeserialize)]
     enum Action {
@@ -99,18 +122,20 @@ mod tests {
     #[near_bindgen]
     struct Contract {}
 
-    impl Approval<Action, SimpleMultisigApprovalState, SimpleMultisigConfig<Self>> for Contract {
+    impl ApprovalManager<Action, ApprovalState, Configuration<Self>> for Contract {
         fn root() -> Slot<()> {
             Slot::new(b"m")
         }
     }
 
-    impl SimpleMultisigApprover for Contract {
-        fn approve(account_id: &near_sdk::AccountId) -> Result<(), std::borrow::Cow<str>> {
+    impl Approver for Contract {
+        type Error = &'static str;
+
+        fn approve(account_id: &near_sdk::AccountId) -> Result<(), Self::Error> {
             if Self::has_role(account_id, &Role::Multisig) {
                 Ok(())
             } else {
-                Err("Must have multisig role".into())
+                Err("Must have multisig role")
             }
         }
     }
@@ -119,7 +144,7 @@ mod tests {
     impl Contract {
         #[init]
         pub fn new() -> Self {
-            <Self as Approval<_, _, _>>::init(SimpleMultisigConfig::new(2));
+            <Self as ApprovalManager<_, _, _>>::init(Configuration::new(2));
             Self {}
         }
 

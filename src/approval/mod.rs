@@ -3,6 +3,8 @@
 // TODO: Use Result instead of panicking in try_* functions
 // TODO: Extract error strings into constants
 
+use std::fmt::Display;
+
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
     env, require, BorshStorageKey,
@@ -11,10 +13,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::slot::Slot;
 
-pub const NOT_INITIALIZED: &str = "Approve::init must be called before use";
-pub const ALREADY_INITIALIZED: &str = "Approve::init can only be called once";
+pub const NOT_INITIALIZED: &str = "Approval::init must be called before use";
+pub const ALREADY_INITIALIZED: &str = "Approval::init can only be called once";
 
-pub mod expire_multisig;
 pub mod simple_multisig;
 
 /// Actions can be executed after they are approved
@@ -28,16 +29,18 @@ pub trait Action: BorshSerialize + BorshDeserialize {
 /// The approval state determines whether an action request has achieved
 /// sufficient approvals. For example, multisig confirmation state would keep
 /// track of who has approved an action request so far.
-pub trait ApprovalState<C>: Default + BorshSerialize + BorshDeserialize {
+pub trait Approval<C>: Default + BorshSerialize + BorshDeserialize {
+    type Error;
+
     /// Whether the current state represents full approval. Note that this
     /// function is called immediately before attempting to execute an action,
     /// so it is possible for this function to respond to externalities (i.e.
-    /// changes to contract state other than calls to approve or reject)
-    fn is_approved(&self, config: &C) -> bool;
+    /// changes to contract state other than calls to approve)
+    fn is_fulfilled(&self, config: &C) -> bool;
 
     /// Try to improve the approval state. Additional arguments may be
     /// provided, e.g. from the initiating function call
-    fn try_approve(&mut self, args: Option<String>, config: &C);
+    fn try_approve(&mut self, args: Option<String>, config: &C) -> Result<(), Self::Error>;
 }
 
 /// An action request is composed of an action that will be executed when the
@@ -60,11 +63,12 @@ enum ApprovalStorageKey {
 
 /// Collection of action requests that manages their approval state and
 /// execution
-pub trait Approval<A, S, C>
+pub trait ApprovalManager<A, S, C>
 where
     A: Action,
-    S: ApprovalState<C>,
+    S: Approval<C> + Serialize,
     C: BorshDeserialize + BorshSerialize,
+    S::Error: Display,
 {
     /// Storage root
     fn root() -> Slot<()>;
@@ -149,7 +153,7 @@ where
             .read()
             .map(|request| {
                 let config = Self::config();
-                request.approval_state.is_approved(&config)
+                request.approval_state.is_fulfilled(&config)
             })
             .unwrap_or(false)
     }
@@ -160,7 +164,10 @@ where
         let mut request_slot = Self::slot_request(request_id);
         let mut request = request_slot.read().unwrap();
 
-        request.approval_state.try_approve(args, &Self::config());
+        request
+            .approval_state
+            .try_approve(args, &Self::config())
+            .unwrap_or_else(|e| env::panic_str(&format!("Approval failure: {e}")));
 
         request_slot.write(&request);
     }
@@ -168,18 +175,21 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::fmt::Display;
+
     use near_contract_tools_macros::Rbac;
     use near_sdk::{
         borsh::{self, BorshDeserialize, BorshSerialize},
-        env, near_bindgen, require,
+        env, near_bindgen,
         test_utils::VMContextBuilder,
         testing_env, AccountId, BorshStorageKey,
     };
+    use serde::Serialize;
 
-    use crate::{approval::ApprovalState, rbac::Rbac};
+    use crate::{approval::Approval, rbac::Rbac};
     use crate::{near_contract_tools, slot::Slot};
 
-    use super::{Action, Approval};
+    use super::{Action, ApprovalManager};
 
     #[derive(BorshSerialize, BorshStorageKey)]
     enum Role {
@@ -220,13 +230,13 @@ mod tests {
         pub fn new(threshold: u8) -> Self {
             let contract = Self {};
 
-            <Self as Approval<_, _, _>>::init(MultisigConfig { threshold });
+            <Self as ApprovalManager<_, _, _>>::init(MultisigConfig { threshold });
 
             contract
         }
     }
 
-    impl Approval<MyAction, MultisigApprovalState, MultisigConfig> for Contract {
+    impl ApprovalManager<MyAction, MultisigApprovalState, MultisigConfig> for Contract {
         fn root() -> Slot<()> {
             Slot::new(b"a")
         }
@@ -237,13 +247,33 @@ mod tests {
         pub threshold: u8,
     }
 
-    #[derive(BorshSerialize, BorshDeserialize, Default, Debug)]
+    #[derive(BorshSerialize, BorshDeserialize, Serialize, Default, Debug)]
     struct MultisigApprovalState {
         pub approved_by: Vec<AccountId>,
     }
 
-    impl ApprovalState<MultisigConfig> for MultisigApprovalState {
-        fn is_approved(&self, config: &MultisigConfig) -> bool {
+    enum ApprovalError {
+        MissingRole,
+        AlreadyApprovedByAccount,
+    }
+
+    impl Display for ApprovalError {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(
+                f,
+                "{}",
+                match self {
+                    Self::MissingRole => "Missing required role",
+                    Self::AlreadyApprovedByAccount => "Already approved by account",
+                }
+            )
+        }
+    }
+
+    impl Approval<MultisigConfig> for MultisigApprovalState {
+        type Error = ApprovalError;
+
+        fn is_fulfilled(&self, config: &MultisigConfig) -> bool {
             self.approved_by
                 .iter()
                 .filter(|account| {
@@ -254,18 +284,24 @@ mod tests {
                 >= config.threshold as usize
         }
 
-        fn try_approve(&mut self, _args: Option<String>, _config: &MultisigConfig) {
+        fn try_approve(
+            &mut self,
+            _args: Option<String>,
+            _config: &MultisigConfig,
+        ) -> Result<(), Self::Error> {
             let predecessor = env::predecessor_account_id();
-            require!(
-                Contract::has_role(&predecessor, &Role::Multisig),
-                "Must have multisig role",
-            );
-            require!(
-                !self.approved_by.contains(&predecessor),
-                "Already approved by this account",
-            );
+
+            if !Contract::has_role(&predecessor, &Role::Multisig) {
+                return Err(ApprovalError::MissingRole);
+            }
+
+            if self.approved_by.contains(&predecessor) {
+                return Err(ApprovalError::AlreadyApprovedByAccount);
+            }
 
             self.approved_by.push(predecessor);
+
+            Ok(())
         }
     }
 
