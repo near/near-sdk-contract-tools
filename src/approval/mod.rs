@@ -17,6 +17,7 @@ pub const NOT_INITIALIZED: &str = "Approval::init must be called before use";
 pub const ALREADY_INITIALIZED: &str = "Approval::init can only be called once";
 
 pub mod simple_multisig;
+pub mod native_action;
 
 /// Actions can be executed after they are approved
 pub trait Action: BorshSerialize + BorshDeserialize {

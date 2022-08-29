@@ -5,7 +5,7 @@ use std::fmt::Display;
 
 use near_contract_tools::{
     approval::{
-        self,
+        native_action::{self, NativeAction},
         simple_multisig::{ApprovalState, Approver, Configuration},
         ApprovalManager,
     },
@@ -15,29 +15,12 @@ use near_contract_tools::{
 };
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
-    env, near_bindgen, BorshStorageKey, PanicOnDefault,
+    env, near_bindgen, AccountId, BorshStorageKey, PanicOnDefault, Promise,
 };
 
 #[derive(BorshSerialize, BorshStorageKey)]
 enum StorageKey {
     SimpleMultisig,
-}
-
-#[derive(BorshSerialize, BorshDeserialize)]
-enum MyAction {
-    SayHello,
-    SayGoodbye,
-}
-
-impl approval::Action for MyAction {
-    type Output = &'static str;
-
-    fn execute(self) -> Self::Output {
-        match self {
-            Self::SayHello => "hello",
-            Self::SayGoodbye => "goodbye",
-        }
-    }
 }
 
 #[derive(BorshSerialize, BorshStorageKey)]
@@ -52,7 +35,7 @@ pub struct Contract {}
 
 // This single function implementation completely implements simple multisig on
 // the contract
-impl ApprovalManager<MyAction, ApprovalState, Configuration<Self>> for Contract {
+impl ApprovalManager<NativeAction, ApprovalState, Configuration<Self>> for Contract {
     fn root() -> Slot<()> {
         Slot::new(StorageKey::SimpleMultisig)
     }
@@ -74,7 +57,7 @@ impl Display for ApproverError {
 impl Approver for Contract {
     type Error = ApproverError;
 
-    fn approve(account_id: &near_sdk::AccountId) -> Result<(), ApproverError> {
+    fn approve(account_id: &AccountId) -> Result<(), ApproverError> {
         if Contract::has_role(account_id, &Role::Multisig) {
             Ok(())
         } else {
@@ -96,16 +79,17 @@ impl Contract {
         self.add_role(&env::predecessor_account_id(), &Role::Multisig);
     }
 
-    pub fn request(&mut self, action: String) -> u32 {
-        let action = match &action[..] {
-            "hello" => MyAction::SayHello,
-            "goodbye" => MyAction::SayGoodbye,
-            _ => env::panic_str("action must be \"hello\" or \"goodbye\""),
-        };
-
+    pub fn request(
+        &mut self,
+        receiver_id: AccountId,
+        actions: Vec<native_action::PromiseAction>,
+    ) -> u32 {
         self.require_role(&Role::Multisig);
 
-        let request_id = self.add_request(action);
+        let request_id = self.add_request(native_action::NativeAction {
+            receiver_id,
+            actions,
+        });
 
         near_sdk::log!(format!("Request ID: {request_id}"));
 
@@ -120,7 +104,7 @@ impl Contract {
         <Contract as ApprovalManager<_, _, _>>::is_approved(request_id)
     }
 
-    pub fn execute(&mut self, request_id: u32) -> String {
-        self.try_execute(request_id).into()
+    pub fn execute(&mut self, request_id: u32) -> Promise {
+        self.try_execute(request_id)
     }
 }

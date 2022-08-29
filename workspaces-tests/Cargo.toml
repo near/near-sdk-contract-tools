@@ -8,6 +8,9 @@ version = "0.1.0"
 name = "fungible_token"
 
 [[bin]]
+name = "native_multisig"
+
+[[bin]]
 name = "simple_multisig"
 
 [dependencies]

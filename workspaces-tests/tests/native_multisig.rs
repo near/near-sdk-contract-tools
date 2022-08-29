@@ -1,10 +1,11 @@
 #![cfg(not(windows))]
 
+use near_contract_tools::approval::native_action::PromiseAction;
 use near_sdk::serde_json::json;
 use workspaces::{prelude::*, Account, Contract, Network, Worker};
 
 const WASM: &[u8] =
-    include_bytes!("../../target/wasm32-unknown-unknown/release/simple_multisig.wasm");
+    include_bytes!("../../target/wasm32-unknown-unknown/release/native_multisig.wasm");
 
 struct Setup<N: Network> {
     pub worker: Worker<N>,
@@ -48,7 +49,7 @@ async fn setup_roles(num_accounts: usize) -> Setup<impl Network> {
 }
 
 #[tokio::test]
-async fn successful_request() {
+async fn transfer() {
     let Setup {
         worker,
         contract,
@@ -59,9 +60,17 @@ async fn successful_request() {
     let bob = &accounts[1];
     let charlie = &accounts[2];
 
+    // Send 10 NEAR to charlie
     let request_id = alice
         .call(&worker, contract.id(), "request")
-        .args_json(json!({"action": "hello"}))
+        .args_json(json!({
+            "receiver_id": charlie.id(),
+            "actions": [
+                PromiseAction::Transfer {
+                    amount: (near_sdk::ONE_NEAR * 10).into(),
+                },
+            ],
+        }))
         .unwrap()
         .transact()
         .await
@@ -116,46 +125,18 @@ async fn successful_request() {
 
     assert!(is_approved().await);
 
-    let exec_result = charlie
+    let balance_before = worker.view_account(charlie.id()).await.unwrap().balance;
+
+    alice
         .call(&worker, contract.id(), "execute")
         .args_json(json!({ "request_id": request_id }))
         .unwrap()
         .transact()
         .await
-        .unwrap()
-        .json::<String>()
         .unwrap();
 
-    assert_eq!(exec_result, "hello");
-}
+    let balance_after = worker.view_account(charlie.id()).await.unwrap().balance;
 
-#[tokio::test]
-#[should_panic = "Unauthorized account"]
-async fn unauthorized_account() {
-    let Setup {
-        worker,
-        contract,
-        accounts,
-    } = setup_roles(3).await;
-
-    let alice = &accounts[0];
-    let unauthorized_account = &accounts[3];
-
-    let request_id = alice
-        .call(&worker, contract.id(), "request")
-        .args_json(json!({"action": "hello"}))
-        .unwrap()
-        .transact()
-        .await
-        .unwrap()
-        .json::<u32>()
-        .unwrap();
-
-    unauthorized_account
-        .call(&worker, contract.id(), "approve")
-        .args_json(json!({ "request_id": request_id }))
-        .unwrap()
-        .transact()
-        .await
-        .unwrap();
+    // charlie's balance should have increased by exactly 10 NEAR
+    assert_eq!(balance_after - balance_before, near_sdk::ONE_NEAR * 10);
 }
