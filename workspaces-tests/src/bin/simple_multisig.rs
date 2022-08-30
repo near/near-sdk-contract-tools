@@ -74,7 +74,7 @@ impl Display for ApproverError {
 impl Approver for Contract {
     type Error = ApproverError;
 
-    fn approve(account_id: &near_sdk::AccountId) -> Result<(), ApproverError> {
+    fn approve_account(account_id: &near_sdk::AccountId) -> Result<(), ApproverError> {
         if Contract::has_role(account_id, &Role::Multisig) {
             Ok(())
         } else {

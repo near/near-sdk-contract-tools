@@ -10,7 +10,7 @@ use crate::approval::Approval;
 
 pub trait Approver {
     type Error;
-    fn approve(account_id: &AccountId) -> Result<(), Self::Error>;
+    fn approve_account(account_id: &AccountId) -> Result<(), Self::Error>;
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize, Debug)]
@@ -56,7 +56,7 @@ impl<A: Approver> Approval<Configuration<A>> for ApprovalState {
     fn is_fulfilled(&self, config: &Configuration<A>) -> bool {
         self.approved_by
             .iter()
-            .filter(|account_id| A::approve(account_id).is_ok())
+            .filter(|account_id| A::approve_account(account_id).is_ok())
             .count()
             >= config.threshold as usize
     }
@@ -68,7 +68,7 @@ impl<A: Approver> Approval<Configuration<A>> for ApprovalState {
     ) -> Result<(), Self::Error> {
         let predecessor = env::predecessor_account_id();
 
-        if let Err(e) = A::approve(&predecessor) {
+        if let Err(e) = A::approve_account(&predecessor) {
             return Err(ApprovalError::ApproverError(e));
         }
 
@@ -131,7 +131,7 @@ mod tests {
     impl Approver for Contract {
         type Error = &'static str;
 
-        fn approve(account_id: &near_sdk::AccountId) -> Result<(), Self::Error> {
+        fn approve_account(account_id: &near_sdk::AccountId) -> Result<(), Self::Error> {
             if Self::has_role(account_id, &Role::Multisig) {
                 Ok(())
             } else {
