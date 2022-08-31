@@ -5,7 +5,6 @@
 # https://www.atlassian.com/git/tutorials/git-hooks#local-hooks
 # https://near-foundation.atlassian.net/browse/ENG-149
 
-echo "Checking formatting."
 diff=$(cargo fmt -- --check)
 result=$?
 
@@ -19,21 +18,6 @@ if [[ ${result} -ne 0 ]] ; then
     printf "  Alternatively, you can always run \`cargo fmt\` before committing code.\n"
     printf "  Here is the current result of \`cargo fmt -- --check\`:\n\n"
     echo "$diff"
-    exit 1
-fi
-
-echo "Linting."
-output=$(cargo clippy -- -D warnings 2>&1)
-result=$?
-
-RED='\033[0;31m'
-RESET='\033[0m' # No Color
-
-if [[ ${result} -ne 0 ]] ; then
-    printf "${RED}Linting errors.${RESET}\n\n"
-    printf "  Some of these errors may be fixable with \`cargo clippy --fix\`.\n"
-    printf "  Here is the current result of \`cargo clippy -- -D warnings\`:\n\n"
-    echo "$output"
     exit 1
 fi
 
