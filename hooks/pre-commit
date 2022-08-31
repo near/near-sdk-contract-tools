@@ -5,6 +5,7 @@
 # https://www.atlassian.com/git/tutorials/git-hooks#local-hooks
 # https://near-foundation.atlassian.net/browse/ENG-149
 
+echo "Checking formatting."
 diff=$(cargo fmt -- --check)
 result=$?
 
@@ -21,7 +22,8 @@ if [[ ${result} -ne 0 ]] ; then
     exit 1
 fi
 
-output=$(cargo clippy -- -D warnings)
+echo "Linting."
+output=$(cargo clippy -- -D warnings 2>&1)
 result=$?
 
 RED='\033[0;31m'
