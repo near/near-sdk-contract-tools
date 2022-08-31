@@ -21,4 +21,18 @@ if [[ ${result} -ne 0 ]] ; then
     exit 1
 fi
 
+output=$(cargo clippy -- -D warnings)
+result=$?
+
+RED='\033[0;31m'
+RESET='\033[0m' # No Color
+
+if [[ ${result} -ne 0 ]] ; then
+    printf "${RED}Linting errors.${RESET}\n\n"
+    printf "  Some of these errors may be fixable with \`cargo clippy --fix\`.\n"
+    printf "  Here is the current result of \`cargo clippy -- -D warnings\`:\n\n"
+    echo "$output"
+    exit 1
+fi
+
 exit 0
