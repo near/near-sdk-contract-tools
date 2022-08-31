@@ -46,9 +46,8 @@ impl Contract {
 fn derive_pause() {
     let mut contract = Contract { value: 0 };
 
-    assert_eq!(
-        contract.paus_is_paused(),
-        false,
+    assert!(
+        !contract.paus_is_paused(),
         "Initial state should be unpaused",
     );
 
@@ -56,21 +55,13 @@ fn derive_pause() {
 
     contract.pause();
 
-    assert_eq!(
-        contract.paus_is_paused(),
-        true,
-        "Pausing the contract works",
-    );
+    assert!(contract.paus_is_paused(), "Pausing the contract works");
 
     Contract::require_paused();
 
     contract.unpause();
 
-    assert_eq!(
-        contract.paus_is_paused(),
-        false,
-        "Unpausing the contract works",
-    );
+    assert!(!contract.paus_is_paused(), "Unpausing the contract works");
 
     Contract::require_unpaused();
 }
