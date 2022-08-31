@@ -2,6 +2,7 @@ use darling::FromDeriveInput;
 use proc_macro::TokenStream;
 use syn::{parse_macro_input, DeriveInput};
 
+mod approval;
 mod event;
 mod migrate;
 mod owner;
