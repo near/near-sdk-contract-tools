@@ -1,13 +1,14 @@
 //! Simple multi-signature wallet component. Generic over approvable actions.
 //! Use with NativeTransactionAction for multisig over native transactions.
 
-use std::{fmt::Display, marker::PhantomData};
+use std::marker::PhantomData;
 
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
     env, AccountId,
 };
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
 use crate::approval::Approval;
 
@@ -49,23 +50,15 @@ pub struct ApprovalState {
     pub approved_by: Vec<AccountId>,
 }
 
-// TODO: use thiserror
 /// Why might a simple multisig approval attempt fail?
-#[derive(Clone, Debug)]
+#[derive(Error, Clone, Debug)]
 pub enum ApprovalError<E> {
     /// The account has already approved this action request
+    #[error("Already approved by this account")]
     AlreadyApprovedByAccount,
     /// The AccountApprover returned another error
+    #[error("Account approver error: {0}")]
     AccountApproverError(E),
-}
-
-impl<E: Display> Display for ApprovalError<E> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::AlreadyApprovedByAccount => write!(f, "Already approved by this account"),
-            Self::AccountApproverError(e) => write!(f, "Approver error: {e}"),
-        }
-    }
 }
 
 impl<Ap> Approval<Configuration<Ap>> for ApprovalState
