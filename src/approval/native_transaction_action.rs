@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 /// Every native NEAR action can be mapped to a Promise action.
 /// NOTE: The native ADD_KEY action is split into two: one for adding a
 /// full-access key, one for a function call access key.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
 pub enum PromiseAction {
     /// Native CREATE_ACCOUNT action
     CreateAccount,
@@ -78,7 +78,7 @@ pub enum PromiseAction {
 
 /// A NativeTransactionAction represents a native protocol-level transaction,
 /// and is easily (de)serializable into many different formats
-#[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize, PartialEq, Clone, Debug)]
+#[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize, Eq, PartialEq, Clone, Debug)]
 pub struct NativeTransactionAction {
     /// Receiver of the transaction
     pub receiver_id: AccountId,
