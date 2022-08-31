@@ -1,7 +1,5 @@
 //! Queue and approve actions
 
-// TODO: getters
-
 use std::fmt::Display;
 
 use near_sdk::{
@@ -89,7 +87,7 @@ where
 
     /// Reads config from storage. Panics if the component has not been
     /// initialized.
-    fn config() -> C {
+    fn get_config() -> C {
         Self::slot_config()
             .read()
             .unwrap_or_else(|| env::panic_str(NOT_INITIALIZED))
@@ -98,6 +96,11 @@ where
     /// Current list of pending action requests.
     fn slot_request(request_id: u32) -> Slot<ActionRequest<A, S>> {
         Self::root().field(ApprovalStorageKey::Request(request_id))
+    }
+
+    /// Get a request by ID
+    fn get_request(request_id: u32) -> Option<ActionRequest<A, S>> {
+        Self::slot_request(request_id).read()
     }
 
     /// Must be called before using the Approval construct. Can only be called
@@ -155,7 +158,7 @@ where
         Self::slot_request(request_id)
             .read()
             .map(|request| {
-                let config = Self::config();
+                let config = Self::get_config();
                 request.approval_state.is_fulfilled(&config)
             })
             .unwrap_or(false)
@@ -169,7 +172,7 @@ where
 
         request
             .approval_state
-            .try_approve(args, &Self::config())
+            .try_approve(args, &Self::get_config())
             .unwrap_or_else(|e| env::panic_str(&format!("Approval failure: {e}")));
 
         request_slot.write(&request);
