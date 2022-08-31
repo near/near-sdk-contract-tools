@@ -5,8 +5,8 @@ use std::fmt::Display;
 
 use near_contract_tools::{
     approval::{
-        native_action::{self, NativeAction},
-        simple_multisig::{ApprovalState, Approver, Configuration},
+        native_transaction_action::{self, NativeTransactionAction},
+        simple_multisig::{AccountApprover, ApprovalState, Configuration},
         ApprovalManager,
     },
     rbac::Rbac,
@@ -35,7 +35,7 @@ pub struct Contract {}
 
 // This single function implementation completely implements simple multisig on
 // the contract
-impl ApprovalManager<NativeAction, ApprovalState, Configuration<Self>> for Contract {
+impl ApprovalManager<NativeTransactionAction, ApprovalState, Configuration<Self>> for Contract {
     fn root() -> Slot<()> {
         Slot::new(StorageKey::SimpleMultisig)
     }
@@ -54,7 +54,7 @@ impl Display for ApproverError {
 
 // We don't have to check env::predecessor_account_id or anything like that
 // SimpleMultisig handles it all for us
-impl Approver for Contract {
+impl AccountApprover for Contract {
     type Error = ApproverError;
 
     fn approve_account(account_id: &AccountId) -> Result<(), ApproverError> {
@@ -82,11 +82,11 @@ impl Contract {
     pub fn request(
         &mut self,
         receiver_id: AccountId,
-        actions: Vec<native_action::PromiseAction>,
+        actions: Vec<native_transaction_action::PromiseAction>,
     ) -> u32 {
         self.require_role(&Role::Multisig);
 
-        let request_id = self.add_request(native_action::NativeAction {
+        let request_id = self.add_request(native_transaction_action::NativeTransactionAction {
             receiver_id,
             actions,
         });
@@ -97,7 +97,7 @@ impl Contract {
     }
 
     pub fn approve(&mut self, request_id: u32) {
-        self.try_approve(request_id, None);
+        self.approve_request(request_id, None);
     }
 
     pub fn is_approved(&self, request_id: u32) -> bool {
@@ -105,6 +105,6 @@ impl Contract {
     }
 
     pub fn execute(&mut self, request_id: u32) -> Promise {
-        self.try_execute(request_id)
+        self.execute_request(request_id)
     }
 }

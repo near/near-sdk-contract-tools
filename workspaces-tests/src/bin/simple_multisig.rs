@@ -6,7 +6,7 @@ use std::fmt::Display;
 use near_contract_tools::{
     approval::{
         self,
-        simple_multisig::{ApprovalState, Approver, Configuration},
+        simple_multisig::{AccountApprover, ApprovalState, Configuration},
         ApprovalManager,
     },
     rbac::Rbac,
@@ -71,7 +71,7 @@ impl Display for ApproverError {
 
 // We don't have to check env::predecessor_account_id or anything like that
 // SimpleMultisig handles it all for us
-impl Approver for Contract {
+impl AccountApprover for Contract {
     type Error = ApproverError;
 
     fn approve_account(account_id: &near_sdk::AccountId) -> Result<(), ApproverError> {
@@ -113,7 +113,7 @@ impl Contract {
     }
 
     pub fn approve(&mut self, request_id: u32) {
-        self.try_approve(request_id, None);
+        self.approve_request(request_id, None);
     }
 
     pub fn is_approved(&self, request_id: u32) -> bool {
@@ -121,6 +121,6 @@ impl Contract {
     }
 
     pub fn execute(&mut self, request_id: u32) -> String {
-        self.try_execute(request_id).into()
+        self.execute_request(request_id).into()
     }
 }

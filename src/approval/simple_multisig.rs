@@ -1,3 +1,6 @@
+//! Simple multi-signature wallet component. Generic over approvable actions.
+//! Use with NativeTransactionAction for multisig over native transactions.
+
 use std::{fmt::Display, marker::PhantomData};
 
 use near_sdk::{
@@ -8,20 +11,29 @@ use serde::{Deserialize, Serialize};
 
 use crate::approval::Approval;
 
-pub trait Approver {
+/// An AccountApprover gatekeeps which accounts are eligible to submit approvals
+/// to an ApprovalManager
+pub trait AccountApprover {
+    /// Error type returned by approve_account on failure (e.g. reason for
+    /// ineligibility)
     type Error;
+
+    /// Determines whether an account ID is allowed to submit an approval
     fn approve_account(account_id: &AccountId) -> Result<(), Self::Error>;
 }
 
-#[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize, Debug)]
-pub struct Configuration<A: Approver> {
+/// M (threshold) of N approval scheme
+#[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize, Clone, Debug)]
+pub struct Configuration<Ap: AccountApprover> {
+    /// How many approvals are required?
     pub threshold: u8,
     #[borsh_skip]
     #[serde(skip)]
-    __approver: PhantomData<A>,
+    __approver: PhantomData<Ap>,
 }
 
-impl<A: Approver> Configuration<A> {
+impl<Ap: AccountApprover> Configuration<Ap> {
+    /// Create an approval scheme with the given threshold
     pub fn new(threshold: u8) -> Self {
         Self {
             threshold,
@@ -30,46 +42,51 @@ impl<A: Approver> Configuration<A> {
     }
 }
 
+/// Approval state for simple multisig
 #[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize, Default, Debug)]
 pub struct ApprovalState {
+    /// List of accounts that have approved an action thus far
     pub approved_by: Vec<AccountId>,
 }
 
-#[derive(Debug)]
+// TODO: use thiserror
+/// Why might a simple multisig approval attempt fail?
+#[derive(Clone, Debug)]
 pub enum ApprovalError<E> {
+    /// The account has already approved this action request
     AlreadyApprovedByAccount,
-    ApproverError(E),
+    /// The AccountApprover returned another error
+    AccountApproverError(E),
 }
 
 impl<E: Display> Display for ApprovalError<E> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::AlreadyApprovedByAccount => write!(f, "Already approved by this account"),
-            Self::ApproverError(e) => write!(f, "Approver error: {e}"),
+            Self::AccountApproverError(e) => write!(f, "Approver error: {e}"),
         }
     }
 }
 
-impl<A: Approver> Approval<Configuration<A>> for ApprovalState {
-    type Error = ApprovalError<A::Error>;
+impl<Ap> Approval<Configuration<Ap>> for ApprovalState
+where
+    Ap: AccountApprover,
+{
+    type Error = ApprovalError<Ap::Error>;
 
-    fn is_fulfilled(&self, config: &Configuration<A>) -> bool {
-        self.approved_by
-            .iter()
-            .filter(|account_id| A::approve_account(account_id).is_ok())
-            .count()
-            >= config.threshold as usize
+    fn is_fulfilled(&self, config: &Configuration<Ap>) -> bool {
+        self.approved_by.len() >= config.threshold as usize
     }
 
     fn try_approve(
         &mut self,
         _args: Option<String>,
-        _config: &Configuration<A>,
+        _config: &Configuration<Ap>,
     ) -> Result<(), Self::Error> {
         let predecessor = env::predecessor_account_id();
 
-        if let Err(e) = A::approve_account(&predecessor) {
-            return Err(ApprovalError::ApproverError(e));
+        if let Err(e) = Ap::approve_account(&predecessor) {
+            return Err(ApprovalError::AccountApproverError(e));
         }
 
         if self.approved_by.contains(&predecessor) {
@@ -93,7 +110,7 @@ mod tests {
 
     use crate::{approval::ApprovalManager, near_contract_tools, rbac::Rbac, slot::Slot, Rbac};
 
-    use super::{ApprovalState, Approver, Configuration};
+    use super::{AccountApprover, ApprovalState, Configuration};
 
     #[derive(BorshSerialize, BorshDeserialize)]
     enum Action {
@@ -128,7 +145,7 @@ mod tests {
         }
     }
 
-    impl Approver for Contract {
+    impl AccountApprover for Contract {
         type Error = &'static str;
 
         fn approve_account(account_id: &near_sdk::AccountId) -> Result<(), Self::Error> {
@@ -167,11 +184,11 @@ mod tests {
         }
 
         pub fn approve(&mut self, request_id: u32) {
-            self.try_approve(request_id, None);
+            self.approve_request(request_id, None);
         }
 
         pub fn execute(&mut self, request_id: u32) -> &'static str {
-            self.try_execute(request_id)
+            self.execute_request(request_id)
         }
     }
 
