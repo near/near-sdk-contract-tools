@@ -1,8 +1,5 @@
 //! Queue and approve actions
 
-// TODO: Use Result instead of panicking in try_* functions
-// TODO: Extract error strings into constants
-
 use std::fmt::Display;
 
 use near_sdk::{
@@ -13,10 +10,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::slot::Slot;
 
-pub const NOT_INITIALIZED: &str = "Approval::init must be called before use";
-pub const ALREADY_INITIALIZED: &str = "Approval::init can only be called once";
+/// Error message emitted when the component is used before it is initialized
+pub const NOT_INITIALIZED: &str = "init must be called before use";
+/// Error message emitted when the init function is called multiple times
+pub const ALREADY_INITIALIZED: &str = "init can only be called once";
 
-pub mod native_action;
+pub mod native_transaction_action;
 pub mod simple_multisig;
 
 /// Actions can be executed after they are approved
@@ -31,6 +30,7 @@ pub trait Action: BorshSerialize + BorshDeserialize {
 /// sufficient approvals. For example, multisig confirmation state would keep
 /// track of who has approved an action request so far.
 pub trait Approval<C>: Default + BorshSerialize + BorshDeserialize {
+    /// Error type returned when try_approve fails
     type Error;
 
     /// Whether the current state represents full approval. Note that this
@@ -87,7 +87,7 @@ where
 
     /// Reads config from storage. Panics if the component has not been
     /// initialized.
-    fn config() -> C {
+    fn get_config() -> C {
         Self::slot_config()
             .read()
             .unwrap_or_else(|| env::panic_str(NOT_INITIALIZED))
@@ -96,6 +96,11 @@ where
     /// Current list of pending action requests.
     fn slot_request(request_id: u32) -> Slot<ActionRequest<A, S>> {
         Self::root().field(ApprovalStorageKey::Request(request_id))
+    }
+
+    /// Get a request by ID
+    fn get_request(request_id: u32) -> Option<ActionRequest<A, S>> {
+        Self::slot_request(request_id).read()
     }
 
     /// Must be called before using the Approval construct. Can only be called
@@ -135,7 +140,7 @@ where
 
     /// Executes an action request and removes it from the collection if the
     /// approval state of the request is fulfilled. Panics otherwise.
-    fn try_execute(&mut self, request_id: u32) -> A::Output {
+    fn execute_request(&mut self, request_id: u32) -> A::Output {
         require!(
             Self::is_approved(request_id),
             "Request must be approved before it can be executed",
@@ -153,7 +158,7 @@ where
         Self::slot_request(request_id)
             .read()
             .map(|request| {
-                let config = Self::config();
+                let config = Self::get_config();
                 request.approval_state.is_fulfilled(&config)
             })
             .unwrap_or(false)
@@ -161,13 +166,13 @@ where
 
     /// Tries to approve the action request designated by the given request ID
     /// with the given arguments. Panics if the request ID does not exist.
-    fn try_approve(&mut self, request_id: u32, args: Option<String>) {
+    fn approve_request(&mut self, request_id: u32, args: Option<String>) {
         let mut request_slot = Self::slot_request(request_id);
         let mut request = request_slot.read().unwrap();
 
         request
             .approval_state
-            .try_approve(args, &Self::config())
+            .try_approve(args, &Self::get_config())
             .unwrap_or_else(|e| env::panic_str(&format!("Approval failure: {e}")));
 
         request_slot.write(&request);
@@ -330,16 +335,16 @@ mod tests {
         assert!(!Contract::is_approved(request_id));
 
         predecessor(&alice);
-        contract.try_approve(request_id, None);
+        contract.approve_request(request_id, None);
 
         assert!(!Contract::is_approved(request_id));
 
         predecessor(&charlie);
-        contract.try_approve(request_id, None);
+        contract.approve_request(request_id, None);
 
         assert!(Contract::is_approved(request_id));
 
-        assert_eq!(contract.try_execute(request_id), "hello",);
+        assert_eq!(contract.execute_request(request_id), "hello",);
     }
 
     #[test]
@@ -354,9 +359,9 @@ mod tests {
         let request_id = contract.add_request(MyAction::SayHello);
 
         predecessor(&alice);
-        contract.try_approve(request_id, None);
+        contract.approve_request(request_id, None);
 
-        contract.try_approve(request_id, None);
+        contract.approve_request(request_id, None);
     }
 
     #[test]
@@ -371,9 +376,9 @@ mod tests {
         let request_id = contract.add_request(MyAction::SayHello);
 
         predecessor(&alice);
-        contract.try_approve(request_id, None);
+        contract.approve_request(request_id, None);
 
-        contract.try_execute(request_id);
+        contract.execute_request(request_id);
     }
 
     #[test]
@@ -391,10 +396,10 @@ mod tests {
         let request_id = contract.add_request(MyAction::SayGoodbye);
 
         predecessor(&alice);
-        contract.try_approve(request_id, None);
+        contract.approve_request(request_id, None);
 
         predecessor(&bob);
-        contract.try_approve(request_id, None);
+        contract.approve_request(request_id, None);
 
         assert!(Contract::is_approved(request_id));
 
@@ -403,7 +408,7 @@ mod tests {
         assert!(!Contract::is_approved(request_id));
 
         predecessor(&charlie);
-        contract.try_approve(request_id, None);
+        contract.approve_request(request_id, None);
 
         assert!(Contract::is_approved(request_id));
     }

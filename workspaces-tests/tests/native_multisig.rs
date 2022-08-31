@@ -1,6 +1,6 @@
 #![cfg(not(windows))]
 
-use near_contract_tools::approval::native_action::PromiseAction;
+use near_contract_tools::approval::native_transaction_action::PromiseAction;
 use near_sdk::serde_json::json;
 use workspaces::{prelude::*, Account, Contract, Network, Worker};
 
