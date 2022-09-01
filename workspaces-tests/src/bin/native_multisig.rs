@@ -1,17 +1,14 @@
 // Ignore
 pub fn main() {}
 
-use std::fmt::Display;
-
 use near_contract_tools::{
     approval::{
         native_transaction_action::{self, NativeTransactionAction},
-        simple_multisig::{AccountApprover, ApprovalState, Configuration},
+        simple_multisig::Configuration,
         ApprovalManager,
     },
     rbac::Rbac,
-    slot::Slot,
-    Rbac,
+    Rbac, SimpleMultisig,
 };
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
@@ -19,52 +16,15 @@ use near_sdk::{
 };
 
 #[derive(BorshSerialize, BorshStorageKey)]
-enum StorageKey {
-    SimpleMultisig,
-}
-
-#[derive(BorshSerialize, BorshStorageKey)]
 enum Role {
     Multisig,
 }
 
-#[derive(PanicOnDefault, BorshSerialize, BorshDeserialize, Rbac)]
+#[derive(PanicOnDefault, BorshSerialize, BorshDeserialize, Rbac, SimpleMultisig)]
+#[simple_multisig(action = "NativeTransactionAction", role = "Role::Multisig")]
 #[rbac(roles = "Role")]
 #[near_bindgen]
 pub struct Contract {}
-
-// This single function implementation completely implements simple multisig on
-// the contract
-impl ApprovalManager<NativeTransactionAction, ApprovalState, Configuration<Self>> for Contract {
-    fn root() -> Slot<()> {
-        Slot::new(StorageKey::SimpleMultisig)
-    }
-}
-
-#[derive(Clone, Copy, Debug)]
-pub enum ApproverError {
-    UnauthorizedAccount,
-}
-
-impl Display for ApproverError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Unauthorized account")
-    }
-}
-
-// We don't have to check env::predecessor_account_id or anything like that
-// SimpleMultisig handles it all for us
-impl AccountApprover for Contract {
-    type Error = ApproverError;
-
-    fn approve_account(account_id: &AccountId) -> Result<(), ApproverError> {
-        if Contract::has_role(account_id, &Role::Multisig) {
-            Ok(())
-        } else {
-            Err(ApproverError::UnauthorizedAccount)
-        }
-    }
-}
 
 #[near_bindgen]
 impl Contract {
