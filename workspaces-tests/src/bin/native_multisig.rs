@@ -15,9 +15,7 @@ use near_contract_tools::{
 };
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
-    env,
-    json_types::U128,
-    near_bindgen, AccountId, BorshStorageKey, PanicOnDefault, Promise, PromiseOrValue,
+    env, near_bindgen, AccountId, BorshStorageKey, PanicOnDefault, Promise,
 };
 
 #[derive(BorshSerialize, BorshStorageKey)]

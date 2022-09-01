@@ -5,7 +5,9 @@ script = """
 set -e
 
 if [[ -n $1 ]]; then
-    cargo build --target wasm32-unknown-unknown --release --bin "$1"
+    # a test may depend on more than one contract and we don't have a nice way of declaring that yet
+    # cargo build --target wasm32-unknown-unknown --release --bin "$1"
+    cargo build --target wasm32-unknown-unknown --release --all
     cargo test --package workspaces-tests --test "$1" -- --nocapture
 else
     cargo build --target wasm32-unknown-unknown --release --all
