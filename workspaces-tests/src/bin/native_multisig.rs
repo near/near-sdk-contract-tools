@@ -15,7 +15,9 @@ use near_contract_tools::{
 };
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
-    env, near_bindgen, AccountId, BorshStorageKey, PanicOnDefault, Promise,
+    env,
+    json_types::U128,
+    near_bindgen, AccountId, BorshStorageKey, PanicOnDefault, Promise, PromiseOrValue,
 };
 
 #[derive(BorshSerialize, BorshStorageKey)]
@@ -109,5 +111,10 @@ impl Contract {
 
     pub fn execute(&mut self, request_id: u32) -> Promise {
         self.execute_request(request_id)
+    }
+
+    #[private]
+    pub fn private_add_one(&mut self, value: u32) -> u32 {
+        value + 1
     }
 }

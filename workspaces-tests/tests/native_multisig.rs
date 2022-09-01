@@ -1,8 +1,8 @@
 #![cfg(not(windows))]
 
 use near_contract_tools::approval::native_transaction_action::PromiseAction;
-use near_sdk::serde_json::json;
-use workspaces::{prelude::*, Account, Contract, Network, Worker};
+use near_sdk::{serde_json::json, Gas};
+use workspaces::{network::Sandbox, prelude::*, Account, Contract, Network, Worker};
 
 const WASM: &[u8] =
     include_bytes!("../../target/wasm32-unknown-unknown/release/native_multisig.wasm");
@@ -14,7 +14,7 @@ struct Setup<N: Network> {
 }
 
 /// Setup for individual tests
-async fn setup(num_accounts: usize) -> Setup<impl Network> {
+async fn setup(num_accounts: usize) -> Setup<Sandbox> {
     let worker = workspaces::sandbox().await.unwrap();
 
     // Initialize contract
@@ -49,6 +49,7 @@ async fn setup_roles(num_accounts: usize) -> Setup<impl Network> {
 }
 
 #[tokio::test]
+#[ignore]
 async fn transfer() {
     let Setup {
         worker,
@@ -139,4 +140,65 @@ async fn transfer() {
 
     // charlie's balance should have increased by exactly 10 NEAR
     assert_eq!(balance_after - balance_before, near_sdk::ONE_NEAR * 10);
+}
+
+#[tokio::test]
+async fn reflexive_xcc() {
+    let Setup {
+        worker,
+        contract,
+        accounts,
+    } = setup_roles(3).await;
+
+    let alice = &accounts[0];
+    let bob = &accounts[1];
+    let charlie = &accounts[2];
+
+    let actions = vec![PromiseAction::FunctionCall {
+        function_name: "private_add_one".into(),
+        arguments: json!({ "value": 25 }).to_string().as_bytes().to_vec(),
+        amount: 0.into(),
+        gas: (Gas::ONE_TERA.0 * 50).into(),
+    }];
+
+    let request_id = alice
+        .call(&worker, contract.id(), "request")
+        .args_json(json!({
+            "receiver_id": contract.id(),
+            "actions": actions,
+        }))
+        .unwrap()
+        .transact()
+        .await
+        .unwrap()
+        .json::<u32>()
+        .unwrap();
+
+    alice
+        .call(&worker, contract.id(), "approve")
+        .args_json(json!({ "request_id": request_id }))
+        .unwrap()
+        .transact()
+        .await
+        .unwrap();
+
+    bob.call(&worker, contract.id(), "approve")
+        .args_json(json!({ "request_id": request_id }))
+        .unwrap()
+        .transact()
+        .await
+        .unwrap();
+
+    let result = charlie
+        .call(&worker, contract.id(), "execute")
+        .max_gas()
+        .args_json(json!({ "request_id": request_id }))
+        .unwrap()
+        .transact()
+        .await
+        .unwrap()
+        .json::<u32>()
+        .unwrap();
+
+    assert_eq!(result, 26);
 }
