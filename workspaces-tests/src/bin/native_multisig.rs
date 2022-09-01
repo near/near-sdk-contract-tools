@@ -86,10 +86,13 @@ impl Contract {
     ) -> u32 {
         self.require_role(&Role::Multisig);
 
-        let request_id = self.add_request(native_transaction_action::NativeTransactionAction {
-            receiver_id,
-            actions,
-        });
+        let request_id = self.add_request(
+            native_transaction_action::NativeTransactionAction {
+                receiver_id,
+                actions,
+            },
+            Default::default(),
+        );
 
         near_sdk::log!(format!("Request ID: {request_id}"));
 

@@ -105,7 +105,7 @@ impl Contract {
 
         self.require_role(&Role::Multisig);
 
-        let request_id = self.add_request(action);
+        let request_id = self.add_request(action, Default::default());
 
         near_sdk::log!(format!("Request ID: {request_id}"));
 

@@ -171,7 +171,7 @@ mod tests {
                 Action::SayGoodbye
             };
 
-            let request_id = self.add_request(action);
+            let request_id = self.add_request(action, Default::default());
 
             request_id
         }

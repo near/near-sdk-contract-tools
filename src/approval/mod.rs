@@ -19,7 +19,7 @@ pub mod native_transaction_action;
 pub mod simple_multisig;
 
 /// Actions can be executed after they are approved
-pub trait Action: BorshSerialize + BorshDeserialize {
+pub trait Action {
     /// Return type of the action. Useful if the action creates a `Promise`, for example.
     type Output;
     /// Perform the action. One time only.
@@ -29,7 +29,7 @@ pub trait Action: BorshSerialize + BorshDeserialize {
 /// The approval state determines whether an action request has achieved
 /// sufficient approvals. For example, multisig confirmation state would keep
 /// track of who has approved an action request so far.
-pub trait Approval<C>: Default + BorshSerialize + BorshDeserialize {
+pub trait Approval<C> {
     /// Error type returned when try_approve fails
     type Error;
 
@@ -66,8 +66,8 @@ enum ApprovalStorageKey {
 /// execution
 pub trait ApprovalManager<A, S, C>
 where
-    A: Action,
-    S: Approval<C> + Serialize,
+    A: Action + BorshSerialize + BorshDeserialize,
+    S: Approval<C> + BorshSerialize + BorshDeserialize + Serialize,
     C: BorshDeserialize + BorshSerialize,
     S::Error: Display,
 {
@@ -113,26 +113,13 @@ where
     }
 
     /// Creates a new action request initialized with the given approval state
-    fn add_request_with_state(&mut self, action: A, approval_state: S) -> u32 {
+    fn add_request(&mut self, action: A, approval_state: S) -> u32 {
         let request_id = Self::slot_next_request_id().read().unwrap_or(0);
         Self::slot_next_request_id().write(&(request_id + 1));
 
         Self::slot_request(request_id).write(&ActionRequest {
             action,
             approval_state,
-        });
-
-        request_id
-    }
-
-    /// Creates a new action request with the default approval state
-    fn add_request(&mut self, action: A) -> u32 {
-        let request_id = Self::slot_next_request_id().read().unwrap_or(0);
-        Self::slot_next_request_id().write(&(request_id + 1));
-
-        Self::slot_request(request_id).write(&ActionRequest {
-            action,
-            approval_state: Default::default(),
         });
 
         request_id
@@ -329,7 +316,7 @@ mod tests {
         contract.add_role(&bob, &Role::Multisig);
         contract.add_role(&charlie, &Role::Multisig);
 
-        let request_id = contract.add_request(MyAction::SayHello);
+        let request_id = contract.add_request(MyAction::SayHello, Default::default());
 
         assert_eq!(request_id, 0);
         assert!(!Contract::is_approved(request_id));
@@ -356,7 +343,7 @@ mod tests {
 
         contract.add_role(&alice, &Role::Multisig);
 
-        let request_id = contract.add_request(MyAction::SayHello);
+        let request_id = contract.add_request(MyAction::SayHello, Default::default());
 
         predecessor(&alice);
         contract.approve_request(request_id, None);
@@ -373,7 +360,7 @@ mod tests {
 
         contract.add_role(&alice, &Role::Multisig);
 
-        let request_id = contract.add_request(MyAction::SayHello);
+        let request_id = contract.add_request(MyAction::SayHello, Default::default());
 
         predecessor(&alice);
         contract.approve_request(request_id, None);
@@ -393,7 +380,7 @@ mod tests {
         contract.add_role(&bob, &Role::Multisig);
         contract.add_role(&charlie, &Role::Multisig);
 
-        let request_id = contract.add_request(MyAction::SayGoodbye);
+        let request_id = contract.add_request(MyAction::SayGoodbye, Default::default());
 
         predecessor(&alice);
         contract.approve_request(request_id, None);
