@@ -52,7 +52,7 @@ async fn setup_roles(num_accounts: usize) -> Setup {
 }
 
 #[tokio::test]
-#[ignore] // TODO: Remove
+// #[ignore] // TODO: Remove
 async fn transfer() {
     let Setup {
         worker,
@@ -146,7 +146,7 @@ async fn transfer() {
 }
 
 #[tokio::test]
-#[ignore] // TODO: Remove
+// #[ignore] // TODO: Remove
 async fn reflexive_xcc() {
     let Setup {
         worker,

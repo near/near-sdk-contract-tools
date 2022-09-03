@@ -1,12 +1,11 @@
 //! Queue and approve actions
 
-use std::fmt::Display;
-
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
-    env, require, BorshStorageKey,
+    env, require, AccountId, BorshStorageKey,
 };
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
 use crate::slot::Slot;
 
@@ -26,22 +25,32 @@ pub trait Action {
     fn execute(self) -> Self::Output;
 }
 
-/// The approval state determines whether an action request has achieved
-/// sufficient approvals. For example, multisig confirmation state would keep
-/// track of who has approved an action request so far.
-pub trait Approval<C> {
-    /// Error type returned when try_approve fails
+/// Defines the operating parameters for an ApprovalManager and performs
+/// approvals
+pub trait ApprovalConfiguration<A, S> {
+    /// Approval errors, e.g. "this account has already approved this request",
+    /// "this request is not allowed to be approved yet", etc.
     type Error;
 
-    /// Whether the current state represents full approval. Note that this
-    /// function is called immediately before attempting to execute an action,
-    /// so it is possible for this function to respond to externalities (i.e.
-    /// changes to contract state other than calls to approve)
-    fn is_fulfilled(&self, config: &C) -> bool;
+    /// Has the request reached full approval?
+    fn is_approved_for_execution(&self, action_request: &ActionRequest<A, S>) -> bool;
 
-    /// Try to improve the approval state. Additional arguments may be
-    /// provided, e.g. from the initiating function call
-    fn try_approve(&mut self, args: Option<String>, config: &C) -> Result<(), Self::Error>;
+    /// Can this request be removed by an allowed account?
+    fn is_removable(&self, action_request: &ActionRequest<A, S>) -> bool;
+
+    /// Is the account allowed to execute, approve, or remove this request?
+    fn is_account_authorized(
+        &self,
+        account_id: &AccountId,
+        action_request: &ActionRequest<A, S>,
+    ) -> bool;
+
+    /// Modify action_request.approval_state in-place to increase approval
+    fn try_approve_with_authorized_account(
+        &self,
+        account_id: AccountId,
+        action_request: &mut ActionRequest<A, S>,
+    ) -> Result<(), Self::Error>;
 }
 
 /// An action request is composed of an action that will be executed when the
@@ -62,14 +71,54 @@ enum ApprovalStorageKey {
     Request(u32),
 }
 
+/// Top-level errors that may occur when attempting to approve a request
+#[derive(Error, Debug)]
+pub enum ApprovalError<E> {
+    /// The account is not allowed to act on requests
+    #[error("Unauthorized account")]
+    UnauthorizedAccount,
+    /// The approval function encountered another error
+    #[error("Approval error: {0}")]
+    ApprovalError(E),
+}
+
+/// Errors that may occur when trying to execute a request
+#[derive(Error, Debug)]
+pub enum ExecutionError {
+    /// The account is not allowed to act on requests
+    #[error("Unauthorized account")]
+    UnauthorizedAccount,
+    /// Unapproved requests cannot be executed
+    #[error("Request not approved")]
+    RequestNotApproved,
+}
+
+/// Errors that may occur when trying to create a request
+#[derive(Error, Debug)]
+pub enum CreationError {
+    /// The account is not allowed to act on requests
+    #[error("Unauthorized account")]
+    UnauthorizedAccount,
+}
+
+/// Errors that may occur when trying to remove a request
+#[derive(Error, Debug)]
+pub enum RemovalError {
+    /// The account is not allowed to act on requests
+    #[error("Unauthorized account")]
+    UnauthorizedAccount,
+    /// This request is not (yet?) allowed to be removed
+    #[error("Removal not allowed")]
+    RemovalNotAllowed,
+}
+
 /// Collection of action requests that manages their approval state and
 /// execution
 pub trait ApprovalManager<A, S, C>
 where
     A: Action + BorshSerialize + BorshDeserialize,
-    S: Approval<C> + BorshSerialize + BorshDeserialize + Serialize,
-    C: BorshDeserialize + BorshSerialize,
-    S::Error: Display,
+    S: BorshSerialize + BorshDeserialize + Serialize,
+    C: ApprovalConfiguration<A, S> + BorshDeserialize + BorshSerialize,
 {
     /// Storage root
     fn root() -> Slot<()>;
@@ -113,30 +162,48 @@ where
     }
 
     /// Creates a new action request initialized with the given approval state
-    fn add_request(&mut self, action: A, approval_state: S) -> u32 {
+    fn create_request(&mut self, action: A, approval_state: S) -> Result<u32, CreationError> {
         let request_id = Self::slot_next_request_id().read().unwrap_or(0);
-        Self::slot_next_request_id().write(&(request_id + 1));
 
-        Self::slot_request(request_id).write(&ActionRequest {
+        let request = ActionRequest {
             action,
             approval_state,
-        });
+        };
 
-        request_id
+        let config = Self::get_config();
+        let predecessor = env::predecessor_account_id();
+
+        if !config.is_account_authorized(&predecessor, &request) {
+            return Err(CreationError::UnauthorizedAccount);
+        }
+
+        Self::slot_next_request_id().write(&(request_id + 1));
+        Self::slot_request(request_id).write(&request);
+
+        Ok(request_id)
     }
 
     /// Executes an action request and removes it from the collection if the
     /// approval state of the request is fulfilled. Panics otherwise.
-    fn execute_request(&mut self, request_id: u32) -> A::Output {
-        require!(
-            Self::is_approved(request_id),
-            "Request must be approved before it can be executed",
-        );
+    fn execute_request(&mut self, request_id: u32) -> Result<A::Output, ExecutionError> {
+        if !Self::is_approved(request_id) {
+            return Err(ExecutionError::RequestNotApproved);
+        }
 
-        Self::slot_request(request_id)
-            .take()
-            .map(|request| request.action.execute())
-            .unwrap()
+        let predecessor = env::predecessor_account_id();
+        let config = Self::get_config();
+
+        let mut request_slot = Self::slot_request(request_id);
+        let request = request_slot.read().unwrap();
+
+        if !config.is_account_authorized(&predecessor, &request) {
+            return Err(ExecutionError::UnauthorizedAccount);
+        }
+
+        let result = request.action.execute();
+        request_slot.remove();
+
+        Ok(result)
     }
 
     /// Returns `true` if the given request ID exists and is approved (that
@@ -146,50 +213,77 @@ where
             .read()
             .map(|request| {
                 let config = Self::get_config();
-                request.approval_state.is_fulfilled(&config)
+                config.is_approved_for_execution(&request)
             })
             .unwrap_or(false)
     }
 
     /// Tries to approve the action request designated by the given request ID
     /// with the given arguments. Panics if the request ID does not exist.
-    fn approve_request(&mut self, request_id: u32, args: Option<String>) {
+    fn approve_request(&mut self, request_id: u32) -> Result<(), ApprovalError<C::Error>> {
         let mut request_slot = Self::slot_request(request_id);
         let mut request = request_slot.read().unwrap();
 
-        request
-            .approval_state
-            .try_approve(args, &Self::get_config())
-            .unwrap_or_else(|e| env::panic_str(&format!("Approval failure: {e}")));
+        let predecessor = env::predecessor_account_id();
+        let config = Self::get_config();
+
+        if !config.is_account_authorized(&predecessor, &request) {
+            return Err(ApprovalError::UnauthorizedAccount);
+        }
+
+        config
+            .try_approve_with_authorized_account(predecessor, &mut request)
+            .map_err(ApprovalError::ApprovalError)?;
 
         request_slot.write(&request);
+
+        Ok(())
+    }
+
+    /// Tries to remove the action request indicated by request_id.
+    fn remove_request(&mut self, request_id: u32) -> Result<(), RemovalError> {
+        let mut request_slot = Self::slot_request(request_id);
+        let request = request_slot.read().unwrap();
+        let predecessor = env::predecessor_account_id();
+
+        let config = Self::get_config();
+
+        if !config.is_removable(&request) {
+            return Err(RemovalError::RemovalNotAllowed);
+        }
+
+        config
+            .is_account_authorized(&predecessor, &request)
+            .then(|| {
+                request_slot.remove();
+            })
+            .ok_or(RemovalError::UnauthorizedAccount)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::fmt::Display;
-
     use near_contract_tools_macros::Rbac;
     use near_sdk::{
         borsh::{self, BorshDeserialize, BorshSerialize},
-        env, near_bindgen,
+        near_bindgen,
         test_utils::VMContextBuilder,
         testing_env, AccountId, BorshStorageKey,
     };
     use serde::Serialize;
+    use thiserror::Error;
 
-    use crate::{approval::Approval, rbac::Rbac};
+    use crate::rbac::Rbac;
     use crate::{near_contract_tools, slot::Slot};
 
-    use super::{Action, ApprovalManager};
+    use super::{Action, ActionRequest, ApprovalConfiguration, ApprovalManager};
 
     #[derive(BorshSerialize, BorshStorageKey)]
     enum Role {
         Multisig,
     }
 
-    #[derive(BorshSerialize, BorshDeserialize, Debug, PartialEq, Eq, Clone, Copy)]
+    #[derive(BorshSerialize, BorshDeserialize, Debug, PartialEq, Eq, Clone)]
     enum MyAction {
         SayHello,
         SayGoodbye,
@@ -245,54 +339,57 @@ mod tests {
         pub approved_by: Vec<AccountId>,
     }
 
+    #[derive(Error, Debug)]
     enum ApprovalError {
-        MissingRole,
+        #[error("Already approved by this account")]
         AlreadyApprovedByAccount,
     }
 
-    impl Display for ApprovalError {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            write!(
-                f,
-                "{}",
-                match self {
-                    Self::MissingRole => "Missing required role",
-                    Self::AlreadyApprovedByAccount => "Already approved by this account",
-                }
-            )
-        }
-    }
-
-    impl Approval<MultisigConfig> for MultisigApprovalState {
+    impl ApprovalConfiguration<MyAction, MultisigApprovalState> for MultisigConfig {
         type Error = ApprovalError;
 
-        fn is_fulfilled(&self, config: &MultisigConfig) -> bool {
-            self.approved_by
+        fn is_approved_for_execution(
+            &self,
+            action_request: &super::ActionRequest<MyAction, MultisigApprovalState>,
+        ) -> bool {
+            action_request
+                .approval_state
+                .approved_by
                 .iter()
-                .filter(|account| {
-                    // in case a signatory's role was revoked in the meantime
-                    Contract::has_role(&account, &Role::Multisig)
-                })
+                .filter(|account_id| Contract::has_role(account_id, &Role::Multisig))
                 .count()
-                >= config.threshold as usize
+                >= self.threshold as usize
         }
 
-        fn try_approve(
-            &mut self,
-            _args: Option<String>,
-            _config: &MultisigConfig,
+        fn is_removable(
+            &self,
+            _action_request: &super::ActionRequest<MyAction, MultisigApprovalState>,
+        ) -> bool {
+            true
+        }
+
+        fn is_account_authorized(
+            &self,
+            account_id: &AccountId,
+            _action_request: &ActionRequest<MyAction, MultisigApprovalState>,
+        ) -> bool {
+            Contract::has_role(account_id, &Role::Multisig)
+        }
+
+        fn try_approve_with_authorized_account(
+            &self,
+            account_id: AccountId,
+            action_request: &mut ActionRequest<MyAction, MultisigApprovalState>,
         ) -> Result<(), Self::Error> {
-            let predecessor = env::predecessor_account_id();
-
-            if !Contract::has_role(&predecessor, &Role::Multisig) {
-                return Err(ApprovalError::MissingRole);
-            }
-
-            if self.approved_by.contains(&predecessor) {
+            if action_request
+                .approval_state
+                .approved_by
+                .contains(&account_id)
+            {
                 return Err(ApprovalError::AlreadyApprovedByAccount);
             }
 
-            self.approved_by.push(predecessor);
+            action_request.approval_state.approved_by.push(account_id);
 
             Ok(())
         }
@@ -316,26 +413,28 @@ mod tests {
         contract.add_role(&bob, &Role::Multisig);
         contract.add_role(&charlie, &Role::Multisig);
 
-        let request_id = contract.add_request(MyAction::SayHello, Default::default());
+        predecessor(&alice);
+        let request_id = contract
+            .create_request(MyAction::SayHello, Default::default())
+            .unwrap();
 
         assert_eq!(request_id, 0);
         assert!(!Contract::is_approved(request_id));
 
-        predecessor(&alice);
-        contract.approve_request(request_id, None);
+        contract.approve_request(request_id).unwrap();
 
         assert!(!Contract::is_approved(request_id));
 
         predecessor(&charlie);
-        contract.approve_request(request_id, None);
+        contract.approve_request(request_id).unwrap();
 
         assert!(Contract::is_approved(request_id));
 
-        assert_eq!(contract.execute_request(request_id), "hello",);
+        assert_eq!(contract.execute_request(request_id).unwrap(), "hello");
     }
 
     #[test]
-    #[should_panic(expected = "Already approved by this account")]
+    #[should_panic(expected = "ApprovalError(AlreadyApprovedByAccount)")]
     fn duplicate_approval() {
         let alice: AccountId = "alice".parse().unwrap();
 
@@ -343,16 +442,18 @@ mod tests {
 
         contract.add_role(&alice, &Role::Multisig);
 
-        let request_id = contract.add_request(MyAction::SayHello, Default::default());
-
         predecessor(&alice);
-        contract.approve_request(request_id, None);
+        let request_id = contract
+            .create_request(MyAction::SayHello, Default::default())
+            .unwrap();
 
-        contract.approve_request(request_id, None);
+        contract.approve_request(request_id).unwrap();
+
+        contract.approve_request(request_id).unwrap();
     }
 
     #[test]
-    #[should_panic = "Request must be approved before it can be executed"]
+    #[should_panic = "RequestNotApproved"]
     fn no_execution_before_approval() {
         let alice: AccountId = "alice".parse().unwrap();
 
@@ -360,16 +461,42 @@ mod tests {
 
         contract.add_role(&alice, &Role::Multisig);
 
-        let request_id = contract.add_request(MyAction::SayHello, Default::default());
-
         predecessor(&alice);
-        contract.approve_request(request_id, None);
 
-        contract.execute_request(request_id);
+        let request_id = contract
+            .create_request(MyAction::SayHello, Default::default())
+            .unwrap();
+
+        contract.approve_request(request_id).unwrap();
+
+        contract.execute_request(request_id).unwrap();
     }
 
     #[test]
-    fn dynamic_is_approved_calculation() {
+    fn successful_removal() {
+        let alice: AccountId = "alice".parse().unwrap();
+        let bob: AccountId = "bob_acct".parse().unwrap();
+
+        let mut contract = Contract::new(2);
+
+        contract.add_role(&alice, &Role::Multisig);
+        contract.add_role(&bob, &Role::Multisig);
+
+        predecessor(&alice);
+
+        let request_id = contract
+            .create_request(MyAction::SayHello, Default::default())
+            .unwrap();
+
+        contract.approve_request(request_id).unwrap();
+
+        predecessor(&bob);
+
+        contract.remove_request(request_id).unwrap();
+    }
+
+    #[test]
+    fn dynamic_eligibility() {
         let alice: AccountId = "alice".parse().unwrap();
         let bob: AccountId = "bob_acct".parse().unwrap();
         let charlie: AccountId = "charlie".parse().unwrap();
@@ -380,13 +507,15 @@ mod tests {
         contract.add_role(&bob, &Role::Multisig);
         contract.add_role(&charlie, &Role::Multisig);
 
-        let request_id = contract.add_request(MyAction::SayGoodbye, Default::default());
-
         predecessor(&alice);
-        contract.approve_request(request_id, None);
+        let request_id = contract
+            .create_request(MyAction::SayGoodbye, Default::default())
+            .unwrap();
+
+        contract.approve_request(request_id).unwrap();
 
         predecessor(&bob);
-        contract.approve_request(request_id, None);
+        contract.approve_request(request_id).unwrap();
 
         assert!(Contract::is_approved(request_id));
 
@@ -395,7 +524,7 @@ mod tests {
         assert!(!Contract::is_approved(request_id));
 
         predecessor(&charlie);
-        contract.approve_request(request_id, None);
+        contract.approve_request(request_id).unwrap();
 
         assert!(Contract::is_approved(request_id));
     }

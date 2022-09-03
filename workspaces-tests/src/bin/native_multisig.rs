@@ -1,12 +1,10 @@
 // Ignore
 pub fn main() {}
 
-use std::fmt::Display;
-
 use near_contract_tools::{
     approval::{
         native_transaction_action::{self, NativeTransactionAction},
-        simple_multisig::{AccountApprover, ApprovalState, Configuration},
+        simple_multisig::{AccountAuthorizer, ApprovalState, Configuration},
         ApprovalManager,
     },
     rbac::Rbac,
@@ -41,36 +39,23 @@ impl ApprovalManager<NativeTransactionAction, ApprovalState, Configuration<Self>
     }
 }
 
-#[derive(Clone, Copy, Debug)]
-pub enum ApproverError {
-    UnauthorizedAccount,
-}
-
-impl Display for ApproverError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Unauthorized account")
-    }
-}
-
-// We don't have to check env::predecessor_account_id or anything like that
-// SimpleMultisig handles it all for us
-impl AccountApprover for Contract {
-    type Error = ApproverError;
-
-    fn approve_account(account_id: &AccountId) -> Result<(), ApproverError> {
-        if Contract::has_role(account_id, &Role::Multisig) {
-            Ok(())
-        } else {
-            Err(ApproverError::UnauthorizedAccount)
-        }
+impl AccountAuthorizer for Contract {
+    fn is_account_authorized(account_id: &AccountId) -> bool {
+        Contract::has_role(account_id, &Role::Multisig)
     }
 }
 
 #[near_bindgen]
 impl Contract {
+    const APPROVAL_THRESHOLD: u8 = 2;
+    const VALIDITY_PERIOD: u64 = 1000000 * 1000 * 60 * 60 * 24 * 7;
+
     #[init]
     pub fn new() -> Self {
-        <Self as ApprovalManager<_, _, _>>::init(Configuration::new(2));
+        <Self as ApprovalManager<_, _, _>>::init(Configuration::new(
+            Self::APPROVAL_THRESHOLD,
+            Self::VALIDITY_PERIOD,
+        ));
 
         Self {}
     }
@@ -84,15 +69,15 @@ impl Contract {
         receiver_id: AccountId,
         actions: Vec<native_transaction_action::PromiseAction>,
     ) -> u32 {
-        self.require_role(&Role::Multisig);
-
-        let request_id = self.add_request(
-            native_transaction_action::NativeTransactionAction {
-                receiver_id,
-                actions,
-            },
-            Default::default(),
-        );
+        let request_id = self
+            .create_request(
+                native_transaction_action::NativeTransactionAction {
+                    receiver_id,
+                    actions,
+                },
+                ApprovalState::new(),
+            )
+            .unwrap();
 
         near_sdk::log!(format!("Request ID: {request_id}"));
 
@@ -100,7 +85,7 @@ impl Contract {
     }
 
     pub fn approve(&mut self, request_id: u32) {
-        self.approve_request(request_id, None);
+        self.approve_request(request_id).unwrap();
     }
 
     pub fn is_approved(&self, request_id: u32) -> bool {
@@ -108,7 +93,7 @@ impl Contract {
     }
 
     pub fn execute(&mut self, request_id: u32) -> Promise {
-        self.execute_request(request_id)
+        self.execute_request(request_id).unwrap()
     }
 
     #[private]
