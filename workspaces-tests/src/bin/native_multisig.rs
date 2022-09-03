@@ -4,7 +4,7 @@ pub fn main() {}
 use near_contract_tools::{
     approval::{
         native_transaction_action::{self, NativeTransactionAction},
-        simple_multisig::Configuration,
+        simple_multisig::{ApprovalState, Configuration},
         ApprovalManager,
     },
     rbac::Rbac,
@@ -28,9 +28,15 @@ pub struct Contract {}
 
 #[near_bindgen]
 impl Contract {
+    const APPROVAL_THRESHOLD: u8 = 2;
+    const VALIDITY_PERIOD: u64 = 1000000 * 1000 * 60 * 60 * 24 * 7;
+
     #[init]
     pub fn new() -> Self {
-        <Self as ApprovalManager<_, _, _>>::init(Configuration::new(2));
+        <Self as ApprovalManager<_, _, _>>::init(Configuration::new(
+            Self::APPROVAL_THRESHOLD,
+            Self::VALIDITY_PERIOD,
+        ));
 
         Self {}
     }
@@ -44,12 +50,15 @@ impl Contract {
         receiver_id: AccountId,
         actions: Vec<native_transaction_action::PromiseAction>,
     ) -> u32 {
-        self.require_role(&Role::Multisig);
-
-        let request_id = self.add_request(native_transaction_action::NativeTransactionAction {
-            receiver_id,
-            actions,
-        });
+        let request_id = self
+            .create_request(
+                native_transaction_action::NativeTransactionAction {
+                    receiver_id,
+                    actions,
+                },
+                ApprovalState::new(),
+            )
+            .unwrap();
 
         near_sdk::log!(format!("Request ID: {request_id}"));
 
@@ -57,7 +66,7 @@ impl Contract {
     }
 
     pub fn approve(&mut self, request_id: u32) {
-        self.approve_request(request_id, None);
+        self.approve_request(request_id).unwrap();
     }
 
     pub fn is_approved(&self, request_id: u32) -> bool {
@@ -65,6 +74,11 @@ impl Contract {
     }
 
     pub fn execute(&mut self, request_id: u32) -> Promise {
-        self.execute_request(request_id)
+        self.execute_request(request_id).unwrap()
+    }
+
+    #[private]
+    pub fn private_add_one(&mut self, value: u32) -> u32 {
+        value + 1
     }
 }

@@ -291,7 +291,7 @@ mod tests {
     fn require_owner_fail() {
         let owner_id: AccountId = "owner".parse().unwrap();
 
-        let contract = Contract::new(owner_id.clone());
+        let contract = Contract::new(owner_id);
 
         let alice: AccountId = "alice".parse().unwrap();
 
@@ -324,7 +324,7 @@ mod tests {
         let proposed_owner: AccountId = "proposed".parse().unwrap();
 
         testing_env!(VMContextBuilder::new()
-            .predecessor_account_id(owner_id.clone())
+            .predecessor_account_id(owner_id)
             .attached_deposit(1)
             .build());
 
@@ -339,7 +339,7 @@ mod tests {
     #[should_panic(expected = "Owner only")]
     fn propose_owner_unauthorized() {
         let owner_id: AccountId = "owner".parse().unwrap();
-        let mut contract = Contract::new(owner_id.clone());
+        let mut contract = Contract::new(owner_id);
 
         let proposed_owner: AccountId = "proposed".parse().unwrap();
 
@@ -348,7 +348,7 @@ mod tests {
             .attached_deposit(1)
             .build());
 
-        contract.own_propose_owner(Some(proposed_owner.clone()));
+        contract.own_propose_owner(Some(proposed_owner));
     }
 
     #[test]
@@ -360,10 +360,10 @@ mod tests {
         let proposed_owner: AccountId = "proposed".parse().unwrap();
 
         testing_env!(VMContextBuilder::new()
-            .predecessor_account_id(owner_id.clone())
+            .predecessor_account_id(owner_id)
             .build());
 
-        contract.own_propose_owner(Some(proposed_owner.clone()));
+        contract.own_propose_owner(Some(proposed_owner));
     }
 
     #[test]
@@ -375,7 +375,7 @@ mod tests {
         let proposed_owner: AccountId = "proposed".parse().unwrap();
 
         testing_env!(VMContextBuilder::new()
-            .predecessor_account_id(owner_id.clone())
+            .predecessor_account_id(owner_id)
             .attached_deposit(1)
             .build());
 
@@ -402,16 +402,16 @@ mod tests {
         let proposed_owner: AccountId = "proposed".parse().unwrap();
 
         testing_env!(VMContextBuilder::new()
-            .predecessor_account_id(owner_id.clone())
+            .predecessor_account_id(owner_id)
             .attached_deposit(1)
             .build());
 
-        contract.own_propose_owner(Some(proposed_owner.clone()));
+        contract.own_propose_owner(Some(proposed_owner));
 
         let third_party: AccountId = "third".parse().unwrap();
 
         testing_env!(VMContextBuilder::new()
-            .predecessor_account_id(third_party.clone())
+            .predecessor_account_id(third_party)
             .attached_deposit(1)
             .build());
 
@@ -428,14 +428,14 @@ mod tests {
         let proposed_owner: AccountId = "proposed".parse().unwrap();
 
         testing_env!(VMContextBuilder::new()
-            .predecessor_account_id(owner_id.clone())
+            .predecessor_account_id(owner_id)
             .attached_deposit(1)
             .build());
 
         contract.own_propose_owner(Some(proposed_owner.clone()));
 
         testing_env!(VMContextBuilder::new()
-            .predecessor_account_id(proposed_owner.clone())
+            .predecessor_account_id(proposed_owner)
             .build());
 
         contract.own_accept_owner();
@@ -445,7 +445,7 @@ mod tests {
     fn update_owner_unchecked() {
         let owner_id: AccountId = "owner".parse().unwrap();
 
-        let mut contract = Contract::new(owner_id.clone());
+        let mut contract = Contract::new(owner_id);
 
         let new_owner: AccountId = "new_owner".parse().unwrap();
 

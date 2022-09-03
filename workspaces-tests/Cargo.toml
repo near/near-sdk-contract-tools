@@ -5,6 +5,9 @@ name = "workspaces-tests"
 version = "0.1.0"
 
 [[bin]]
+name = "cross_target"
+
+[[bin]]
 name = "fungible_token"
 
 [[bin]]

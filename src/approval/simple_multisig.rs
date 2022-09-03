@@ -10,83 +10,129 @@ use near_sdk::{
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::approval::Approval;
+use super::{ActionRequest, ApprovalConfiguration};
 
 /// An AccountApprover gatekeeps which accounts are eligible to submit approvals
 /// to an ApprovalManager
-pub trait AccountApprover {
-    /// Error type returned by approve_account on failure (e.g. reason for
-    /// ineligibility)
-    type Error;
-
+pub trait AccountAuthorizer {
     /// Determines whether an account ID is allowed to submit an approval
-    fn approve_account(account_id: &AccountId) -> Result<(), Self::Error>;
+    fn is_account_authorized(account_id: &AccountId) -> bool;
 }
 
 /// M (threshold) of N approval scheme
 #[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize, Clone, Debug)]
-pub struct Configuration<Ap: AccountApprover> {
+pub struct Configuration<Au: AccountAuthorizer> {
     /// How many approvals are required?
     pub threshold: u8,
+    /// A request cannot be executed, and can be deleted by any
+    /// approval-eligible member after this period has elapsed.
+    /// 0 = perpetual validity, no deletion
+    pub validity_period_nanoseconds: u64,
     #[borsh_skip]
     #[serde(skip)]
-    __approver: PhantomData<Ap>,
+    _authorizer: PhantomData<Au>,
 }
 
-impl<Ap: AccountApprover> Configuration<Ap> {
+impl<Au: AccountAuthorizer> Configuration<Au> {
     /// Create an approval scheme with the given threshold
-    pub fn new(threshold: u8) -> Self {
+    pub fn new(threshold: u8, validity_period_nanoseconds: u64) -> Self {
         Self {
             threshold,
-            __approver: PhantomData,
+            validity_period_nanoseconds,
+            _authorizer: PhantomData,
+        }
+    }
+
+    /// Is the given approval state still considered valid?
+    pub fn is_within_validity_period(&self, approval_state: &ApprovalState) -> bool {
+        if self.validity_period_nanoseconds == 0 {
+            true
+        } else {
+            env::block_timestamp()
+                .checked_sub(approval_state.created_at_nanoseconds)
+                .unwrap() // inconsistent state if a request timestamp is in the future
+                < self.validity_period_nanoseconds
         }
     }
 }
 
 /// Approval state for simple multisig
-#[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize, Default, Debug)]
+#[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize, Debug)]
 pub struct ApprovalState {
     /// List of accounts that have approved an action thus far
     pub approved_by: Vec<AccountId>,
+    /// Network timestamp when the request was created
+    pub created_at_nanoseconds: u64,
+}
+
+impl Default for ApprovalState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl ApprovalState {
+    /// Creates an ApprovalState with the current network timestamp
+    pub fn new() -> Self {
+        Self {
+            approved_by: Vec::new(),
+            created_at_nanoseconds: env::block_timestamp(),
+        }
+    }
 }
 
 /// Why might a simple multisig approval attempt fail?
 #[derive(Error, Clone, Debug)]
-pub enum ApprovalError<E> {
+pub enum ApprovalError {
     /// The account has already approved this action request
     #[error("Already approved by this account")]
     AlreadyApprovedByAccount,
-    /// The AccountApprover returned another error
-    #[error("Account approver error: {0}")]
-    AccountApproverError(E),
+    /// The request has expired and cannot be approved or executed
+    #[error("Validity period exceeded")]
+    RequestExpired,
 }
 
-impl<Ap> Approval<Configuration<Ap>> for ApprovalState
+impl<Au, Ac> ApprovalConfiguration<Ac, ApprovalState> for Configuration<Au>
 where
-    Ap: AccountApprover,
+    Au: AccountAuthorizer,
 {
-    type Error = ApprovalError<Ap::Error>;
+    type Error = ApprovalError;
 
-    fn is_fulfilled(&self, config: &Configuration<Ap>) -> bool {
-        self.approved_by.len() >= config.threshold as usize
+    fn is_approved_for_execution(&self, action_request: &ActionRequest<Ac, ApprovalState>) -> bool {
+        self.is_within_validity_period(&action_request.approval_state)
+            && action_request.approval_state.approved_by.len() >= self.threshold as usize
     }
 
-    fn try_approve(
-        &mut self,
-        _args: Option<String>,
-        _config: &Configuration<Ap>,
-    ) -> Result<(), Self::Error> {
-        let predecessor = env::predecessor_account_id();
+    fn is_removable(&self, action_request: &ActionRequest<Ac, ApprovalState>) -> bool {
+        !self.is_within_validity_period(&action_request.approval_state)
+    }
 
-        if let Err(e) = Ap::approve_account(&predecessor) {
-            return Err(ApprovalError::AccountApproverError(e));
+    fn is_account_authorized(
+        &self,
+        account_id: &AccountId,
+        _action_request: &ActionRequest<Ac, ApprovalState>,
+    ) -> bool {
+        Au::is_account_authorized(account_id)
+    }
+
+    fn try_approve_with_authorized_account(
+        &self,
+        account_id: AccountId,
+        action_request: &mut ActionRequest<Ac, ApprovalState>,
+    ) -> Result<(), Self::Error> {
+        if !self.is_within_validity_period(&action_request.approval_state) {
+            return Err(ApprovalError::RequestExpired);
         }
 
-        if self.approved_by.contains(&predecessor) {
+        if action_request
+            .approval_state
+            .approved_by
+            .contains(&account_id)
+        {
             return Err(ApprovalError::AlreadyApprovedByAccount);
         }
 
-        self.approved_by.push(predecessor);
+        action_request.approval_state.approved_by.push(account_id);
 
         Ok(())
     }
@@ -101,9 +147,16 @@ mod tests {
         testing_env, AccountId, BorshStorageKey,
     };
 
-    use crate::{approval::ApprovalManager, near_contract_tools, rbac::Rbac, slot::Slot, Rbac};
-
-    use super::{AccountApprover, ApprovalState, Configuration};
+    use crate::{
+        approval::{
+            simple_multisig::{AccountAuthorizer, ApprovalState, Configuration},
+            ApprovalManager,
+        },
+        near_contract_tools,
+        rbac::Rbac,
+        slot::Slot,
+        Rbac,
+    };
 
     #[derive(BorshSerialize, BorshDeserialize)]
     enum Action {
@@ -138,15 +191,9 @@ mod tests {
         }
     }
 
-    impl AccountApprover for Contract {
-        type Error = &'static str;
-
-        fn approve_account(account_id: &near_sdk::AccountId) -> Result<(), Self::Error> {
-            if Self::has_role(account_id, &Role::Multisig) {
-                Ok(())
-            } else {
-                Err("Must have multisig role")
-            }
+    impl AccountAuthorizer for Contract {
+        fn is_account_authorized(account_id: &near_sdk::AccountId) -> bool {
+            Self::has_role(account_id, &Role::Multisig)
         }
     }
 
@@ -154,7 +201,7 @@ mod tests {
     impl Contract {
         #[init]
         pub fn new() -> Self {
-            <Self as ApprovalManager<_, _, _>>::init(Configuration::new(2));
+            <Self as ApprovalManager<_, _, _>>::init(Configuration::new(2, 10000));
             Self {}
         }
 
@@ -163,25 +210,27 @@ mod tests {
         }
 
         pub fn create(&mut self, say_hello: bool) -> u32 {
-            self.require_role(&Role::Multisig);
-
             let action = if say_hello {
                 Action::SayHello
             } else {
                 Action::SayGoodbye
             };
 
-            let request_id = self.add_request(action);
+            let request_id = self.create_request(action, ApprovalState::new()).unwrap();
 
             request_id
         }
 
         pub fn approve(&mut self, request_id: u32) {
-            self.approve_request(request_id, None);
+            self.approve_request(request_id).unwrap();
         }
 
         pub fn execute(&mut self, request_id: u32) -> &'static str {
-            self.execute_request(request_id)
+            self.execute_request(request_id).unwrap()
+        }
+
+        pub fn remove(&mut self, request_id: u32) {
+            self.remove_request(request_id).unwrap()
         }
     }
 
@@ -192,7 +241,7 @@ mod tests {
     }
 
     #[test]
-    fn test() {
+    fn successful_approval() {
         let alice: AccountId = "alice".parse().unwrap();
         let bob: AccountId = "bob_acct".parse().unwrap();
         let charlie: AccountId = "charlie".parse().unwrap();
@@ -227,5 +276,89 @@ mod tests {
         assert!(Contract::is_approved(request_id));
 
         assert_eq!(contract.execute(request_id), "hello");
+    }
+
+    #[test]
+    fn successful_removal() {
+        let alice: AccountId = "alice".parse().unwrap();
+
+        let mut contract = Contract::new();
+
+        predecessor(&alice);
+        contract.obtain_multisig_permission();
+
+        let request_id = contract.create(true);
+
+        contract.approve(request_id);
+
+        let created_at = Contract::get_request(request_id)
+            .unwrap()
+            .approval_state
+            .created_at_nanoseconds;
+
+        let mut context = VMContextBuilder::new();
+        context
+            .predecessor_account_id(alice.clone())
+            .block_timestamp(created_at + 10000);
+        testing_env!(context.build());
+
+        contract.remove(request_id);
+    }
+
+    #[test]
+    #[should_panic = "RemovalNotAllowed"]
+    fn unsuccessful_removal_not_expired() {
+        let alice: AccountId = "alice".parse().unwrap();
+
+        let mut contract = Contract::new();
+
+        predecessor(&alice);
+        contract.obtain_multisig_permission();
+
+        let request_id = contract.create(true);
+
+        contract.approve(request_id);
+
+        let created_at = Contract::get_request(request_id)
+            .unwrap()
+            .approval_state
+            .created_at_nanoseconds;
+
+        let mut context = VMContextBuilder::new();
+        context
+            .predecessor_account_id(alice.clone())
+            .block_timestamp(created_at + 9999);
+        testing_env!(context.build());
+
+        contract.remove(request_id);
+    }
+
+    #[test]
+    #[should_panic = "UnauthorizedAccount"]
+    fn unsuccessful_removal_no_permission() {
+        let alice: AccountId = "alice".parse().unwrap();
+        let bob: AccountId = "bob_acct".parse().unwrap();
+
+        let mut contract = Contract::new();
+
+        predecessor(&alice);
+        contract.obtain_multisig_permission();
+
+        let request_id = contract.create(true);
+
+        contract.approve(request_id);
+
+        let created_at = Contract::get_request(request_id)
+            .unwrap()
+            .approval_state
+            .created_at_nanoseconds;
+
+        let mut context = VMContextBuilder::new();
+        context
+            .predecessor_account_id(bob.clone())
+            .block_timestamp(created_at + 10000);
+        testing_env!(context.build());
+
+        contract.remove(request_id);
     }
 }

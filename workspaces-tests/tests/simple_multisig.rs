@@ -130,7 +130,7 @@ async fn successful_request() {
 }
 
 #[tokio::test]
-#[should_panic = "Unauthorized account"]
+#[should_panic = "UnauthorizedAccount"]
 async fn unauthorized_account() {
     let Setup {
         worker,

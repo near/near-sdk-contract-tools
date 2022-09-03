@@ -41,27 +41,9 @@ pub fn expand(meta: SimpleMultisigMeta) -> Result<TokenStream, darling::Error> {
             }
         }
 
-        // TODO: This pollutes the global namespace. Is there some better strategy?
-        #[derive(Debug, PartialEq)]
-        pub enum AccountApproverError {
-            UnauthorizedAccount,
-        }
-
-        impl ::std::fmt::Display for AccountApproverError {
-            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-                ::std::write!(f, "Unauthorized account")
-            }
-        }
-
-        impl #imp ::near_contract_tools::approval::simple_multisig::AccountApprover for #ident #ty #wher {
-            type Error = AccountApproverError;
-
-            fn approve_account(account_id: &::near_sdk::AccountId) -> Result<(), AccountApproverError> {
-                if <#ident as ::near_contract_tools::rbac::Rbac<_>>::has_role(account_id, &#role) {
-                    Ok(())
-                } else {
-                    Err(AccountApproverError::UnauthorizedAccount)
-                }
+        impl #imp ::near_contract_tools::approval::simple_multisig::AccountAuthorizer for #ident #ty #wher {
+            fn is_account_authorized(account_id: &AccountId) -> bool {
+                <#ident as ::near_contract_tools::rbac::Rbac<_>>::has_role(account_id, &#role)
             }
         }
     })
