@@ -1,7 +1,5 @@
 //! Helpful functions and macros for developing smart contracts on NEAR Protocol.
 
-#![warn(missing_docs)]
-
 pub mod standard;
 
 pub mod event;

@@ -1,0 +1,5 @@
+[target.'cfg(all())']
+rustflags = [
+  "-Wmissing_docs",
+  "-Wclippy::large_digit_groups",
+]
