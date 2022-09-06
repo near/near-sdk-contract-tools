@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 // Ignore
 pub fn main() {}
 
@@ -48,7 +50,7 @@ impl AccountAuthorizer for Contract {
 #[near_bindgen]
 impl Contract {
     const APPROVAL_THRESHOLD: u8 = 2;
-    const VALIDITY_PERIOD: u64 = 1000000 * 1000 * 60 * 60 * 24 * 7;
+    const VALIDITY_PERIOD: u64 = 1_000_000 * 1_000 * 60 * 60 * 24 * 7;
 
     #[init]
     pub fn new() -> Self {

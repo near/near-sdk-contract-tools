@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
     env, near_bindgen, require, AccountId, PanicOnDefault,
