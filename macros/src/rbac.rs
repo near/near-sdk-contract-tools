@@ -25,7 +25,9 @@ pub fn expand(meta: RbacMeta) -> Result<TokenStream, darling::Error> {
         storage_key.unwrap_or_else(|| syn::parse_str::<Expr>(DEFAULT_STORAGE_KEY).unwrap());
 
     Ok(quote! {
-        impl near_contract_tools::rbac::Rbac<#roles> for #ident {
+        impl near_contract_tools::rbac::Rbac for #ident {
+            type Role = #roles;
+
             fn root() -> near_contract_tools::slot::Slot<()> {
                 near_contract_tools::slot::Slot::new(#storage_key)
             }
