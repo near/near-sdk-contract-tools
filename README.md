@@ -27,6 +27,33 @@ Not to be confused with [`near-contract-standards`](https://crates.io/crates/nea
 
 You can think of this collection of common tools and patterns (mostly in the form of [derive macros](https://doc.rust-lang.org/reference/procedural-macros.html#derive-macros)) as sort of an OpenZeppelin for NEAR.
 
+## Getting Started
+
+```
+rustup target add wasm32-unknown-unknown
+cargo init
+cargo add near-contract-tools
+cargo add near-sdk
+# https://raen.dev/guide/intro/getting-set-up.html
+cargo install raen
+# Implement a contract. See `workspaces-tests/src/bin/simple_multisig.rs` for example until we offer better examples here. Then:
+near dev-deploy $(raen build --release -q)
+```
+
+### Example Usage
+
+After installing NEAR CLI (https://docs.near.org/tools/near-cli#near-call), call like:
+
+```
+near call dev-1662491554455-22903649156976 new --account-id example-acct-alice.testnet
+near call dev-1662491554455-22903649156976 obtain_multisig_permission --account-id example-acct-alice.testnet
+near call dev-1662491554455-22903649156976 request '{"action": "hello"}' --account-id example-acct-alice.testnet
+near call dev-1662491554455-22903649156976 approve '{"request_id": 0}' --account-id example-acct-alice.testnet
+near call dev-1662491554455-22903649156976 obtain_multisig_permission --account-id example-acct-bob.testnet
+near call dev-1662491554455-22903649156976 approve '{"request_id": 0}' --account-id example-acct-bob.testnet
+near call dev-1662491554455-22903649156976 execute '{"request_id": 0}' --account-id example-acct-bob.testnet
+```
+
 ## Build and test
 
 Install `cargo-make` if it is not installed already:

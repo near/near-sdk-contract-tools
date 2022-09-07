@@ -2,6 +2,7 @@
 
 pub mod standard;
 
+pub mod approval;
 pub mod event;
 pub mod migrate;
 pub mod owner;

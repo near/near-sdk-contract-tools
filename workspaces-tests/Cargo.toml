@@ -5,11 +5,21 @@ name = "workspaces-tests"
 version = "0.1.0"
 
 [[bin]]
+name = "cross_target"
+
+[[bin]]
 name = "fungible_token"
+
+[[bin]]
+name = "native_multisig"
+
+[[bin]]
+name = "simple_multisig"
 
 [dependencies]
 near-contract-tools = {path = "../"}
 near-sdk = "4.0.0"
+thiserror = "1.0.34"
 
 [dev-dependencies]
 tokio = "1"
