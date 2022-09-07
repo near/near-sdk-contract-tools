@@ -12,7 +12,7 @@ use thiserror::Error;
 
 use super::{ActionRequest, ApprovalConfiguration};
 
-/// An AccountApprover gatekeeps which accounts are eligible to submit approvals
+/// An AccountAuthorizer gatekeeps which accounts are eligible to submit approvals
 /// to an ApprovalManager
 pub trait AccountAuthorizer {
     /// Determines whether an account ID is allowed to submit an approval
