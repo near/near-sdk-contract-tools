@@ -47,7 +47,7 @@ pub fn expand(meta: SimpleMultisigMeta) -> Result<TokenStream, darling::Error> {
                     <#ident as ::near_contract_tools::rbac::Rbac>::Role
                 >;
 
-            fn is_account_authorized(account_id: &AccountId) -> Result<(), Self::AuthorizationError> {
+            fn is_account_authorized(account_id: &::near_sdk::AccountId) -> Result<(), Self::AuthorizationError> {
                 if <#ident as ::near_contract_tools::rbac::Rbac>::has_role(account_id, &#role) {
                     Ok(())
                 } else {
