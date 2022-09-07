@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 // Ignore
 pub fn main() {}
 
@@ -15,7 +17,7 @@ use near_sdk::{
     env, near_bindgen, AccountId, BorshStorageKey, PanicOnDefault, Promise,
 };
 
-#[derive(BorshSerialize, BorshStorageKey)]
+#[derive(Clone, Debug, BorshSerialize, BorshStorageKey)]
 enum Role {
     Multisig,
 }
@@ -29,7 +31,7 @@ pub struct Contract {}
 #[near_bindgen]
 impl Contract {
     const APPROVAL_THRESHOLD: u8 = 2;
-    const VALIDITY_PERIOD: u64 = 1000000 * 1000 * 60 * 60 * 24 * 7;
+    const VALIDITY_PERIOD: u64 = 1_000_000 * 1_000 * 60 * 60 * 24 * 7;
 
     #[init]
     pub fn new() -> Self {
@@ -70,7 +72,7 @@ impl Contract {
     }
 
     pub fn is_approved(&self, request_id: u32) -> bool {
-        <Contract as ApprovalManager<_, _, _>>::is_approved(request_id)
+        <Contract as ApprovalManager<_, _, _>>::is_approved_for_execution(request_id).is_ok()
     }
 
     pub fn execute(&mut self, request_id: u32) -> Promise {

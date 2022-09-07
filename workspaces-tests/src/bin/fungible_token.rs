@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 // Ignore
 pub fn main() {}
 

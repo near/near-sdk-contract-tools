@@ -42,8 +42,14 @@ pub fn expand(meta: SimpleMultisigMeta) -> Result<TokenStream, darling::Error> {
         }
 
         impl #imp ::near_contract_tools::approval::simple_multisig::AccountAuthorizer for #ident #ty #wher {
-            fn is_account_authorized(account_id: &AccountId) -> bool {
-                <#ident as ::near_contract_tools::rbac::Rbac<_>>::has_role(account_id, &#role)
+            type AuthorizationError = ::near_contract_tools::approval::simple_multisig::macro_types::MissingRole;
+
+            fn is_account_authorized(account_id: &AccountId) -> Result<(), Self::AuthorizationError> {
+                if <#ident as ::near_contract_tools::rbac::Rbac<_>>::has_role(account_id, &#role) {
+                    Ok(())
+                } else {
+                    Err(::near_contract_tools::approval::simple_multisig::macro_types::MissingRole(format!("{:?}", #role)))
+                }
             }
         }
     })

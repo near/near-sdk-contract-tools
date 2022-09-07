@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 // Ignore
 pub fn main() {}
 
@@ -15,8 +17,9 @@ use near_contract_tools::{
 };
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
-    env, near_bindgen, BorshStorageKey, PanicOnDefault,
+    env, near_bindgen, AccountId, BorshStorageKey, PanicOnDefault,
 };
+use thiserror::Error;
 
 #[derive(BorshSerialize, BorshStorageKey)]
 enum StorageKey {
@@ -40,7 +43,7 @@ impl approval::Action for MyAction {
     }
 }
 
-#[derive(BorshSerialize, BorshStorageKey)]
+#[derive(Debug, Clone, BorshSerialize, BorshStorageKey)]
 enum Role {
     Multisig,
 }
@@ -69,11 +72,19 @@ impl Display for ApproverError {
     }
 }
 
-// We don't have to check env::predecessor_account_id or anything like that
-// SimpleMultisig handles it all for us
+#[derive(Error, Clone, Debug)]
+#[error("Missing role: {0:?}")]
+pub struct MissingRole(Role);
+
 impl AccountAuthorizer for Contract {
-    fn is_account_authorized(account_id: &near_sdk::AccountId) -> bool {
-        Contract::has_role(account_id, &Role::Multisig)
+    type AuthorizationError = MissingRole;
+
+    fn is_account_authorized(account_id: &AccountId) -> Result<(), Self::AuthorizationError> {
+        if Contract::has_role(account_id, &Role::Multisig) {
+            Ok(())
+        } else {
+            Err(MissingRole(Role::Multisig))
+        }
     }
 }
 
@@ -115,7 +126,7 @@ impl Contract {
     }
 
     pub fn is_approved(&self, request_id: u32) -> bool {
-        <Contract as ApprovalManager<_, _, _>>::is_approved(request_id)
+        <Contract as ApprovalManager<_, _, _>>::is_approved_for_execution(request_id).is_ok()
     }
 
     pub fn execute(&mut self, request_id: u32) -> String {

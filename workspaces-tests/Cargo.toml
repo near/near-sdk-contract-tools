@@ -19,6 +19,7 @@ name = "simple_multisig"
 [dependencies]
 near-contract-tools = {path = "../"}
 near-sdk = "4.0.0"
+thiserror = "1.0.34"
 
 [dev-dependencies]
 tokio = "1"

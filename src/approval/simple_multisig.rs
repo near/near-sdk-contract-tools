@@ -12,11 +12,14 @@ use thiserror::Error;
 
 use super::{ActionRequest, ApprovalConfiguration};
 
-/// An AccountApprover gatekeeps which accounts are eligible to submit approvals
+/// An AccountAuthorizer gatekeeps which accounts are eligible to submit approvals
 /// to an ApprovalManager
 pub trait AccountAuthorizer {
+    /// Why can this account not be authorized?
+    type AuthorizationError;
+
     /// Determines whether an account ID is allowed to submit an approval
-    fn is_account_authorized(account_id: &AccountId) -> bool;
+    fn is_account_authorized(account_id: &AccountId) -> Result<(), Self::AuthorizationError>;
 }
 
 /// M (threshold) of N approval scheme
@@ -81,6 +84,11 @@ impl ApprovalState {
     }
 }
 
+/// If a request has expired, some actions may not be performed
+#[derive(Error, Clone, Debug)]
+#[error("Validity period exceeded")]
+pub struct RequestExpiredError;
+
 /// Why might a simple multisig approval attempt fail?
 #[derive(Error, Clone, Debug)]
 pub enum ApprovalError {
@@ -88,30 +96,77 @@ pub enum ApprovalError {
     #[error("Already approved by this account")]
     AlreadyApprovedByAccount,
     /// The request has expired and cannot be approved or executed
-    #[error("Validity period exceeded")]
-    RequestExpired,
+    #[error(transparent)]
+    RequestExpired(#[from] RequestExpiredError),
+}
+
+/// Errors when evaluating a request for execution
+#[derive(Error, Clone, Debug)]
+pub enum ExecutionEligibilityError {
+    /// The request does not have enough approvals
+    #[error("Insufficient approvals on request: required {required} but only has {current}")]
+    InsufficientApprovals {
+        /// Current number of approvals
+        current: usize,
+        /// Required number of approvals
+        required: usize,
+    },
+    /// The request has expired and cannot be approved or executed
+    #[error(transparent)]
+    RequestExpired(#[from] RequestExpiredError),
+}
+
+/// What errors may occur when removing a request?
+#[derive(Error, Clone, Debug)]
+pub enum RemovalError {
+    /// Requests may not be removed while they are still valid
+    #[error("Removal prohibited before expiration")]
+    RequestStillValid,
 }
 
 impl<Au, Ac> ApprovalConfiguration<Ac, ApprovalState> for Configuration<Au>
 where
     Au: AccountAuthorizer,
 {
-    type Error = ApprovalError;
+    type ApprovalError = ApprovalError;
+    type RemovalError = RemovalError;
+    type AuthorizationError = Au::AuthorizationError;
+    type ExecutionEligibilityError = ExecutionEligibilityError;
 
-    fn is_approved_for_execution(&self, action_request: &ActionRequest<Ac, ApprovalState>) -> bool {
-        self.is_within_validity_period(&action_request.approval_state)
-            && action_request.approval_state.approved_by.len() >= self.threshold as usize
+    fn is_approved_for_execution(
+        &self,
+        action_request: &ActionRequest<Ac, ApprovalState>,
+    ) -> Result<(), ExecutionEligibilityError> {
+        if !self.is_within_validity_period(&action_request.approval_state) {
+            return Err(RequestExpiredError.into());
+        }
+
+        let current = action_request.approval_state.approved_by.len();
+        let required = self.threshold as usize;
+
+        if current < required {
+            return Err(ExecutionEligibilityError::InsufficientApprovals { current, required });
+        }
+
+        Ok(())
     }
 
-    fn is_removable(&self, action_request: &ActionRequest<Ac, ApprovalState>) -> bool {
-        !self.is_within_validity_period(&action_request.approval_state)
+    fn is_removable(
+        &self,
+        action_request: &ActionRequest<Ac, ApprovalState>,
+    ) -> Result<(), Self::RemovalError> {
+        if self.is_within_validity_period(&action_request.approval_state) {
+            Err(RemovalError::RequestStillValid)
+        } else {
+            Ok(())
+        }
     }
 
     fn is_account_authorized(
         &self,
         account_id: &AccountId,
         _action_request: &ActionRequest<Ac, ApprovalState>,
-    ) -> bool {
+    ) -> Result<(), Self::AuthorizationError> {
         Au::is_account_authorized(account_id)
     }
 
@@ -119,9 +174,9 @@ where
         &self,
         account_id: AccountId,
         action_request: &mut ActionRequest<Ac, ApprovalState>,
-    ) -> Result<(), Self::Error> {
+    ) -> Result<(), Self::ApprovalError> {
         if !self.is_within_validity_period(&action_request.approval_state) {
-            return Err(ApprovalError::RequestExpired);
+            return Err(RequestExpiredError.into());
         }
 
         if action_request
@@ -138,6 +193,16 @@ where
     }
 }
 
+/// Types used by near-contract-tools-macros
+pub mod macro_types {
+    use thiserror::Error;
+
+    /// Account that attempted an action is missing a role
+    #[derive(Error, Clone, Debug)]
+    #[error("Missing role '{0}' required for this action")]
+    pub struct MissingRole(pub String);
+}
+
 #[cfg(test)]
 mod tests {
     use near_sdk::{
@@ -146,6 +211,7 @@ mod tests {
         test_utils::VMContextBuilder,
         testing_env, AccountId, BorshStorageKey,
     };
+    use thiserror::Error;
 
     use crate::{
         approval::{
@@ -191,9 +257,19 @@ mod tests {
         }
     }
 
+    #[derive(Error, Clone, Debug)]
+    #[error("Missing role: {0}")]
+    struct MissingRole(&'static str);
+
     impl AccountAuthorizer for Contract {
-        fn is_account_authorized(account_id: &near_sdk::AccountId) -> bool {
-            Self::has_role(account_id, &Role::Multisig)
+        type AuthorizationError = MissingRole;
+
+        fn is_account_authorized(account_id: &near_sdk::AccountId) -> Result<(), MissingRole> {
+            if Self::has_role(account_id, &Role::Multisig) {
+                Ok(())
+            } else {
+                Err(MissingRole("Multisig"))
+            }
         }
     }
 
@@ -258,22 +334,22 @@ mod tests {
         let request_id = contract.create(true);
 
         assert_eq!(request_id, 0);
-        assert!(!Contract::is_approved(request_id));
+        assert!(Contract::is_approved_for_execution(request_id).is_err());
 
         predecessor(&alice);
         contract.approve(request_id);
 
-        assert!(!Contract::is_approved(request_id));
+        assert!(Contract::is_approved_for_execution(request_id).is_err());
 
         predecessor(&charlie);
         contract.approve(request_id);
 
-        assert!(Contract::is_approved(request_id));
+        assert!(Contract::is_approved_for_execution(request_id).is_ok());
 
         predecessor(&bob);
         contract.approve(request_id);
 
-        assert!(Contract::is_approved(request_id));
+        assert!(Contract::is_approved_for_execution(request_id).is_ok());
 
         assert_eq!(contract.execute(request_id), "hello");
     }
