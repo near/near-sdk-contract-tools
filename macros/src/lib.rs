@@ -4,6 +4,7 @@ use darling::FromDeriveInput;
 use proc_macro::TokenStream;
 use syn::{parse_macro_input, DeriveInput};
 
+mod approval;
 mod event;
 mod migrate;
 mod owner;
@@ -129,4 +130,20 @@ pub fn derive_fungible_token(input: TokenStream) -> TokenStream {
 #[proc_macro_derive(Migrate, attributes(migrate))]
 pub fn derive_migrate(input: TokenStream) -> TokenStream {
     make_derive(input, migrate::expand)
+}
+
+/// Create a simple multisig component. Does not expose any functions to the
+/// blockchain. Creates implementations for `ApprovalManager` and
+/// `AccountApprover` for the target contract struct.
+///
+/// Fields may be specified in the `#[simple_multisig(...)]` attribute.
+///
+/// Fields include:
+///  - `storage_key` Storage prefix for multisig data (optional, default: `b"~sm"`)
+///  - `action` What sort of approval `Action` can be approved by the multisig
+///     component?
+///  - `role` Approving accounts are required to have this `Rbac` role.
+#[proc_macro_derive(SimpleMultisig, attributes(simple_multisig))]
+pub fn derive_simple_multisig(input: TokenStream) -> TokenStream {
+    make_derive(input, approval::simple_multisig::expand)
 }

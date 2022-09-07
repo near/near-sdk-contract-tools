@@ -44,7 +44,7 @@ impl approval::Action for MyAction {
 }
 
 #[derive(Debug, Clone, BorshSerialize, BorshStorageKey)]
-enum Role {
+pub enum Role {
     Multisig,
 }
 

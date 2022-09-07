@@ -6,57 +6,27 @@ pub fn main() {}
 use near_contract_tools::{
     approval::{
         native_transaction_action::{self, NativeTransactionAction},
-        simple_multisig::{AccountAuthorizer, ApprovalState, Configuration},
+        simple_multisig::{ApprovalState, Configuration},
         ApprovalManager,
     },
     rbac::Rbac,
-    slot::Slot,
-    Rbac,
+    Rbac, SimpleMultisig,
 };
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
     env, near_bindgen, AccountId, BorshStorageKey, PanicOnDefault, Promise,
 };
-use thiserror::Error;
-
-#[derive(BorshSerialize, BorshStorageKey)]
-enum StorageKey {
-    SimpleMultisig,
-}
 
 #[derive(Clone, Debug, BorshSerialize, BorshStorageKey)]
-enum Role {
+pub enum Role {
     Multisig,
 }
 
-#[derive(PanicOnDefault, BorshSerialize, BorshDeserialize, Rbac)]
+#[derive(PanicOnDefault, BorshSerialize, BorshDeserialize, Rbac, SimpleMultisig)]
+#[simple_multisig(action = "NativeTransactionAction", role = "Role::Multisig")]
 #[rbac(roles = "Role")]
 #[near_bindgen]
 pub struct Contract {}
-
-// This single function implementation completely implements simple multisig on
-// the contract
-impl ApprovalManager<NativeTransactionAction, ApprovalState, Configuration<Self>> for Contract {
-    fn root() -> Slot<()> {
-        Slot::new(StorageKey::SimpleMultisig)
-    }
-}
-
-#[derive(Error, Clone, Debug)]
-#[error("Missing role: {0:?}")]
-pub struct MissingRole(Role);
-
-impl AccountAuthorizer for Contract {
-    type AuthorizationError = MissingRole;
-
-    fn is_account_authorized(account_id: &AccountId) -> Result<(), MissingRole> {
-        if Contract::has_role(account_id, &Role::Multisig) {
-            Ok(())
-        } else {
-            Err(MissingRole(Role::Multisig))
-        }
-    }
-}
 
 #[near_bindgen]
 impl Contract {

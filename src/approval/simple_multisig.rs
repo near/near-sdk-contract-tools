@@ -193,6 +193,16 @@ where
     }
 }
 
+/// Types used by near-contract-tools-macros
+pub mod macro_types {
+    use thiserror::Error;
+
+    /// Account that attempted an action is missing a role
+    #[derive(Error, Clone, Debug)]
+    #[error("Missing role '{0}' required for this action")]
+    pub struct MissingRole<R>(pub R);
+}
+
 #[cfg(test)]
 mod tests {
     use near_sdk::{
