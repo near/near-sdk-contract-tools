@@ -28,29 +28,37 @@ pub trait Action {
 /// Defines the operating parameters for an ApprovalManager and performs
 /// approvals
 pub trait ApprovalConfiguration<A, S> {
-    /// Approval errors, e.g. "this account has already approved this request",
-    /// "this request is not allowed to be approved yet", etc.
-    type Error;
+    /// Errors when approving a request
+    type ApprovalError;
+    /// Errors when removing a request
+    type RemovalError;
+    /// Errors when authorizing an account
+    type AuthorizationError;
+    /// Errors when evaluating a request for execution candidacy
+    type ExecutionEligibilityError;
 
     /// Has the request reached full approval?
-    fn is_approved_for_execution(&self, action_request: &ActionRequest<A, S>) -> bool;
+    fn is_approved_for_execution(
+        &self,
+        action_request: &ActionRequest<A, S>,
+    ) -> Result<(), Self::ExecutionEligibilityError>;
 
     /// Can this request be removed by an allowed account?
-    fn is_removable(&self, action_request: &ActionRequest<A, S>) -> bool;
+    fn is_removable(&self, action_request: &ActionRequest<A, S>) -> Result<(), Self::RemovalError>;
 
     /// Is the account allowed to execute, approve, or remove this request?
     fn is_account_authorized(
         &self,
         account_id: &AccountId,
         action_request: &ActionRequest<A, S>,
-    ) -> bool;
+    ) -> Result<(), Self::AuthorizationError>;
 
     /// Modify action_request.approval_state in-place to increase approval
     fn try_approve_with_authorized_account(
         &self,
         account_id: AccountId,
         action_request: &mut ActionRequest<A, S>,
-    ) -> Result<(), Self::Error>;
+    ) -> Result<(), Self::ApprovalError>;
 }
 
 /// An action request is composed of an action that will be executed when the
@@ -71,45 +79,50 @@ enum ApprovalStorageKey {
     Request(u32),
 }
 
+/// The account is ineligile to perform an action for some reason
+#[derive(Error, Clone, Debug)]
+#[error("Unauthorized account: '{0}' for {1}")]
+pub struct UnauthorizedAccountError<AuthErr>(AccountId, AuthErr);
+
 /// Top-level errors that may occur when attempting to approve a request
-#[derive(Error, Debug)]
-pub enum ApprovalError<E> {
+#[derive(Error, Clone, Debug)]
+pub enum ApprovalError<AuthErr, AppErr> {
     /// The account is not allowed to act on requests
-    #[error("Unauthorized account")]
-    UnauthorizedAccount,
+    #[error(transparent)]
+    UnauthorizedAccount(#[from] UnauthorizedAccountError<AuthErr>),
     /// The approval function encountered another error
     #[error("Approval error: {0}")]
-    ApprovalError(E),
+    ApprovalError(AppErr),
 }
 
 /// Errors that may occur when trying to execute a request
-#[derive(Error, Debug)]
-pub enum ExecutionError {
+#[derive(Error, Clone, Debug)]
+pub enum ExecutionError<AuthErr, ExecErr> {
     /// The account is not allowed to act on requests
-    #[error("Unauthorized account")]
-    UnauthorizedAccount,
+    #[error(transparent)]
+    UnauthorizedAccount(#[from] UnauthorizedAccountError<AuthErr>),
     /// Unapproved requests cannot be executed
-    #[error("Request not approved")]
-    RequestNotApproved,
+    #[error("Request not approved: {0}")]
+    ExecutionEligibility(ExecErr),
 }
 
 /// Errors that may occur when trying to create a request
-#[derive(Error, Debug)]
-pub enum CreationError {
+#[derive(Error, Clone, Debug)]
+pub enum CreationError<AuthErr> {
     /// The account is not allowed to act on requests
-    #[error("Unauthorized account")]
-    UnauthorizedAccount,
+    #[error(transparent)]
+    UnauthorizedAccount(#[from] UnauthorizedAccountError<AuthErr>),
 }
 
 /// Errors that may occur when trying to remove a request
-#[derive(Error, Debug)]
-pub enum RemovalError {
+#[derive(Error, Clone, Debug)]
+pub enum RemovalError<AuthErr, RemErr> {
     /// The account is not allowed to act on requests
-    #[error("Unauthorized account")]
-    UnauthorizedAccount,
+    #[error(transparent)]
+    UnauthorizedAccount(#[from] UnauthorizedAccountError<AuthErr>),
     /// This request is not (yet?) allowed to be removed
-    #[error("Removal not allowed")]
-    RemovalNotAllowed,
+    #[error("Removal not allowed: {0}")]
+    RemovalNotAllowed(RemErr),
 }
 
 /// Collection of action requests that manages their approval state and
@@ -162,7 +175,11 @@ where
     }
 
     /// Creates a new action request initialized with the given approval state
-    fn create_request(&mut self, action: A, approval_state: S) -> Result<u32, CreationError> {
+    fn create_request(
+        &mut self,
+        action: A,
+        approval_state: S,
+    ) -> Result<u32, CreationError<C::AuthorizationError>> {
         let request_id = Self::slot_next_request_id().read().unwrap_or(0);
 
         let request = ActionRequest {
@@ -173,9 +190,9 @@ where
         let config = Self::get_config();
         let predecessor = env::predecessor_account_id();
 
-        if !config.is_account_authorized(&predecessor, &request) {
-            return Err(CreationError::UnauthorizedAccount);
-        }
+        config
+            .is_account_authorized(&predecessor, &request)
+            .map_err(|e| UnauthorizedAccountError(predecessor, e))?;
 
         Self::slot_next_request_id().write(&(request_id + 1));
         Self::slot_request(request_id).write(&request);
@@ -184,11 +201,14 @@ where
     }
 
     /// Executes an action request and removes it from the collection if the
-    /// approval state of the request is fulfilled. Panics otherwise.
-    fn execute_request(&mut self, request_id: u32) -> Result<A::Output, ExecutionError> {
-        if !Self::is_approved(request_id) {
-            return Err(ExecutionError::RequestNotApproved);
-        }
+    /// approval state of the request is fulfilled.
+    fn execute_request(
+        &mut self,
+        request_id: u32,
+    ) -> Result<A::Output, ExecutionError<C::AuthorizationError, C::ExecutionEligibilityError>>
+    {
+        Self::is_approved_for_execution(request_id)
+            .map_err(ExecutionError::ExecutionEligibility)?;
 
         let predecessor = env::predecessor_account_id();
         let config = Self::get_config();
@@ -196,9 +216,9 @@ where
         let mut request_slot = Self::slot_request(request_id);
         let request = request_slot.read().unwrap();
 
-        if !config.is_account_authorized(&predecessor, &request) {
-            return Err(ExecutionError::UnauthorizedAccount);
-        }
+        config
+            .is_account_authorized(&predecessor, &request)
+            .map_err(|e| UnauthorizedAccountError(predecessor, e))?;
 
         let result = request.action.execute();
         request_slot.remove();
@@ -206,30 +226,30 @@ where
         Ok(result)
     }
 
-    /// Returns `true` if the given request ID exists and is approved (that
-    /// is, the action request may be executed), `false` otherwise.
-    fn is_approved(request_id: u32) -> bool {
-        Self::slot_request(request_id)
-            .read()
-            .map(|request| {
-                let config = Self::get_config();
-                config.is_approved_for_execution(&request)
-            })
-            .unwrap_or(false)
+    /// Is the given request ID able to be executed if such a request were to
+    /// be initiated by an authorized account?
+    fn is_approved_for_execution(request_id: u32) -> Result<(), C::ExecutionEligibilityError> {
+        let request = Self::slot_request(request_id).read().unwrap();
+
+        let config = Self::get_config();
+        config.is_approved_for_execution(&request)
     }
 
     /// Tries to approve the action request designated by the given request ID
     /// with the given arguments. Panics if the request ID does not exist.
-    fn approve_request(&mut self, request_id: u32) -> Result<(), ApprovalError<C::Error>> {
+    fn approve_request(
+        &mut self,
+        request_id: u32,
+    ) -> Result<(), ApprovalError<C::AuthorizationError, C::ApprovalError>> {
         let mut request_slot = Self::slot_request(request_id);
         let mut request = request_slot.read().unwrap();
 
         let predecessor = env::predecessor_account_id();
         let config = Self::get_config();
 
-        if !config.is_account_authorized(&predecessor, &request) {
-            return Err(ApprovalError::UnauthorizedAccount);
-        }
+        config
+            .is_account_authorized(&predecessor, &request)
+            .map_err(|e| UnauthorizedAccountError(predecessor.clone(), e))?;
 
         config
             .try_approve_with_authorized_account(predecessor, &mut request)
@@ -241,23 +261,27 @@ where
     }
 
     /// Tries to remove the action request indicated by request_id.
-    fn remove_request(&mut self, request_id: u32) -> Result<(), RemovalError> {
+    fn remove_request(
+        &mut self,
+        request_id: u32,
+    ) -> Result<(), RemovalError<C::AuthorizationError, C::RemovalError>> {
         let mut request_slot = Self::slot_request(request_id);
         let request = request_slot.read().unwrap();
         let predecessor = env::predecessor_account_id();
 
         let config = Self::get_config();
 
-        if !config.is_removable(&request) {
-            return Err(RemovalError::RemovalNotAllowed);
-        }
+        config
+            .is_removable(&request)
+            .map_err(RemovalError::RemovalNotAllowed)?;
 
         config
             .is_account_authorized(&predecessor, &request)
-            .then(|| {
-                request_slot.remove();
-            })
-            .ok_or(RemovalError::UnauthorizedAccount)
+            .map_err(|e| UnauthorizedAccountError(predecessor, e))?;
+
+        request_slot.remove();
+
+        Ok(())
     }
 }
 
@@ -271,7 +295,6 @@ mod tests {
         testing_env, AccountId, BorshStorageKey,
     };
     use serde::Serialize;
-    use thiserror::Error;
 
     use crate::rbac::Rbac;
     use crate::{near_contract_tools, slot::Slot};
@@ -339,54 +362,62 @@ mod tests {
         pub approved_by: Vec<AccountId>,
     }
 
-    #[derive(Error, Debug)]
-    enum ApprovalError {
-        #[error("Already approved by this account")]
-        AlreadyApprovedByAccount,
-    }
-
     impl ApprovalConfiguration<MyAction, MultisigApprovalState> for MultisigConfig {
-        type Error = ApprovalError;
+        type ApprovalError = String;
+        type RemovalError = ();
+        type AuthorizationError = String;
+        type ExecutionEligibilityError = String;
 
         fn is_approved_for_execution(
             &self,
             action_request: &super::ActionRequest<MyAction, MultisigApprovalState>,
-        ) -> bool {
-            action_request
+        ) -> Result<(), Self::ExecutionEligibilityError> {
+            let valid_signatures = action_request
                 .approval_state
                 .approved_by
                 .iter()
                 .filter(|account_id| Contract::has_role(account_id, &Role::Multisig))
-                .count()
-                >= self.threshold as usize
+                .count();
+
+            let threshold = self.threshold as usize;
+
+            if valid_signatures >= threshold {
+                Ok(())
+            } else {
+                Err("Insufficient signatures".to_string())
+            }
         }
 
         fn is_removable(
             &self,
             _action_request: &super::ActionRequest<MyAction, MultisigApprovalState>,
-        ) -> bool {
-            true
+        ) -> Result<(), Self::RemovalError> {
+            Ok(())
         }
 
         fn is_account_authorized(
             &self,
             account_id: &AccountId,
             _action_request: &ActionRequest<MyAction, MultisigApprovalState>,
-        ) -> bool {
-            Contract::has_role(account_id, &Role::Multisig)
+        ) -> Result<(), Self::AuthorizationError> {
+            if Contract::has_role(account_id, &Role::Multisig) {
+                Ok(())
+            } else {
+                Err("Account is missing Multisig role".to_string())
+            }
         }
 
         fn try_approve_with_authorized_account(
             &self,
             account_id: AccountId,
             action_request: &mut ActionRequest<MyAction, MultisigApprovalState>,
-        ) -> Result<(), Self::Error> {
+        ) -> Result<(), Self::ApprovalError> {
             if action_request
                 .approval_state
                 .approved_by
                 .contains(&account_id)
             {
-                return Err(ApprovalError::AlreadyApprovedByAccount);
+                return Err("Already approved by account".to_string());
             }
 
             action_request.approval_state.approved_by.push(account_id);
@@ -419,22 +450,22 @@ mod tests {
             .unwrap();
 
         assert_eq!(request_id, 0);
-        assert!(!Contract::is_approved(request_id));
+        assert!(Contract::is_approved_for_execution(request_id).is_err());
 
         contract.approve_request(request_id).unwrap();
 
-        assert!(!Contract::is_approved(request_id));
+        assert!(Contract::is_approved_for_execution(request_id).is_err());
 
         predecessor(&charlie);
         contract.approve_request(request_id).unwrap();
 
-        assert!(Contract::is_approved(request_id));
+        assert!(Contract::is_approved_for_execution(request_id).is_ok());
 
         assert_eq!(contract.execute_request(request_id).unwrap(), "hello");
     }
 
     #[test]
-    #[should_panic(expected = "ApprovalError(AlreadyApprovedByAccount)")]
+    #[should_panic(expected = "Already approved by account")]
     fn duplicate_approval() {
         let alice: AccountId = "alice".parse().unwrap();
 
@@ -453,7 +484,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic = "RequestNotApproved"]
+    #[should_panic = "Insufficient signatures"]
     fn no_execution_before_approval() {
         let alice: AccountId = "alice".parse().unwrap();
 
@@ -517,15 +548,15 @@ mod tests {
         predecessor(&bob);
         contract.approve_request(request_id).unwrap();
 
-        assert!(Contract::is_approved(request_id));
+        assert!(Contract::is_approved_for_execution(request_id).is_ok());
 
         contract.remove_role(&alice, &Role::Multisig);
 
-        assert!(!Contract::is_approved(request_id));
+        assert!(Contract::is_approved_for_execution(request_id).is_err());
 
         predecessor(&charlie);
         contract.approve_request(request_id).unwrap();
 
-        assert!(Contract::is_approved(request_id));
+        assert!(Contract::is_approved_for_execution(request_id).is_ok());
     }
 }

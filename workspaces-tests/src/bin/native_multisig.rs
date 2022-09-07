@@ -17,13 +17,14 @@ use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
     env, near_bindgen, AccountId, BorshStorageKey, PanicOnDefault, Promise,
 };
+use thiserror::Error;
 
 #[derive(BorshSerialize, BorshStorageKey)]
 enum StorageKey {
     SimpleMultisig,
 }
 
-#[derive(BorshSerialize, BorshStorageKey)]
+#[derive(Clone, Debug, BorshSerialize, BorshStorageKey)]
 enum Role {
     Multisig,
 }
@@ -41,9 +42,19 @@ impl ApprovalManager<NativeTransactionAction, ApprovalState, Configuration<Self>
     }
 }
 
+#[derive(Error, Clone, Debug)]
+#[error("Missing role: {0:?}")]
+pub struct MissingRole(Role);
+
 impl AccountAuthorizer for Contract {
-    fn is_account_authorized(account_id: &AccountId) -> bool {
-        Contract::has_role(account_id, &Role::Multisig)
+    type AuthorizationError = MissingRole;
+
+    fn is_account_authorized(account_id: &AccountId) -> Result<(), MissingRole> {
+        if Contract::has_role(account_id, &Role::Multisig) {
+            Ok(())
+        } else {
+            Err(MissingRole(Role::Multisig))
+        }
     }
 }
 
@@ -91,7 +102,7 @@ impl Contract {
     }
 
     pub fn is_approved(&self, request_id: u32) -> bool {
-        <Contract as ApprovalManager<_, _, _>>::is_approved(request_id)
+        <Contract as ApprovalManager<_, _, _>>::is_approved_for_execution(request_id).is_ok()
     }
 
     pub fn execute(&mut self, request_id: u32) -> Promise {
