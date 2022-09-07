@@ -200,7 +200,7 @@ pub mod macro_types {
     /// Account that attempted an action is missing a role
     #[derive(Error, Clone, Debug)]
     #[error("Missing role '{0}' required for this action")]
-    pub struct MissingRole(pub String);
+    pub struct MissingRole<R>(pub R);
 }
 
 #[cfg(test)]

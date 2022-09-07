@@ -40,19 +40,18 @@ async fn setup(num_accounts: usize) -> Setup {
 async fn setup_roles(num_accounts: usize) -> Setup {
     let s = setup(num_accounts).await;
 
-    // for account in s.accounts[..s.accounts.len() - 1].iter() {
-    //     account
-    //         .call(&s.worker, s.contract.id(), "obtain_multisig_permission")
-    //         .transact()
-    //         .await
-    //         .unwrap();
-    // }
+    for account in s.accounts[..s.accounts.len() - 1].iter() {
+        account
+            .call(&s.worker, s.contract.id(), "obtain_multisig_permission")
+            .transact()
+            .await
+            .unwrap();
+    }
 
     s
 }
 
 #[tokio::test]
-// #[ignore] // TODO: Remove
 async fn transfer() {
     let Setup {
         worker,
@@ -146,7 +145,6 @@ async fn transfer() {
 }
 
 #[tokio::test]
-// #[ignore] // TODO: Remove
 async fn reflexive_xcc() {
     let Setup {
         worker,

@@ -18,7 +18,7 @@ use near_sdk::{
 };
 
 #[derive(Clone, Debug, BorshSerialize, BorshStorageKey)]
-enum Role {
+pub enum Role {
     Multisig,
 }
 
