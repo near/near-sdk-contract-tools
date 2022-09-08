@@ -2,6 +2,8 @@
 
 > Helpful functions and macros for developing smart contracts on NEAR Protocol.
 
+See https://docs.rs/near-contract-tools/latest/near_contract_tools/ for more docs.
+
 This package is a collection of common tools and patterns in NEAR smart contract development:
 
 - Storage fee management
