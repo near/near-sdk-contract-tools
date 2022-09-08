@@ -32,10 +32,10 @@ enum MyAction {
     SayGoodbye,
 }
 
-impl approval::Action for MyAction {
+impl approval::Action<Contract> for MyAction {
     type Output = &'static str;
 
-    fn execute(self) -> Self::Output {
+    fn execute(self, _contract: &mut Contract) -> Self::Output {
         match self {
             Self::SayHello => "hello",
             Self::SayGoodbye => "goodbye",

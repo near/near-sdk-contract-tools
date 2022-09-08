@@ -18,11 +18,11 @@ pub mod native_transaction_action;
 pub mod simple_multisig;
 
 /// Actions can be executed after they are approved
-pub trait Action {
+pub trait Action<Cont: ?Sized> {
     /// Return type of the action. Useful if the action creates a `Promise`, for example.
     type Output;
     /// Perform the action. One time only.
-    fn execute(self) -> Self::Output;
+    fn execute(self, contract: &mut Cont) -> Self::Output;
 }
 
 /// Defines the operating parameters for an ApprovalManager and performs
@@ -129,7 +129,7 @@ pub enum RemovalError<AuthErr, RemErr> {
 /// execution
 pub trait ApprovalManager<A, S, C>
 where
-    A: Action + BorshSerialize + BorshDeserialize,
+    A: Action<Self> + BorshSerialize + BorshDeserialize,
     S: BorshSerialize + BorshDeserialize + Serialize,
     C: ApprovalConfiguration<A, S> + BorshDeserialize + BorshSerialize,
 {
@@ -220,7 +220,7 @@ where
             .is_account_authorized(&predecessor, &request)
             .map_err(|e| UnauthorizedAccountError(predecessor, e))?;
 
-        let result = request.action.execute();
+        let result = request.action.execute(self);
         request_slot.remove();
 
         Ok(result)
@@ -312,10 +312,10 @@ mod tests {
         SayGoodbye,
     }
 
-    impl Action for MyAction {
+    impl Action<Contract> for MyAction {
         type Output = &'static str;
 
-        fn execute(self) -> Self::Output {
+        fn execute(self, _contract: &mut Contract) -> Self::Output {
             match self {
                 Self::SayHello => {
                     println!("Hello!");

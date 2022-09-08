@@ -86,10 +86,10 @@ pub struct NativeTransactionAction {
     pub actions: Vec<PromiseAction>,
 }
 
-impl super::Action for NativeTransactionAction {
+impl<C> super::Action<C> for NativeTransactionAction {
     type Output = Promise;
 
-    fn execute(self) -> Self::Output {
+    fn execute(self, _contract: &mut C) -> Self::Output {
         let mut promise = Promise::new(self.receiver_id);
 
         // Construct promise
