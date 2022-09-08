@@ -45,7 +45,7 @@ pub fn expand(meta: Nep141Meta) -> Result<TokenStream, darling::Error> {
         use ::near_contract_tools::standard::nep141::Nep141Controller;
 
         impl #imp ::near_contract_tools::standard::nep141::Nep141Controller for #ident #ty #wher {
-            fn root(&self) -> ::near_contract_tools::slot::Slot<()> {
+            fn root() -> ::near_contract_tools::slot::Slot<()> {
                 ::near_contract_tools::slot::Slot::root(#storage_key)
             }
         }
@@ -123,11 +123,11 @@ pub fn expand(meta: Nep141Meta) -> Result<TokenStream, darling::Error> {
             }
 
             fn ft_total_supply(&self) -> ::near_sdk::json_types::U128 {
-                ::near_contract_tools::standard::nep141::Nep141Controller::total_supply(self).into()
+                <Self as ::near_contract_tools::standard::nep141::Nep141Controller>::total_supply().into()
             }
 
             fn ft_balance_of(&self, account_id: ::near_sdk::AccountId) -> near_sdk::json_types::U128 {
-                ::near_contract_tools::standard::nep141::Nep141Controller::balance_of(self, &account_id).into()
+                <Self as ::near_contract_tools::standard::nep141::Nep141Controller>::balance_of(&account_id).into()
             }
         }
 
