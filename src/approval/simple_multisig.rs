@@ -230,10 +230,10 @@ mod tests {
         SayGoodbye,
     }
 
-    impl crate::approval::Action for Action {
+    impl crate::approval::Action<Contract> for Action {
         type Output = &'static str;
 
-        fn execute(self) -> Self::Output {
+        fn execute(self, _contract: &mut Contract) -> Self::Output {
             match self {
                 Self::SayHello => "hello",
                 Self::SayGoodbye => "goodbye",
