@@ -21,7 +21,7 @@ name = "simple_multisig"
 
 [dependencies]
 near-contract-tools = {path = "../"}
-near-sdk = "4.0.0"
+near-sdk = {version = "=4.1.0-pre.3", features = ["unstable"]}
 strum = "0.24.1"
 strum_macros = "0.24.3"
 thiserror = "1.0.34"
