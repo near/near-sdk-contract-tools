@@ -82,7 +82,7 @@ mod tests {
     }
 
     #[derive(Rbac)]
-    #[rbac(roles = "Role")]
+    #[rbac(roles = "Role", crate = "crate")]
     #[near_bindgen]
     struct Contract {}
 

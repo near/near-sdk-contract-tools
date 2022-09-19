@@ -12,6 +12,22 @@ mod rbac;
 mod rename;
 mod standard;
 
+fn default_crate_name() -> syn::Path {
+    syn::parse_str("::near_contract_tools").unwrap()
+}
+
+fn default_macros() -> syn::Path {
+    syn::parse_str("::near_contract_tools").unwrap()
+}
+
+fn default_near_sdk() -> syn::Path {
+    syn::parse_str("::near_sdk").unwrap()
+}
+
+fn default_serde() -> syn::Path {
+    syn::parse_str("::serde").unwrap()
+}
+
 fn make_derive<T>(
     input: TokenStream,
     expand: fn(T) -> Result<proc_macro2::TokenStream, darling::Error>,
@@ -153,7 +169,7 @@ pub fn event(attr: TokenStream, item: TokenStream) -> TokenStream {
     let attr = parse_macro_input!(attr as AttributeArgs);
 
     standard::event::EventAttributeMeta::from_list(&attr)
-        .map(|meta| standard::event::event_attribute(meta, item.into()))
+        .and_then(|meta| standard::event::event_attribute(meta, item.into()))
         .map(Into::into)
         .unwrap_or_else(|e| e.write_errors().into())
 }
