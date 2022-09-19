@@ -1,18 +1,33 @@
-use crate::{owner, owner::Owner};
+//! Upgrade Mod
+//!
+//! Makes it easier to upgrade your contract by providing a simple interface for upgrading the code and the state of your contract.
+
 use near_sdk::{env, sys, Gas};
 
 use near_sdk::borsh::{BorshDeserialize, BorshSerialize};
 
-/// upgrade function
-#[deny(no_mangle_generic_items)]
+/// Upgrade Trait
+pub trait Upgrade {
+    /// upgrade_all - Upgrades the code and the state of the contract
+    fn upgrade_all();
+}
+
+/// Contracts may implement this trait to inject code into Upgrade functions.
+///
+/// `T` is an optional value for passing state between different lifecycle
+/// hooks. This may be useful for charging callers for storage usage, for
+/// example.
+pub trait UpgradeHook {
+    /// Executed before a upgrade call is conducted
+    fn on_upgrade();
+}
+
+/// naked upgrade function which calls migrate method on the contract
 pub fn upgrade<T>()
 where
-    T: BorshDeserialize + BorshSerialize + Owner,
+    T: BorshDeserialize + BorshSerialize,
 {
     env::setup_panic_hook();
-
-    let contract: T = env::state_read().expect("Contract is not initialized");
-    contract.assert_owner();
 
     const MIGRATE_METHOD_NAME: &[u8; 7] = b"migrate";
     const UPDATE_GAS_LEFTOVER: Gas = Gas(5_000_000_000_000);
