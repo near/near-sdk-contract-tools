@@ -1,6 +1,6 @@
 [package]
 authors = ["Jacob Lindahl <jacob@near.foundation>"]
-categories = ["wasm"]
+categories = ["wasm", "cryptography::cryptocurrencies"]
 description = """
 Helpful functions and macros for developing smart contracts on NEAR Protocol.
 """
@@ -14,9 +14,12 @@ version = "0.5.0"
 [dependencies]
 near-contract-tools-macros = {version = "=0.5.0", path = "./macros"}
 near-sdk = {version = "=4.1.0-pre.3", features = ["unstable"]}
-serde = "1"
-serde_json = "1"
-thiserror = "1"
+serde = "1.0.144"
+serde_json = "1.0.85"
+thiserror = "1.0.35"
+
+[dev-dependencies]
+doc-comment = "0.3.3"
 
 [workspace]
 members = [

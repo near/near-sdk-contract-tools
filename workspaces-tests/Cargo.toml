@@ -2,6 +2,7 @@
 autobins = false
 edition = "2021"
 name = "workspaces-tests"
+publish = false
 version = "0.1.0"
 
 [[bin]]
@@ -27,7 +28,7 @@ strum_macros = "0.24.3"
 thiserror = "1.0.34"
 
 [dev-dependencies]
-tokio = "1"
+tokio = "1.21.1"
 
 [target.'cfg(not(windows))'.dev-dependencies]
 workspaces = "0.4"

@@ -1,5 +1,5 @@
 //! NEP-141 fungible token core implementation
-//! https://github.com/near/NEPs/blob/master/neps/nep-0141.md
+//! <https://github.com/near/NEPs/blob/master/neps/nep-0141.md>
 #![allow(missing_docs)] // ext_contract doesn't play nice with #![warn(missing_docs)]
 
 use near_sdk::{
