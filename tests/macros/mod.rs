@@ -113,7 +113,7 @@ struct MigrateIntegration {
 }
 
 impl MigrateHook for MigrateIntegration {
-    fn migrate(old: Integration, _args: Option<String>) -> Self {
+    fn on_migrate(old: Integration, _args: Option<String>) -> Self {
         Self::require_owner();
         Self::require_unpaused();
 
