@@ -1,8 +1,8 @@
 //! Macros for near-contract-tools
 
-use darling::FromDeriveInput;
+use darling::{FromDeriveInput, FromMeta};
 use proc_macro::TokenStream;
-use syn::{parse_macro_input, DeriveInput};
+use syn::{parse_macro_input, AttributeArgs, DeriveInput};
 
 mod approval;
 mod event;
@@ -146,4 +146,15 @@ pub fn derive_migrate(input: TokenStream) -> TokenStream {
 #[proc_macro_derive(SimpleMultisig, attributes(simple_multisig))]
 pub fn derive_simple_multisig(input: TokenStream) -> TokenStream {
     make_derive(input, approval::simple_multisig::expand)
+}
+
+/// Smart #[event] macro
+#[proc_macro_attribute]
+pub fn to_event(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let attr = parse_macro_input!(attr as AttributeArgs);
+
+    event::EventAttributeMeta::from_list(&attr)
+        .map(|meta| event::event_attribute(meta, item.into()))
+        .map(Into::into)
+        .unwrap_or_else(|e| e.write_errors().into())
 }

@@ -43,7 +43,7 @@ pub trait EventMetadata {
 
 /// NEP-297 Event Log Data
 /// <https://github.com/near/NEPs/blob/master/neps/nep-0297.md#specification>
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 struct EventLogData<'a, T> {
     pub standard: &'a str,
     pub version: &'a str,

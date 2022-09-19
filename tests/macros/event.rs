@@ -40,3 +40,25 @@ fn derive_event() {
 
     assert_eq!(Nep171::CustomEvent.event(), "CUSTOM-EVENT");
 }
+
+mod event_attribute_macro {
+    use near_contract_tools::{event::Event, to_event};
+
+    #[to_event(standard = "my_event_standard", version = "1")]
+    #[allow(unused)]
+    enum MyEvent {
+        One,
+        ThreePointFive { foo: &'static str },
+        Six,
+    }
+
+    #[test]
+    fn test() {
+        let e = MyEvent::ThreePointFive { foo: "hello" };
+        e.emit();
+        assert_eq!(
+            e.to_string(),
+            r#"EVENT_JSON:{"standard":"my_event_standard","version":"1","event":"three_point_five","data":{"foo":"hello"}}"#,
+        );
+    }
+}

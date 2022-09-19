@@ -1,6 +1,7 @@
-use darling::{ast::Style, FromDeriveInput, FromVariant};
+use darling::{ast::Style, FromDeriveInput, FromMeta, FromVariant};
 use proc_macro2::TokenStream;
 use quote::quote;
+use syn::Expr;
 
 use crate::rename::RenameStrategy;
 
@@ -59,6 +60,7 @@ pub fn expand(meta: EventMeta) -> Result<TokenStream, darling::Error> {
             } else {
                 ident.to_string()
             };
+
             match fields.style {
                 Style::Unit => quote! { #type_name :: #ident => #transformed_name , },
                 Style::Tuple => {
@@ -88,5 +90,49 @@ pub fn expand(meta: EventMeta) -> Result<TokenStream, darling::Error> {
                 }
             }
         }
+
+        impl #imp ::std::fmt::Display for #type_name #ty #wher {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+                write!(
+                    f,
+                    "{}",
+                    near_contract_tools::event::Event::to_event_string(self),
+                )
+            }
+        }
     })
+}
+
+#[derive(Debug, FromMeta)]
+pub struct EventAttributeMeta {
+    pub standard: String,
+    pub version: String,
+    pub rename_all: Option<RenameStrategy>,
+
+    /// serde crate path
+    pub serde: Option<Expr>,
+}
+
+pub fn event_attribute(attr: EventAttributeMeta, item: TokenStream) -> TokenStream {
+    let EventAttributeMeta {
+        standard,
+        version,
+        rename_all,
+        serde,
+    } = attr;
+
+    let rename_all = rename_all.unwrap_or(RenameStrategy::SnakeCase).to_string();
+
+    let serde = serde
+        .map(|s| quote! { #s })
+        .unwrap_or_else(|| quote! { ::serde });
+
+    let serde_str = serde.to_string();
+
+    quote::quote! {
+        #[derive(::near_contract_tools::Event, #serde :: Serialize)]
+        #[event(standard = #standard, version = #version, rename_all = #rename_all)]
+        #[serde(crate = #serde_str, untagged)]
+        #item
+    }
 }
