@@ -16,8 +16,3 @@ pub use near_contract_tools_macros::*;
 mod near_contract_tools {
     pub use super::*;
 }
-
-#[cfg(doctest)]
-mod README_md {
-    doc_comment::doctest!("../README.md");
-}
