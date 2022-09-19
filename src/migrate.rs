@@ -31,7 +31,7 @@ pub trait MigrateController {
 pub trait MigrateHook: MigrateController {
     /// Receives the old schema deserialized from storage as well as optional
     /// arguments from caller, and replaces it with the new schema.
-    fn migrate(
+    fn on_migrate(
         old_schema: <Self as MigrateController>::OldSchema,
         args: Option<String>,
     ) -> <Self as MigrateController>::NewSchema;
