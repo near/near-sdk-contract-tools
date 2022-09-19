@@ -62,8 +62,10 @@ pub fn expand(meta: Nep141Meta) -> Result<TokenStream, darling::Error> {
                 memo: Option<String>,
             ) {
                 use ::near_contract_tools::{
-                    event::Event,
-                    standard::nep141::{Nep141Controller, Nep141Event},
+                    standard::{
+                        nep141::{Nep141Controller, Nep141Event},
+                        nep297::Event,
+                    },
                 };
 
                 ::near_sdk::assert_one_yocto();

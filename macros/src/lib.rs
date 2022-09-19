@@ -5,7 +5,6 @@ use proc_macro::TokenStream;
 use syn::{parse_macro_input, AttributeArgs, DeriveInput};
 
 mod approval;
-mod event;
 mod migrate;
 mod owner;
 mod pause;
@@ -28,9 +27,9 @@ where
         .unwrap_or_else(|e| e.write_errors().into())
 }
 
-/// Derives an NEP-297-compatible event emitting implementation of `Event`.
+/// Use on an enum to emit NEP-297 event strings.
 ///
-/// Specify event standard parameters: `#[event(standard = "...", version = "...")]`
+/// Specify event standard parameters: `#[nep297(standard = "...", version = "...")]`
 ///
 /// Rename strategy for all variants (default: unchanged): `#[event(..., rename_all = "<strategy>")]`
 /// Options for `<strategy>`:
@@ -41,9 +40,9 @@ where
 /// - `SHOUTY_SNAKE_CASE`
 /// - `SHOUTY-KEBAB-CASE`
 /// - `Title Case`
-#[proc_macro_derive(Event, attributes(event))]
-pub fn derive_event(input: TokenStream) -> TokenStream {
-    make_derive(input, event::expand)
+#[proc_macro_derive(Nep297, attributes(nep297))]
+pub fn derive_nep297(input: TokenStream) -> TokenStream {
+    make_derive(input, standard::nep297::expand)
 }
 
 /// Creates a managed, lazily-loaded `Owner` implementation for the targeted
@@ -150,11 +149,11 @@ pub fn derive_simple_multisig(input: TokenStream) -> TokenStream {
 
 /// Smart #[event] macro
 #[proc_macro_attribute]
-pub fn to_event(attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn event(attr: TokenStream, item: TokenStream) -> TokenStream {
     let attr = parse_macro_input!(attr as AttributeArgs);
 
-    event::EventAttributeMeta::from_list(&attr)
-        .map(|meta| event::event_attribute(meta, item.into()))
+    standard::event::EventAttributeMeta::from_list(&attr)
+        .map(|meta| standard::event::event_attribute(meta, item.into()))
         .map(Into::into)
         .unwrap_or_else(|e| e.write_errors().into())
 }

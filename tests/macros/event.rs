@@ -1,4 +1,4 @@
-use near_contract_tools::{event::*, Event};
+use near_contract_tools::{standard::nep297::*, Nep297};
 use serde::Serialize;
 
 #[derive(Serialize)]
@@ -7,20 +7,20 @@ pub struct Nep171NftMintData {
     pub token_ids: Vec<String>,
 }
 
-#[derive(Event, Serialize)]
+#[derive(Nep297, Serialize)]
 // Required fields
-#[event(standard = "nep171", version = "1.0.0")]
+#[nep297(standard = "nep171", version = "1.0.0")]
 // Optional. Default event name is the untransformed variant name, e.g. NftMint, AnotherEvent, CustomEvent
-#[event(rename_all = "snake_case")]
+#[nep297(rename_all = "snake_case")]
 // Variant name will not appear in the serialized output
 #[serde(untagged)]
 pub enum Nep171 {
     NftMint(Vec<Nep171NftMintData>), // Name will be "nft_mint" because rename_all = snake_case
 
-    #[event(name = "sneaky_event")]
+    #[nep297(name = "sneaky_event")]
     AnotherEvent, // Name will be "sneaky_event"
 
-    #[event(rename = "SHOUTY-KEBAB-CASE")]
+    #[nep297(rename = "SHOUTY-KEBAB-CASE")]
     CustomEvent, // Name will be "CUSTOM-EVENT"
 }
 
@@ -42,9 +42,9 @@ fn derive_event() {
 }
 
 mod event_attribute_macro {
-    use near_contract_tools::{event::Event, to_event};
+    use near_contract_tools::{event, standard::nep297::Event};
 
-    #[to_event(standard = "my_event_standard", version = "1")]
+    #[event(standard = "my_event_standard", version = "1")]
     #[allow(unused)]
     enum MyEvent {
         One,

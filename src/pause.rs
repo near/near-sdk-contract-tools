@@ -1,18 +1,14 @@
 //! Contract method pausing/unpausing
 #![allow(missing_docs)] // #[ext_contract(...)] does not play nicely with clippy
 
-use crate::{event::Event, near_contract_tools, slot::Slot};
-use near_contract_tools_macros::Event;
+use crate::{event, near_contract_tools, slot::Slot, standard::nep297::Event};
 use near_sdk::{ext_contract, require};
-use serde::Serialize;
 
 const UNPAUSED_FAIL_MESSAGE: &str = "Disallowed while contract is unpaused";
 const PAUSED_FAIL_MESSAGE: &str = "Disallowed while contract is paused";
 
 /// Events emitted when contract pause state is changed
-#[derive(Event, Serialize)]
-#[event(standard = "x-paus", version = "1.0.0", rename_all = "snake_case")]
-#[serde(untagged)]
+#[event(standard = "x-paus", version = "1.0.0")]
 pub enum PauseEvent {
     /// Emitted when the contract is paused
     Pause,

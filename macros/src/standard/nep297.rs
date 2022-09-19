@@ -1,13 +1,12 @@
-use darling::{ast::Style, FromDeriveInput, FromMeta, FromVariant};
+use darling::{ast::Style, FromDeriveInput, FromVariant};
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::Expr;
 
 use crate::rename::RenameStrategy;
 
 #[derive(Debug, FromDeriveInput)]
-#[darling(attributes(event), supports(enum_any))]
-pub struct EventMeta {
+#[darling(attributes(nep297), supports(enum_any))]
+pub struct Nep297Meta {
     pub standard: String,
     pub version: String,
     pub rename_all: Option<RenameStrategy>,
@@ -18,7 +17,7 @@ pub struct EventMeta {
 }
 
 #[derive(Debug, FromVariant)]
-#[darling(attributes(event))]
+#[darling(attributes(nep297))]
 pub struct EventVariantReceiver {
     pub ident: syn::Ident,
     pub fields: darling::ast::Fields<()>,
@@ -26,8 +25,8 @@ pub struct EventVariantReceiver {
     pub name: Option<String>,
 }
 
-pub fn expand(meta: EventMeta) -> Result<TokenStream, darling::Error> {
-    let EventMeta {
+pub fn expand(meta: Nep297Meta) -> Result<TokenStream, darling::Error> {
+    let Nep297Meta {
         standard,
         version,
         rename_all,
@@ -75,7 +74,7 @@ pub fn expand(meta: EventMeta) -> Result<TokenStream, darling::Error> {
     .collect::<Vec<_>>();
 
     Ok(quote! {
-        impl #imp near_contract_tools::event::EventMetadata for #type_name #ty #wher {
+        impl #imp near_contract_tools::standard::nep297::EventMetadata for #type_name #ty #wher {
             fn standard(&self) -> &'static str {
                 #standard
             }
@@ -96,43 +95,9 @@ pub fn expand(meta: EventMeta) -> Result<TokenStream, darling::Error> {
                 write!(
                     f,
                     "{}",
-                    near_contract_tools::event::Event::to_event_string(self),
+                    near_contract_tools::standard::nep297::Event::to_event_string(self),
                 )
             }
         }
     })
-}
-
-#[derive(Debug, FromMeta)]
-pub struct EventAttributeMeta {
-    pub standard: String,
-    pub version: String,
-    pub rename_all: Option<RenameStrategy>,
-
-    /// serde crate path
-    pub serde: Option<Expr>,
-}
-
-pub fn event_attribute(attr: EventAttributeMeta, item: TokenStream) -> TokenStream {
-    let EventAttributeMeta {
-        standard,
-        version,
-        rename_all,
-        serde,
-    } = attr;
-
-    let rename_all = rename_all.unwrap_or(RenameStrategy::SnakeCase).to_string();
-
-    let serde = serde
-        .map(|s| quote! { #s })
-        .unwrap_or_else(|| quote! { ::serde });
-
-    let serde_str = serde.to_string();
-
-    quote::quote! {
-        #[derive(::near_contract_tools::Event, #serde :: Serialize)]
-        #[event(standard = #standard, version = #version, rename_all = #rename_all)]
-        #[serde(crate = #serde_str, untagged)]
-        #item
-    }
 }

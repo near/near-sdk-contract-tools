@@ -1,10 +1,10 @@
 use near_contract_tools::{
-    event::Event,
     migrate::{MigrateExternal, MigrateHook},
     owner::Owner,
     pause::Pause,
     rbac::Rbac,
-    Event, Migrate, Owner, Pause, Rbac,
+    standard::nep297::Event,
+    Migrate, Nep297, Owner, Pause, Rbac,
 };
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
@@ -20,8 +20,8 @@ mod owner;
 mod pause;
 mod standard;
 
-#[derive(Serialize, Event)]
-#[event(standard = "x-myevent", version = "1.0.0", rename_all = "snake_case")]
+#[derive(Serialize, Nep297)]
+#[nep297(standard = "x-myevent", version = "1.0.0", rename_all = "snake_case")]
 #[serde(untagged)]
 enum MyEvent {
     ValueChanged { from: u32, to: u32 },
