@@ -29,7 +29,7 @@ struct MyContract {
 }
 
 impl MigrateHook for MyContract {
-    fn migrate(old: Old, _args: Option<String>) -> Self {
+    fn on_migrate(old: Old, _args: Option<String>) -> Self {
         Self { bar: old.foo }
     }
 }

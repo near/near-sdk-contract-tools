@@ -39,7 +39,7 @@ pub fn expand(meta: MigrateMeta) -> Result<TokenStream, darling::Error> {
             fn migrate(args: Option<String>) -> Self {
                 let old_state = <#ident as ::near_contract_tools::migrate::MigrateController>::deserialize_old_schema();
 
-                <#ident as ::near_contract_tools::migrate::MigrateHook>::migrate(
+                <#ident as ::near_contract_tools::migrate::MigrateHook>::on_migrate(
                     old_state,
                     args,
                 )
