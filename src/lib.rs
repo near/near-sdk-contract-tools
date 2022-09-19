@@ -4,7 +4,6 @@
 pub mod standard;
 
 pub mod approval;
-pub mod event;
 pub mod migrate;
 pub mod owner;
 pub mod pause;
@@ -17,9 +16,4 @@ pub use near_contract_tools_macros::*;
 
 mod near_contract_tools {
     pub use super::*;
-}
-
-#[cfg(doctest)]
-mod README_md {
-    doc_comment::doctest!("../README.md");
 }
