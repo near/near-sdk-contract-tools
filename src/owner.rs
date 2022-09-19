@@ -1,11 +1,9 @@
 //! Owner pattern
 #![allow(missing_docs)] // #[ext_contract(...)] does not play nicely with clippy
 
-use near_contract_tools_macros::Event;
 use near_sdk::{env, ext_contract, require, AccountId};
-use serde::Serialize;
 
-use crate::{event::Event, near_contract_tools, slot::Slot};
+use crate::{event, near_contract_tools, slot::Slot, standard::nep297::Event};
 
 const ONLY_OWNER_FAIL_MESSAGE: &str = "Owner only";
 const OWNER_INIT_FAIL_MESSAGE: &str = "Owner already initialized";
@@ -14,9 +12,7 @@ const ONLY_PROPOSED_OWNER_FAIL_MESSAGE: &str = "Proposed owner only";
 const NO_PROPOSED_OWNER_FAIL_MESSAGE: &str = "No proposed owner";
 
 /// Events emitted by function calls on an ownable contract
-#[derive(Event, Serialize)]
-#[event(standard = "x-own", version = "1.0.0", rename_all = "snake_case")]
-#[serde(untagged)]
+#[event(standard = "x-own", version = "1.0.0")]
 pub enum OwnerEvent {
     /// Emitted when the current owner of the contract changes
     Transfer {

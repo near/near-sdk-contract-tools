@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use darling::FromMeta;
 use heck::{
     ToKebabCase, ToLowerCamelCase, ToShoutyKebabCase, ToShoutySnakeCase, ToSnakeCase, ToTitleCase,
@@ -34,6 +36,24 @@ impl FromMeta for RenameStrategy {
     fn from_string(value: &str) -> darling::Result<Self> {
         RenameStrategy::try_from(value)
             .map_err(|_| darling::Error::custom("Invalid rename strategy"))
+    }
+}
+
+impl Display for RenameStrategy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                RenameStrategy::UpperCamelCase => "UpperCamelCase",
+                RenameStrategy::LowerCamelCase => "lowerCamelCase",
+                RenameStrategy::SnakeCase => "snake_case",
+                RenameStrategy::KebabCase => "kebab-case",
+                RenameStrategy::ShoutySnakeCase => "SHOUTY_SNAKE_CASE",
+                RenameStrategy::TitleCase => "Title Case",
+                RenameStrategy::ShoutyKebabCase => "SHOUTY-KEBAB-CASE",
+            },
+        )
     }
 }
 

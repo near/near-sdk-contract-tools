@@ -122,9 +122,8 @@ fn own_accept_owner(&mut self);
 ### Events
 
 ```rust
-use near_contract_tools::event::*;
-use near_contract_tools::Event;
 use serde::Serialize;
+use near_contract_tools::{event, standard::nep297::Event};
 
 #[derive(Serialize)]
 pub struct Nep171NftMintData {
@@ -132,11 +131,8 @@ pub struct Nep171NftMintData {
     pub token_ids: Vec<String>,
 }
 
-#[derive(Event, Serialize)]
 #[event(standard = "nep171", version = "1.0.0")]
-#[serde(untagged)]
 pub enum Nep171 {
-    #[event(name = "nft_mint")]
     NftMint(Vec<Nep171NftMintData>),
 }
 
