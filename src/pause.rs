@@ -55,7 +55,7 @@ pub trait Pause {
 
     /// Storage slot for pause state
     fn slot_paused() -> Slot<bool> {
-        unsafe { Self::root().transmute() }
+        Self::root().transmute()
     }
 
     /// Force the contract pause state in a particular direction.
