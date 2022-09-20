@@ -30,7 +30,7 @@ impl Slot<()> {
 }
 
 impl<T> Slot<T> {
-    /// Creates a new `Slot` that controls the given storage key
+    /// Creates a new [`Slot`] that controls the given storage key
     pub fn new<K: IntoStorageKey>(key: K) -> Self {
         Self {
             key: key.into_storage_key(),
@@ -38,7 +38,7 @@ impl<T> Slot<T> {
         }
     }
 
-    /// Creates a new `Slot` that controls the given key namespaced (prefixed)
+    /// Creates a new [`Slot`] that controls the given key namespaced (prefixed)
     /// by the parent key, to be used as a namespace for another subfield.
     pub fn ns<K: IntoStorageKey>(&self, key: K) -> Slot<()> {
         Slot {
@@ -47,7 +47,7 @@ impl<T> Slot<T> {
         }
     }
 
-    /// Creates a new `Slot` that controls the given key namespaced (prefixed)
+    /// Creates a new [`Slot`] that controls the given key namespaced (prefixed)
     /// by the parent key.
     pub fn field<K: IntoStorageKey, U>(&self, key: K) -> Slot<U> {
         Slot {
@@ -56,14 +56,15 @@ impl<T> Slot<T> {
         }
     }
 
-    /// Creates a `Slot` that tries to parse a different data type from the same
+    /// Creates a [`Slot`] that tries to parse a different data type from the same
     /// storage slot.
     ///
-    /// # Safety
+    /// # Warning
     ///
     /// If the data in the slot is not parsable into the new type, methods like
-    /// `read` and `take` will panic.
-    pub unsafe fn transmute<U>(&self) -> Slot<U> {
+    /// [`Slot::read`](struct.Slot.html#method.read) and
+    /// [`Slot::take`](struct.Slot.html#method.take) will panic.
+    pub fn transmute<U>(&self) -> Slot<U> {
         Slot {
             key: self.key.clone(),
             _marker: PhantomData,
@@ -102,7 +103,7 @@ impl<T: BorshSerialize> Slot<T> {
     /// removes the key from storage.
     ///
     /// Use of this method makes the slot function similarly to
-    /// `near_sdk::collections::LazyOption`.
+    /// [`near_sdk::collections::LazyOption`].
     pub fn set(&mut self, value: Option<&T>) -> bool {
         match value {
             Some(value) => self.write(value),
