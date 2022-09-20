@@ -1,24 +1,26 @@
 [package]
-name = "near-contract-tools"
-version = "0.5.0"
-edition = "2021"
 authors = ["Jacob Lindahl <jacob@near.foundation>"]
-license = "GPL-3.0"
-categories = ["wasm"]
+categories = ["wasm", "cryptography::cryptocurrencies"]
 description = """
 Helpful functions and macros for developing smart contracts on NEAR Protocol.
 """
-repository = "https://github.com/encody/near-contract-tools"
 documentation = "https://docs.rs/near-contract-tools"
+edition = "2021"
+license = "GPL-3.0"
+name = "near-contract-tools"
+repository = "https://github.com/encody/near-contract-tools"
+version = "0.6.0"
 
 [dependencies]
-near-sdk = "4"
-serde = "1"
-serde_json = "1"
-near-contract-tools-macros = { version = "=0.5.0", path = "./macros" }
+near-contract-tools-macros = {version = "=0.6.0", path = "./macros"}
+near-sdk = "4.0.0"
+serde = "1.0.144"
+serde_json = "1.0.85"
+thiserror = "1.0.35"
 
 [workspace]
 members = [
-    ".",
-    "macros",
+  ".",
+  "macros",
+  "workspaces-tests",
 ]

@@ -4,16 +4,19 @@ use near_sdk::{borsh::BorshSerialize, env, require, AccountId, IntoStorageKey};
 
 use crate::slot::Slot;
 
+const REQUIRE_ROLE_FAIL_MESSAGE: &str = "Unauthorized role";
+const PROHIBIT_ROLE_FAIL_MESSAGE: &str = "Prohibited role";
+
 /// Role-based access control
-pub trait Rbac<R>
-where
-    R: BorshSerialize + IntoStorageKey,
-{
+pub trait Rbac {
+    /// Roles type (probably an enum)
+    type Role: BorshSerialize + IntoStorageKey;
+
     /// Storage slot namespace for items
     fn root() -> Slot<()>;
 
     /// Returns whether a given account has been given a certain role.
-    fn has_role(account_id: &AccountId, role: &R) -> bool {
+    fn has_role(account_id: &AccountId, role: &Self::Role) -> bool {
         Self::root()
             .ns(role.try_to_vec().unwrap())
             .field(account_id.try_to_vec().unwrap())
@@ -22,7 +25,7 @@ where
     }
 
     /// Assigns a role to an account.
-    fn add_role(&mut self, account_id: &AccountId, role: &R) {
+    fn add_role(&mut self, account_id: &AccountId, role: &Self::Role) {
         Self::root()
             .ns(role.try_to_vec().unwrap())
             .field(account_id.try_to_vec().unwrap())
@@ -30,7 +33,7 @@ where
     }
 
     /// Removes a role from an account.
-    fn remove_role(&mut self, account_id: &AccountId, role: &R) {
+    fn remove_role(&mut self, account_id: &AccountId, role: &Self::Role) {
         Self::root()
             .ns(role.try_to_vec().unwrap())
             .field::<_, bool>(account_id.try_to_vec().unwrap())
@@ -38,9 +41,21 @@ where
     }
 
     /// Requires transaction predecessor to have a given role.
-    fn require_role(&self, role: &R) {
+    fn require_role(&self, role: &Self::Role) {
         let predecessor = env::predecessor_account_id();
-        require!(Self::has_role(&predecessor, role), "Unauthorized");
+        require!(
+            Self::has_role(&predecessor, role),
+            REQUIRE_ROLE_FAIL_MESSAGE
+        );
+    }
+
+    /// Requires transaction predecessor to not have a given role.
+    fn prohibit_role(&self, role: &Self::Role) {
+        let predecessor = env::predecessor_account_id();
+        require!(
+            !Self::has_role(&predecessor, role),
+            PROHIBIT_ROLE_FAIL_MESSAGE
+        );
     }
 }
 
@@ -67,7 +82,7 @@ mod tests {
     }
 
     #[derive(Rbac)]
-    #[rbac(roles = "Role")]
+    #[rbac(roles = "Role", crate = "crate")]
     #[near_bindgen]
     struct Contract {}
 
@@ -145,7 +160,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic = "Unauthorized"]
+    #[should_panic = "Unauthorized role"]
     pub fn require_role_fail_wrong_role() {
         let mut r = Contract {};
         let a: AccountId = "account".parse().unwrap();
@@ -158,7 +173,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic = "Unauthorized"]
+    #[should_panic = "Unauthorized role"]
     pub fn require_role_fail_no_role() {
         let r = Contract {};
         let a: AccountId = "account".parse().unwrap();
@@ -166,5 +181,40 @@ mod tests {
         testing_env!(VMContextBuilder::new().predecessor_account_id(a).build());
 
         r.require_role(&Role::B);
+    }
+
+    #[test]
+    #[should_panic = "Prohibited role"]
+    pub fn prohibit_role_fail() {
+        let mut r = Contract {};
+        let a: AccountId = "account".parse().unwrap();
+
+        r.add_role(&a, &Role::A);
+
+        testing_env!(VMContextBuilder::new().predecessor_account_id(a).build());
+
+        r.prohibit_role(&Role::A);
+    }
+
+    #[test]
+    pub fn prohibit_role_success_diff_role() {
+        let mut r = Contract {};
+        let a: AccountId = "account".parse().unwrap();
+
+        r.add_role(&a, &Role::A);
+
+        testing_env!(VMContextBuilder::new().predecessor_account_id(a).build());
+
+        r.prohibit_role(&Role::B);
+    }
+
+    #[test]
+    pub fn prohibit_role_success_no_role() {
+        let r = Contract {};
+        let a: AccountId = "account".parse().unwrap();
+
+        testing_env!(VMContextBuilder::new().predecessor_account_id(a).build());
+
+        r.prohibit_role(&Role::B);
     }
 }

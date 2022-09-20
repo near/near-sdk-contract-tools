@@ -1,4 +1,4 @@
-//! Helpers for `#[derive(near_contract_tools::Event)]`
+//! Helpers for `#[derive(near_contract_tools::Nep297)]`
 
 use near_sdk::serde::Serialize;
 
@@ -6,8 +6,8 @@ use near_sdk::serde::Serialize;
 ///
 /// # Examples
 /// ```
-/// use near_contract_tools::event::*;
-/// use near_contract_tools::Event;
+/// use near_contract_tools::standard::nep297::*;
+/// use near_contract_tools::Nep297;
 /// use serde::Serialize;
 ///
 /// #[derive(Serialize)]
@@ -16,11 +16,11 @@ use near_sdk::serde::Serialize;
 ///     pub token_ids: Vec<String>,
 /// }
 ///
-/// #[derive(Event, Serialize)]
-/// #[event(standard = "nep171", version = "1.0.0")]
+/// #[derive(Nep297, Serialize)]
+/// #[nep297(standard = "nep171", version = "1.0.0")]
 /// #[serde(untagged)]
 /// pub enum Nep171 {
-///     #[event(name = "nft_mint")]
+///     #[nep297(name = "nft_mint")]
 ///     NftMint(Vec<Nep171NftMintData>),
 /// }
 /// ```
@@ -42,8 +42,8 @@ pub trait EventMetadata {
 }
 
 /// NEP-297 Event Log Data
-/// https://github.com/near/NEPs/blob/master/neps/nep-0297.md#specification
-#[derive(Serialize)]
+/// <https://github.com/near/NEPs/blob/master/neps/nep-0297.md#specification>
+#[derive(Serialize, Debug)]
 struct EventLogData<'a, T> {
     pub standard: &'a str,
     pub version: &'a str,

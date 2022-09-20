@@ -1,5 +1,10 @@
 use near_contract_tools::{
-    event::Event, owner::Owner, pause::Pause, rbac::Rbac, Event, Migrate, Owner, Pause, Rbac,
+    migrate::{MigrateExternal, MigrateHook},
+    owner::Owner,
+    pause::Pause,
+    rbac::Rbac,
+    standard::nep297::Event,
+    Migrate, Nep297, Owner, Pause, Rbac,
 };
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
@@ -15,8 +20,8 @@ mod owner;
 mod pause;
 mod standard;
 
-#[derive(Serialize, Event)]
-#[event(standard = "x-myevent", version = "1.0.0", rename_all = "snake_case")]
+#[derive(Serialize, Nep297)]
+#[nep297(standard = "x-myevent", version = "1.0.0", rename_all = "snake_case")]
 #[serde(untagged)]
 enum MyEvent {
     ValueChanged { from: u32, to: u32 },
@@ -97,7 +102,7 @@ impl Integration {
 }
 
 #[derive(Migrate, Owner, Pause, Rbac, BorshSerialize, BorshDeserialize)]
-#[migrate(from = "Integration", on_migrate = "Self::on_migrate")]
+#[migrate(from = "Integration")]
 #[owner(storage_key = "StorageKey::Owner")]
 #[pause(storage_key = "StorageKey::Pause")]
 #[rbac(storage_key = "StorageKey::Rbac", roles = "Role")]
@@ -107,19 +112,15 @@ struct MigrateIntegration {
     pub moved_value: u32,
 }
 
-impl From<Integration> for MigrateIntegration {
-    fn from(old: Integration) -> Self {
+impl MigrateHook for MigrateIntegration {
+    fn on_migrate(old: Integration, _args: Option<String>) -> Self {
+        Self::require_owner();
+        Self::require_unpaused();
+
         Self {
             new_value: "my string".to_string(),
             moved_value: old.value,
         }
-    }
-}
-
-impl MigrateIntegration {
-    fn on_migrate() {
-        Self::require_owner();
-        Self::require_unpaused();
     }
 }
 
@@ -206,7 +207,7 @@ fn integration() {
     // Perform migration
     env::state_write(&c);
 
-    let mut migrated = MigrateIntegration::migrate();
+    let mut migrated = <MigrateIntegration as MigrateExternal>::migrate(None);
 
     assert_eq!(migrated.moved_value, 25);
     assert_eq!(migrated.get_value(), 25);
@@ -319,7 +320,7 @@ fn integration_fail_migrate_allow() {
 
     testing_env!(context);
 
-    MigrateIntegration::migrate();
+    <MigrateIntegration as MigrateExternal>::migrate(None);
 }
 
 #[test]
@@ -335,14 +336,16 @@ fn integration_fail_migrate_paused() {
 
     Integration::pause(&mut c);
 
-    MigrateIntegration::migrate();
+    env::state_write(&c);
+
+    <MigrateIntegration as MigrateExternal>::migrate(None);
 }
 
 #[cfg(test)]
 mod pausable_fungible_token {
     use near_contract_tools::{
         pause::Pause,
-        standard::nep141::{Nep141, Nep141Controller, Nep141Hook, Nep141Transfer},
+        standard::nep141::{Nep141Hook, Nep141Transfer},
         FungibleToken, Pause,
     };
     use near_sdk::{
@@ -387,7 +390,7 @@ mod pausable_fungible_token {
 
         let mut c = Contract { storage_usage: 0 };
 
-        c.internal_deposit(&alice, 100);
+        c.deposit_unchecked(&alice, 100);
 
         let context = VMContextBuilder::new()
             .attached_deposit(1)
@@ -409,7 +412,7 @@ mod pausable_fungible_token {
 
         let mut c = Contract { storage_usage: 0 };
 
-        c.internal_deposit(&alice, 100);
+        c.deposit_unchecked(&alice, 100);
 
         let context = VMContextBuilder::new()
             .attached_deposit(1)

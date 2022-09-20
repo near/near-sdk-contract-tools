@@ -1,10 +1,4 @@
-use near_contract_tools::{
-    standard::{
-        nep141::{Nep141, Nep141Controller},
-        nep148::Nep148,
-    },
-    FungibleToken,
-};
+use near_contract_tools::FungibleToken;
 use near_sdk::{
     json_types::Base64VecU8, near_bindgen, test_utils::VMContextBuilder, testing_env, AccountId,
 };
@@ -21,11 +15,11 @@ use std::borrow::Cow;
     no_hooks
 )]
 #[near_bindgen]
-struct FungibleToken {}
+struct MyFungibleTokenContract {}
 
 #[test]
 fn fungible_token_transfer() {
-    let mut ft = FungibleToken {};
+    let mut ft = MyFungibleTokenContract {};
 
     let alice: AccountId = "alice".parse().unwrap();
     let bob: AccountId = "bob".parse().unwrap();
@@ -34,8 +28,8 @@ fn fungible_token_transfer() {
     assert_eq!(ft.ft_balance_of(bob.clone()).0, 0);
     assert_eq!(ft.ft_total_supply().0, 0);
 
-    ft.internal_deposit(&alice, 100);
-    ft.internal_deposit(&bob, 20);
+    ft.deposit_unchecked(&alice, 100);
+    ft.deposit_unchecked(&bob, 20);
 
     assert_eq!(ft.ft_balance_of(alice.clone()).0, 100);
     assert_eq!(ft.ft_balance_of(bob.clone()).0, 20);
@@ -57,7 +51,7 @@ fn fungible_token_transfer() {
 
 #[test]
 fn metadata() {
-    let ft = FungibleToken {};
+    let ft = MyFungibleTokenContract {};
     let meta = ft.ft_metadata();
 
     assert_eq!(meta.decimals, 18);

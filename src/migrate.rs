@@ -1,8 +1,9 @@
 //! Migrate default struct between two schemas
+#![allow(missing_docs)] // #[ext_contract(...)] does not play nicely with clippy
 
 use near_sdk::{
     borsh::{BorshDeserialize, BorshSerialize},
-    env,
+    env, ext_contract,
 };
 
 // TODO: Migration events?
@@ -23,8 +24,22 @@ pub trait MigrateController {
         env::state_read::<Self::OldSchema>()
             .unwrap_or_else(|| env::panic_str("Failed to deserialize old state"))
     }
+}
 
-    /// Convert an old schema to a new schema, with additional arguments
-    /// optionally passed as a string.
-    fn convert(old_state: Self::OldSchema, _args: Option<String>) -> Self::NewSchema;
+/// Called on migration. Must be implemented by the user. (The derive macro
+/// does not implement this for you.)
+pub trait MigrateHook: MigrateController {
+    /// Receives the old schema deserialized from storage as well as optional
+    /// arguments from caller, and replaces it with the new schema.
+    fn on_migrate(
+        old_schema: <Self as MigrateController>::OldSchema,
+        args: Option<String>,
+    ) -> <Self as MigrateController>::NewSchema;
+}
+
+/// Migrate-able contracts expose this trait publically
+#[ext_contract(ext_migrate)]
+pub trait MigrateExternal {
+    /// Perform the migration with optional arguments
+    fn migrate(args: Option<String>) -> Self;
 }

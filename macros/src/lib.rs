@@ -1,15 +1,32 @@
-use darling::FromDeriveInput;
-use proc_macro::TokenStream;
-use syn::{parse_macro_input, DeriveInput};
+//! Macros for near-contract-tools
 
-mod event;
-mod integration;
+use darling::{FromDeriveInput, FromMeta};
+use proc_macro::TokenStream;
+use syn::{parse_macro_input, AttributeArgs, DeriveInput};
+
+mod approval;
 mod migrate;
 mod owner;
 mod pause;
 mod rbac;
 mod rename;
 mod standard;
+
+fn default_crate_name() -> syn::Path {
+    syn::parse_str("::near_contract_tools").unwrap()
+}
+
+fn default_macros() -> syn::Path {
+    syn::parse_str("::near_contract_tools").unwrap()
+}
+
+fn default_near_sdk() -> syn::Path {
+    syn::parse_str("::near_sdk").unwrap()
+}
+
+fn default_serde() -> syn::Path {
+    syn::parse_str("::serde").unwrap()
+}
 
 fn make_derive<T>(
     input: TokenStream,
@@ -26,9 +43,9 @@ where
         .unwrap_or_else(|e| e.write_errors().into())
 }
 
-/// Derives an NEP-297-compatible event emitting implementation of `Event`.
+/// Use on an enum to emit NEP-297 event strings.
 ///
-/// Specify event standard parameters: `#[event(standard = "...", version = "...")]`
+/// Specify event standard parameters: `#[nep297(standard = "...", version = "...")]`
 ///
 /// Rename strategy for all variants (default: unchanged): `#[event(..., rename_all = "<strategy>")]`
 /// Options for `<strategy>`:
@@ -39,9 +56,9 @@ where
 /// - `SHOUTY_SNAKE_CASE`
 /// - `SHOUTY-KEBAB-CASE`
 /// - `Title Case`
-#[proc_macro_derive(Event, attributes(event))]
-pub fn derive_event(input: TokenStream) -> TokenStream {
-    make_derive(input, event::expand)
+#[proc_macro_derive(Nep297, attributes(nep297))]
+pub fn derive_nep297(input: TokenStream) -> TokenStream {
+    make_derive(input, standard::nep297::expand)
 }
 
 /// Creates a managed, lazily-loaded `Owner` implementation for the targeted
@@ -128,4 +145,31 @@ pub fn derive_fungible_token(input: TokenStream) -> TokenStream {
 #[proc_macro_derive(Migrate, attributes(migrate))]
 pub fn derive_migrate(input: TokenStream) -> TokenStream {
     make_derive(input, migrate::expand)
+}
+
+/// Create a simple multisig component. Does not expose any functions to the
+/// blockchain. Creates implementations for `ApprovalManager` and
+/// `AccountApprover` for the target contract struct.
+///
+/// Fields may be specified in the `#[simple_multisig(...)]` attribute.
+///
+/// Fields include:
+///  - `storage_key` Storage prefix for multisig data (optional, default: `b"~sm"`)
+///  - `action` What sort of approval `Action` can be approved by the multisig
+///     component?
+///  - `role` Approving accounts are required to have this `Rbac` role.
+#[proc_macro_derive(SimpleMultisig, attributes(simple_multisig))]
+pub fn derive_simple_multisig(input: TokenStream) -> TokenStream {
+    make_derive(input, approval::simple_multisig::expand)
+}
+
+/// Smart #[event] macro
+#[proc_macro_attribute]
+pub fn event(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let attr = parse_macro_input!(attr as AttributeArgs);
+
+    standard::event::EventAttributeMeta::from_list(&attr)
+        .and_then(|meta| standard::event::event_attribute(meta, item.into()))
+        .map(Into::into)
+        .unwrap_or_else(|e| e.write_errors().into())
 }

@@ -1,0 +1,24 @@
+#!/bin/bash
+#
+# In the project directory, run `git config core.hooksPath hooks/` to install the hooks of this directory (without affecting how git hooks work for other projects).
+
+# https://www.atlassian.com/git/tutorials/git-hooks#local-hooks
+# https://near-foundation.atlassian.net/browse/ENG-149
+
+diff=$(cargo fmt -- --check)
+result=$?
+
+RED='\033[0;31m'
+RESET='\033[0m' # No Color
+
+if [[ ${result} -ne 0 ]] ; then
+    printf "${RED}Formatting / style errors.${RESET}\n\n"
+    printf "  To avoid having \`hooks/pre-commit\` block your commits, ensure that your IDE is configured to autoformat Rust code via \`cargo fmt\`.\n"
+    printf "  If you use VSCode, the \`.vscode/settings.json\` file in this repo will autoformat code appropriately.\n"
+    printf "  Alternatively, you can always run \`cargo fmt\` before committing code.\n"
+    printf "  Here is the current result of \`cargo fmt -- --check\`:\n\n"
+    echo "$diff"
+    exit 1
+fi
+
+exit 0

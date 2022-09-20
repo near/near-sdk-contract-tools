@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use near_contract_tools::{standard::nep148::Nep148, Nep148};
+use near_contract_tools::Nep148;
 use near_sdk::{json_types::Base64VecU8, near_bindgen};
 
 #[derive(Nep148)]
