@@ -113,7 +113,7 @@ struct MigrateIntegration {
 }
 
 impl MigrateHook for MigrateIntegration {
-    fn on_migrate(old: Integration, _args: Option<String>) -> Self {
+    fn on_migrate(old: Integration) -> Self {
         Self::require_owner();
         Self::require_unpaused();
 
@@ -207,7 +207,7 @@ fn integration() {
     // Perform migration
     env::state_write(&c);
 
-    let mut migrated = <MigrateIntegration as MigrateExternal>::migrate(None);
+    let mut migrated = <MigrateIntegration as MigrateExternal>::migrate();
 
     assert_eq!(migrated.moved_value, 25);
     assert_eq!(migrated.get_value(), 25);
@@ -320,7 +320,7 @@ fn integration_fail_migrate_allow() {
 
     testing_env!(context);
 
-    <MigrateIntegration as MigrateExternal>::migrate(None);
+    <MigrateIntegration as MigrateExternal>::migrate();
 }
 
 #[test]
@@ -338,7 +338,7 @@ fn integration_fail_migrate_paused() {
 
     env::state_write(&c);
 
-    <MigrateIntegration as MigrateExternal>::migrate(None);
+    <MigrateIntegration as MigrateExternal>::migrate();
 }
 
 #[cfg(test)]

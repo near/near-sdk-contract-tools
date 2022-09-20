@@ -36,12 +36,11 @@ pub fn expand(meta: MigrateMeta) -> Result<TokenStream, darling::Error> {
         #[::near_sdk::near_bindgen]
         impl #imp ::near_contract_tools::migrate::MigrateExternal for #ident #ty #wh {
             #[init(ignore_state)]
-            fn migrate(args: Option<String>) -> Self {
+            fn migrate() -> Self {
                 let old_state = <#ident as ::near_contract_tools::migrate::MigrateController>::deserialize_old_schema();
 
                 <#ident as ::near_contract_tools::migrate::MigrateHook>::on_migrate(
                     old_state,
-                    args,
                 )
             }
         }

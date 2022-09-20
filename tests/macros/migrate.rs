@@ -29,7 +29,7 @@ struct MyContract {
 }
 
 impl MigrateHook for MyContract {
-    fn on_migrate(old: Old, _args: Option<String>) -> Self {
+    fn on_migrate(old: Old) -> Self {
         Self { bar: old.foo }
     }
 }
@@ -43,7 +43,7 @@ fn default_from() {
 
     assert_eq!(old.foo, 99);
 
-    let migrated = <MyContract as MigrateExternal>::migrate(None);
+    let migrated = <MyContract as MigrateExternal>::migrate();
 
     assert_eq!(migrated.bar, 99);
 }

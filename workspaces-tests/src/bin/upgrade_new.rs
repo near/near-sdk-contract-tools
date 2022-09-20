@@ -24,10 +24,7 @@ pub struct ContractNew {
 }
 
 impl MigrateHook for ContractNew {
-    fn on_migrate(
-        old_schema: <Self as near_contract_tools::migrate::MigrateController>::OldSchema,
-        _args: Option<String>,
-    ) -> Self {
+    fn on_migrate(old_schema: ContractOld) -> Self {
         Self {
             bar: old_schema.foo as u64,
         }

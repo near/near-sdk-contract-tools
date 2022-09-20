@@ -36,41 +36,6 @@ async fn setup(num_accounts: usize) -> Setup {
     }
 }
 
-async fn setup_roles(num_accounts: usize) -> Setup {
-    let s = setup(num_accounts).await;
-
-    for account in s.accounts[..s.accounts.len() - 1].iter() {
-        account
-            .call(&s.worker, s.contract.id(), "obtain_multisig_permission")
-            .transact()
-            .await
-            .unwrap();
-    }
-
-    s
-}
-
-/// Setup for individual tests
-async fn setup_new(num_accounts: usize) -> Setup {
-    let worker = workspaces::sandbox().await.unwrap();
-
-    // Initialize contract
-    let contract = worker.dev_deploy(&SECOND_WASM.to_vec()).await.unwrap();
-    contract.call(&worker, "new").transact().await.unwrap();
-
-    // Initialize user accounts
-    let mut accounts = vec![];
-    for _ in 0..(num_accounts + 1) {
-        accounts.push(worker.dev_create_account().await.unwrap());
-    }
-
-    Setup {
-        worker,
-        contract,
-        accounts,
-    }
-}
-
 #[tokio::test]
 async fn upgrade() {
     // Deploy old contract ** LIKE HERE
