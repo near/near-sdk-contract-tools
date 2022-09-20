@@ -15,6 +15,12 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
+      - name: Configure Rust
+        uses: actions-rs/toolchain@v1
+        with:
+            toolchain: stable
+            override: true
+            components: rustfmt
       - name: Check formatting
         run: >
           echo "::echo::on";
@@ -24,6 +30,12 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
+      - name: Configure Rust
+        uses: actions-rs/toolchain@v1
+        with:
+            toolchain: stable
+            override: true
+            components: clippy
       - uses: actions/cache@v3
         with:
           path: |
@@ -33,13 +45,20 @@ jobs:
             ~/.cargo/git/db/
             target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - name: Run linter
-        run: cargo clippy -- -D warnings
+      - uses: actions-rs/clippy-check@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: --all-features
   test:
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v3
+      - name: Configure Rust
+        uses: actions-rs/toolchain@v1
+        with:
+            toolchain: stable
+            override: true
       - uses: actions/cache@v3
         with:
           path: |
@@ -56,6 +75,12 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
+      - name: Configure Rust
+        uses: actions-rs/toolchain@v1
+        with:
+            toolchain: stable
+            override: true
+            target: wasm32-unknown-unknown
       - uses: actions/cache@v3
         with:
           path: |
@@ -69,5 +94,4 @@ jobs:
         run: >
           cd workspaces-tests;
           cargo install cargo-make;
-          rustup target add wasm32-unknown-unknown;
           cargo make test;
