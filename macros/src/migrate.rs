@@ -10,6 +10,12 @@ pub struct MigrateMeta {
 
     pub ident: syn::Ident,
     pub generics: syn::Generics,
+
+    // crates
+    #[darling(rename = "crate", default = "crate::default_crate_name")]
+    pub me: syn::Path,
+    #[darling(default = "crate::default_near_sdk")]
+    pub near_sdk: syn::Path,
 }
 
 pub fn expand(meta: MigrateMeta) -> Result<TokenStream, darling::Error> {
@@ -19,6 +25,9 @@ pub fn expand(meta: MigrateMeta) -> Result<TokenStream, darling::Error> {
 
         ident,
         generics,
+
+        me,
+        near_sdk,
     } = meta;
 
     let (imp, ty, wh) = generics.split_for_impl();
@@ -28,18 +37,18 @@ pub fn expand(meta: MigrateMeta) -> Result<TokenStream, darling::Error> {
         .unwrap_or_else(|| quote! { Self }.to_token_stream());
 
     Ok(quote! {
-        impl #imp ::near_contract_tools::migrate::MigrateController for #ident #ty #wh {
+        impl #imp #me::migrate::MigrateController for #ident #ty #wh {
             type OldSchema = #from;
             type NewSchema = #to;
         }
 
-        #[::near_sdk::near_bindgen]
-        impl #imp ::near_contract_tools::migrate::MigrateExternal for #ident #ty #wh {
+        #[#near_sdk::near_bindgen]
+        impl #imp #me::migrate::MigrateExternal for #ident #ty #wh {
             #[init(ignore_state)]
             fn migrate(args: Option<String>) -> Self {
-                let old_state = <#ident as ::near_contract_tools::migrate::MigrateController>::deserialize_old_schema();
+                let old_state = <#ident as #me::migrate::MigrateController>::deserialize_old_schema();
 
-                <#ident as ::near_contract_tools::migrate::MigrateHook>::on_migrate(
+                <#ident as #me::migrate::MigrateHook>::on_migrate(
                     old_state,
                     args,
                 )

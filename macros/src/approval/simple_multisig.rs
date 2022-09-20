@@ -14,6 +14,12 @@ pub struct SimpleMultisigMeta {
 
     pub generics: syn::Generics,
     pub ident: syn::Ident,
+
+    // crates
+    #[darling(rename = "crate", default = "crate::default_crate_name")]
+    pub me: syn::Path,
+    #[darling(default = "crate::default_near_sdk")]
+    pub near_sdk: syn::Path,
 }
 
 pub fn expand(meta: SimpleMultisigMeta) -> Result<TokenStream, darling::Error> {
@@ -23,6 +29,8 @@ pub fn expand(meta: SimpleMultisigMeta) -> Result<TokenStream, darling::Error> {
         role,
         generics,
         ident,
+        me,
+        near_sdk,
     } = meta;
 
     let (imp, ty, wher) = generics.split_for_impl();
@@ -31,27 +39,27 @@ pub fn expand(meta: SimpleMultisigMeta) -> Result<TokenStream, darling::Error> {
         storage_key.unwrap_or_else(|| syn::parse_str::<Expr>(DEFAULT_STORAGE_KEY).unwrap());
 
     Ok(quote! {
-        impl #imp ::near_contract_tools::approval::ApprovalManager<
+        impl #imp #me::approval::ApprovalManager<
                 #action,
-                ::near_contract_tools::approval::simple_multisig::ApprovalState,
-                ::near_contract_tools::approval::simple_multisig::Configuration<Self>,
+                #me::approval::simple_multisig::ApprovalState,
+                #me::approval::simple_multisig::Configuration<Self>,
             > for #ident #ty #wher {
-            fn root() -> ::near_contract_tools::slot::Slot<()> {
-                ::near_contract_tools::slot::Slot::root(#storage_key)
+            fn root() -> #me::slot::Slot<()> {
+                #me::slot::Slot::root(#storage_key)
             }
         }
 
-        impl #imp ::near_contract_tools::approval::simple_multisig::AccountAuthorizer for #ident #ty #wher {
+        impl #imp #me::approval::simple_multisig::AccountAuthorizer for #ident #ty #wher {
             type AuthorizationError =
-                ::near_contract_tools::approval::simple_multisig::macro_types::MissingRole<
-                    <#ident as ::near_contract_tools::rbac::Rbac>::Role
+                #me::approval::simple_multisig::macro_types::MissingRole<
+                    <#ident as #me::rbac::Rbac>::Role
                 >;
 
-            fn is_account_authorized(account_id: &::near_sdk::AccountId) -> Result<(), Self::AuthorizationError> {
-                if <#ident as ::near_contract_tools::rbac::Rbac>::has_role(account_id, &#role) {
+            fn is_account_authorized(account_id: &#near_sdk::AccountId) -> Result<(), Self::AuthorizationError> {
+                if <#ident as #me::rbac::Rbac>::has_role(account_id, &#role) {
                     Ok(())
                 } else {
-                    Err(::near_contract_tools::approval::simple_multisig::macro_types::MissingRole(#role))
+                    Err(#me::approval::simple_multisig::macro_types::MissingRole(#role))
                 }
             }
         }

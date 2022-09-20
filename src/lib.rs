@@ -12,7 +12,3 @@ pub mod slot;
 pub mod utils;
 
 pub use near_contract_tools_macros::*;
-
-mod near_contract_tools {
-    pub use super::*;
-}

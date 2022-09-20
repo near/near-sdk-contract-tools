@@ -10,47 +10,63 @@ const DEFAULT_STORAGE_KEY: &str = r#"(b"~o" as &[u8])"#;
 pub struct OwnerMeta {
     pub storage_key: Option<Expr>,
 
+    pub generics: syn::Generics,
     pub ident: syn::Ident,
+
+    // crates
+    #[darling(rename = "crate", default = "crate::default_crate_name")]
+    pub me: syn::Path,
+    #[darling(default = "crate::default_near_sdk")]
+    pub near_sdk: syn::Path,
 }
 
 pub fn expand(meta: OwnerMeta) -> Result<TokenStream, darling::Error> {
-    let OwnerMeta { storage_key, ident } = meta;
+    let OwnerMeta {
+        storage_key,
+        ident,
+        generics,
+
+        me,
+        near_sdk,
+    } = meta;
+
+    let (imp, ty, wher) = generics.split_for_impl();
 
     let storage_key =
         storage_key.unwrap_or_else(|| syn::parse_str::<Expr>(DEFAULT_STORAGE_KEY).unwrap());
 
     Ok(quote! {
-        impl near_contract_tools::owner::Owner for #ident {
-            fn root() -> near_contract_tools::slot::Slot<()> {
-                near_contract_tools::slot::Slot::root(#storage_key)
+        impl #imp #me::owner::Owner for #ident #ty #wher {
+            fn root() -> #me::slot::Slot<()> {
+                #me::slot::Slot::root(#storage_key)
             }
         }
 
-        #[near_sdk::near_bindgen]
-        impl near_contract_tools::owner::OwnerExternal for #ident {
-            fn own_get_owner(&self) -> Option<near_sdk::AccountId> {
-                <Self as near_contract_tools::owner::Owner>::slot_owner().read()
+        #[#near_sdk::near_bindgen]
+        impl #imp #me::owner::OwnerExternal for #ident #ty #wher {
+            fn own_get_owner(&self) -> Option<#near_sdk::AccountId> {
+                <Self as #me::owner::Owner>::slot_owner().read()
             }
 
-            fn own_get_proposed_owner(&self) -> Option<near_sdk::AccountId> {
-                <Self as near_contract_tools::owner::Owner>::slot_proposed_owner().read()
+            fn own_get_proposed_owner(&self) -> Option<#near_sdk::AccountId> {
+                <Self as #me::owner::Owner>::slot_proposed_owner().read()
             }
 
             #[payable]
             fn own_renounce_owner(&mut self) {
-                near_sdk::assert_one_yocto();
+                #near_sdk::assert_one_yocto();
                 self.renounce_owner()
             }
 
             #[payable]
-            fn own_propose_owner(&mut self, account_id: Option<near_sdk::AccountId>) {
-                near_sdk::assert_one_yocto();
+            fn own_propose_owner(&mut self, account_id: Option<#near_sdk::AccountId>) {
+                #near_sdk::assert_one_yocto();
                 self.propose_owner(account_id);
             }
 
             #[payable]
             fn own_accept_owner(&mut self) {
-                near_sdk::assert_one_yocto();
+                #near_sdk::assert_one_yocto();
                 self.accept_owner();
             }
         }

@@ -10,7 +10,7 @@ use near_sdk::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{event, near_contract_tools, slot::Slot, standard::nep297::Event};
+use crate::{event, slot::Slot, standard::nep297::Event};
 
 /// Gas value required for ft_resolve_transfer calls
 pub const GAS_FOR_RESOLVE_TRANSFER: Gas = Gas(5_000_000_000_000);
@@ -20,7 +20,13 @@ pub const GAS_FOR_FT_TRANSFER_CALL: Gas = Gas(25_000_000_000_000 + GAS_FOR_RESOL
 const MORE_GAS_FAIL_MESSAGE: &str = "More gas is required";
 
 /// NEP-141 standard events for minting, burning, and transferring tokens
-#[event(standard = "nep141", version = "1.0.0")]
+#[event(
+    crate = "crate",
+    macros = "crate",
+    serde = "serde",
+    standard = "nep141",
+    version = "1.0.0"
+)]
 pub enum Nep141Event<'a> {
     /// Token mint event. Emitted when tokens are created and total_supply is
     /// increased.

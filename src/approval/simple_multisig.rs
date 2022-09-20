@@ -218,7 +218,6 @@ mod tests {
             simple_multisig::{AccountAuthorizer, ApprovalState, Configuration},
             ApprovalManager,
         },
-        near_contract_tools,
         rbac::Rbac,
         slot::Slot,
         Rbac,
@@ -247,7 +246,7 @@ mod tests {
     }
 
     #[derive(Rbac, Debug, BorshSerialize, BorshDeserialize)]
-    #[rbac(roles = "Role")]
+    #[rbac(roles = "Role", crate = "crate")]
     #[near_bindgen]
     struct Contract {}
 

@@ -14,6 +14,10 @@ pub struct Nep297Meta {
     pub ident: syn::Ident,
     pub generics: syn::Generics,
     pub data: darling::ast::Data<EventVariantReceiver, ()>,
+
+    // crates
+    #[darling(rename = "crate", default = "crate::default_crate_name")]
+    pub me: syn::Path,
 }
 
 #[derive(Debug, FromVariant)]
@@ -33,6 +37,7 @@ pub fn expand(meta: Nep297Meta) -> Result<TokenStream, darling::Error> {
         ident: type_name,
         generics,
         data,
+        me,
     } = meta;
 
     let (imp, ty, wher) = generics.split_for_impl();
@@ -74,7 +79,7 @@ pub fn expand(meta: Nep297Meta) -> Result<TokenStream, darling::Error> {
     .collect::<Vec<_>>();
 
     Ok(quote! {
-        impl #imp near_contract_tools::standard::nep297::EventMetadata for #type_name #ty #wher {
+        impl #imp #me::standard::nep297::EventMetadata for #type_name #ty #wher {
             fn standard(&self) -> &'static str {
                 #standard
             }
@@ -95,7 +100,7 @@ pub fn expand(meta: Nep297Meta) -> Result<TokenStream, darling::Error> {
                 write!(
                     f,
                     "{}",
-                    near_contract_tools::standard::nep297::Event::to_event_string(self),
+                    #me::standard::nep297::Event::to_event_string(self),
                 )
             }
         }

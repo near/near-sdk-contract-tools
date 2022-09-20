@@ -296,8 +296,7 @@ mod tests {
     };
     use serde::Serialize;
 
-    use crate::rbac::Rbac;
-    use crate::{near_contract_tools, slot::Slot};
+    use crate::{rbac::Rbac, slot::Slot};
 
     use super::{Action, ActionRequest, ApprovalConfiguration, ApprovalManager};
 
@@ -330,7 +329,7 @@ mod tests {
     }
 
     #[derive(Rbac)]
-    #[rbac(roles = "Role")]
+    #[rbac(roles = "Role", crate = "crate")]
     #[near_bindgen]
     struct Contract {}
 
