@@ -6,6 +6,12 @@ publish = false
 version = "0.1.0"
 
 [[bin]]
+name = "upgrade_old"
+
+[[bin]]
+name = "upgrade_new"
+
+[[bin]]
 name = "counter_multisig"
 
 [[bin]]
