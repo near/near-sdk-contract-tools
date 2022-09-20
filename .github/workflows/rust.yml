@@ -30,9 +30,9 @@ jobs:
         run: cargo test --verbose
       - name: Run workspaces tests
         run: >
-          cd workspaces-tests
-          cargo install cargo-make
-          cargo make test
+          cd workspaces-tests;
+          cargo install cargo-make;
+          cargo make test;
   lint:
     runs-on: ubuntu-latest
 
