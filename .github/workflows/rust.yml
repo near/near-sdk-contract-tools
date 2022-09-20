@@ -26,8 +26,13 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - name: Build
         run: cargo build --verbose
-      - name: Run tests
+      - name: Run unit and integration tests
         run: cargo test --verbose
+      - name: Run workspaces tests
+        run: >
+          cd workspaces-tests
+          cargo install cargo-make
+          cargo make test
   lint:
     runs-on: ubuntu-latest
 
