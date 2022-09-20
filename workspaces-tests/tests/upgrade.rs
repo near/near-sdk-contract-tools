@@ -6,8 +6,14 @@ use workspaces::{network::Sandbox, prelude::*, Account, Contract, Worker};
 
 const WASM: &[u8] = include_bytes!("../../target/wasm32-unknown-unknown/release/upgrade_old.wasm");
 
-const SECOND_WASM: &[u8] =
+const NEW_WASM: &[u8] =
     include_bytes!("../../target/wasm32-unknown-unknown/release/upgrade_new.wasm");
+
+const BAD_WASM: &[u8] =
+    include_bytes!("../../target/wasm32-unknown-unknown/release/upgrade_bad.wasm");
+
+const RANDOM_WASM: &[u8] =
+    include_bytes!("../../target/wasm32-unknown-unknown/release/counter_multisig.wasm");
 
 struct Setup {
     pub worker: Worker<Sandbox>,
@@ -16,11 +22,11 @@ struct Setup {
 }
 
 /// Setup for individual tests
-async fn setup(num_accounts: usize) -> Setup {
+async fn setup(num_accounts: usize, wasm: &[u8]) -> Setup {
     let worker = workspaces::sandbox().await.unwrap();
 
     // Initialize contract
-    let contract = worker.dev_deploy(&WASM.to_vec()).await.unwrap();
+    let contract = worker.dev_deploy(&wasm.to_vec()).await.unwrap();
     contract.call(&worker, "new").transact().await.unwrap();
 
     // Initialize user accounts
@@ -35,7 +41,6 @@ async fn setup(num_accounts: usize) -> Setup {
         accounts,
     }
 }
-
 #[tokio::test]
 async fn upgrade() {
     // Deploy old contract ** LIKE HERE
@@ -44,7 +49,7 @@ async fn upgrade() {
         worker,
         contract,
         accounts,
-    } = setup(3).await;
+    } = setup(3, WASM).await;
 
     let alice = &accounts[0];
     let bob = &accounts[1];
@@ -70,11 +75,10 @@ async fn upgrade() {
 
     assert_eq!(val, 1);
 
-
     let request_id = alice
         .call(&worker, contract.id(), "call_upgrade")
         .max_gas()
-        .args(SECOND_WASM.to_vec())
+        .args(NEW_WASM.to_vec())
         .transact()
         .await
         .unwrap();
@@ -90,4 +94,84 @@ async fn upgrade() {
         .unwrap();
 
     assert_eq!(new_val, 1);
+
+    alice
+        .call(&worker, contract.id(), "decrement_bar")
+        .args_json(json!({}))
+        .unwrap()
+        .transact()
+        .await
+        .unwrap();
+
+    let end_val = alice
+        .call(&worker, contract.id(), "get_bar")
+        .args_json(json!({}))
+        .unwrap()
+        .transact()
+        .await
+        .unwrap()
+        .json::<u32>()
+        .unwrap();
+
+    assert_eq!(end_val, 0);
+}
+
+#[tokio::test]
+#[should_panic = "called `Result::unwrap()` on an `Err` value: Action #1: CompilationError(PrepareError(Deserialization))"]
+async fn upgrade_failure_blank_wasm() {
+    let Setup {
+        worker,
+        contract,
+        accounts,
+    } = setup(1, WASM).await;
+
+    let alice = &accounts[0];
+
+    alice
+        .call(&worker, contract.id(), "call_upgrade")
+        .max_gas()
+        .args(vec![])
+        .transact()
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+#[should_panic = "called `Result::unwrap()` on an `Err` value: Action #0: MethodResolveError(MethodNotFound)"]
+async fn upgrade_failure_no_upgrade() {
+    let Setup {
+        worker,
+        contract,
+        accounts,
+    } = setup(1, BAD_WASM).await;
+
+    let alice = &accounts[0];
+
+    alice
+        .call(&worker, contract.id(), "call_upgrade")
+        .max_gas()
+        .args(vec![])
+        .transact()
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+#[should_panic = "called `Result::unwrap()` on an `Err` value: Action #0: MethodResolveError(MethodNotFound)"]
+async fn upgrade_failure_random_wasm() {
+    let Setup {
+        worker,
+        contract,
+        accounts,
+    } = setup(1, RANDOM_WASM).await;
+
+    let alice = &accounts[0];
+
+    alice
+        .call(&worker, contract.id(), "call_upgrade")
+        .max_gas()
+        .args(vec![])
+        .transact()
+        .await
+        .unwrap();
 }

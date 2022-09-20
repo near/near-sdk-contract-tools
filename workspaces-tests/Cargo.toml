@@ -6,6 +6,9 @@ publish = false
 version = "0.1.0"
 
 [[bin]]
+name = "upgrade_bad"
+
+[[bin]]
 name = "upgrade_old"
 
 [[bin]]
