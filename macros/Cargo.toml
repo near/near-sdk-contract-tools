@@ -7,7 +7,7 @@ Macros for `near-contract-tools`
 edition = "2021"
 license = "GPL-3.0"
 name = "near-contract-tools-macros"
-version = "0.5.0"
+version = "0.6.0"
 
 [dependencies]
 base64 = "0.13.0"

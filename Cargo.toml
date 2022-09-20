@@ -9,10 +9,10 @@ edition = "2021"
 license = "GPL-3.0"
 name = "near-contract-tools"
 repository = "https://github.com/encody/near-contract-tools"
-version = "0.5.0"
+version = "0.6.0"
 
 [dependencies]
-near-contract-tools-macros = {version = "=0.5.0", path = "./macros"}
+near-contract-tools-macros = {version = "=0.6.0", path = "./macros"}
 near-sdk = "4.0.0"
 serde = "1.0.144"
 serde_json = "1.0.85"
