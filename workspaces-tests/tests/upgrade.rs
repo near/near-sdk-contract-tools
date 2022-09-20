@@ -184,3 +184,23 @@ async fn upgrade_failure_random_wasm() {
         .await
         .unwrap();
 }
+
+#[tokio::test]
+#[should_panic = "called `Result::unwrap()` on an `Err` value: Action #0: ExecutionError(\"Smart contract panicked: Owner only\")"]
+async fn upgrade_failure_not_owner() {
+    let Setup {
+        worker,
+        contract,
+        accounts,
+    } = setup(2, WASM).await;
+
+    let alice = &accounts[0];
+    let bob: &Account = &accounts[1];
+
+    bob.call(&worker, contract.id(), "upgrade_all")
+        .max_gas()
+        .args(vec![])
+        .transact()
+        .await
+        .unwrap();
+}
