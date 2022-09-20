@@ -1,12 +1,10 @@
 #![allow(missing_docs)]
 
-use near_contract_tools::{migrate::MigrateHook, Migrate};
+use near_contract_tools::{migrate::MigrateExternal, migrate::MigrateHook, Migrate};
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
     near_bindgen, PanicOnDefault,
 };
-
-use near_contract_tools::migrate::MigrateExternal;
 
 pub fn main() {}
 

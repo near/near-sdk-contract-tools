@@ -1,13 +1,16 @@
 #![allow(missing_docs)]
 
-use near_contract_tools::upgrade::upgrade as other_upgrade;
+use near_contract_tools::upgrade::{self, upgrade as other_upgrade, Upgrade, UpgradeHook};
+
+use near_contract_tools::{owner::Owner, owner::OwnerExternal, Owner};
+
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
-    near_bindgen, PanicOnDefault,
+    env, near_bindgen, PanicOnDefault,
 };
 pub fn main() {}
 
-#[derive(BorshSerialize, BorshDeserialize, PanicOnDefault)]
+#[derive(BorshSerialize, BorshDeserialize, PanicOnDefault, Owner)]
 #[near_bindgen]
 pub struct ContractOld {
     pub foo: u32,
@@ -17,7 +20,10 @@ pub struct ContractOld {
 impl ContractOld {
     #[init]
     pub fn new() -> Self {
-        Self { foo: 0 }
+        let mut contract = Self { foo: 0 };
+
+        Owner::init(&mut contract, &env::predecessor_account_id());
+        contract
     }
 
     pub fn increment_foo(&mut self) {
@@ -29,7 +35,16 @@ impl ContractOld {
     }
 }
 
-#[no_mangle]
-pub fn call_upgrade() {
-    other_upgrade::<ContractOld>();
+impl UpgradeHook for ContractOld {
+    fn on_upgrade() {
+        Self::require_owner();
+    }
+}
+
+impl Upgrade for ContractOld {
+    #[no_mangle]
+    fn upgrade_all() {
+        Self::require_owner();
+        other_upgrade::<ContractOld>();
+    }
 }

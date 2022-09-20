@@ -26,14 +26,23 @@ async fn setup(num_accounts: usize, wasm: &[u8]) -> Setup {
     let worker = workspaces::sandbox().await.unwrap();
 
     // Initialize contract
-    let contract = worker.dev_deploy(&wasm.to_vec()).await.unwrap();
-    contract.call(&worker, "new").transact().await.unwrap();
+    // let contract = worker.dev_deploy(&wasm.to_vec()).await.unwrap();
+    // contract.call(&worker, "new").transact().await.unwrap();
 
     // Initialize user accounts
     let mut accounts = vec![];
     for _ in 0..(num_accounts + 1) {
         accounts.push(worker.dev_create_account().await.unwrap());
     }
+
+    let alice = &accounts[0].clone();
+
+    let contract = alice
+        .deploy(&worker, &wasm.to_vec())
+        .await
+        .unwrap()
+        .unwrap();
+    contract.call(&worker, "new").transact().await.unwrap();
 
     Setup {
         worker,
@@ -76,7 +85,7 @@ async fn upgrade() {
     assert_eq!(val, 1);
 
     let request_id = alice
-        .call(&worker, contract.id(), "call_upgrade")
+        .call(&worker, contract.id(), "upgrade_all")
         .max_gas()
         .args(NEW_WASM.to_vec())
         .transact()
@@ -128,7 +137,7 @@ async fn upgrade_failure_blank_wasm() {
     let alice = &accounts[0];
 
     alice
-        .call(&worker, contract.id(), "call_upgrade")
+        .call(&worker, contract.id(), "upgrade_all")
         .max_gas()
         .args(vec![])
         .transact()
@@ -148,7 +157,7 @@ async fn upgrade_failure_no_upgrade() {
     let alice = &accounts[0];
 
     alice
-        .call(&worker, contract.id(), "call_upgrade")
+        .call(&worker, contract.id(), "upgrade_all")
         .max_gas()
         .args(vec![])
         .transact()
@@ -168,7 +177,7 @@ async fn upgrade_failure_random_wasm() {
     let alice = &accounts[0];
 
     alice
-        .call(&worker, contract.id(), "call_upgrade")
+        .call(&worker, contract.id(), "upgrade_all")
         .max_gas()
         .args(vec![])
         .transact()
