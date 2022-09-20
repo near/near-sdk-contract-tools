@@ -193,6 +193,26 @@ impl Nep141Hook for Contract {
 
 Note: Hooks can be disabled using `#[nep141(no_hooks)]` or `#[fungible_token(no_hooks)]`.
 
+### Custom Crates
+
+If you are a library developer, have modified a crate that one of the `near-contract-tools` macros uses (like `serde` or `near-sdk`), or are otherwise using a crate under a different name, you can specify crate names in macros like so:
+
+```rust, ignore
+#[event(
+    // ...
+    crate = "near_contract_tools",
+    macros = "near_contract_tools_macros",
+    serde = "serde",
+)]
+// ...
+
+#[derive(Owner)]
+#[owner(
+    // ...
+    near_sdk = "near_sdk",
+)]
+```
+
 ## Other Tips
 
 ### [Internal vs External Methods](https://youtu.be/kJzes_UP5j0?t=2172)

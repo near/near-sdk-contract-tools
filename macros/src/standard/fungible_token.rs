@@ -24,6 +24,12 @@ pub struct FungibleTokenMeta {
     // darling
     pub generics: syn::Generics,
     pub ident: syn::Ident,
+
+    // crates
+    #[darling(rename = "crate", default = "crate::default_crate_name")]
+    pub me: syn::Path,
+    #[darling(default = "crate::default_near_sdk")]
+    pub near_sdk: syn::Path,
 }
 
 pub fn expand(meta: FungibleTokenMeta) -> Result<TokenStream, darling::Error> {
@@ -41,6 +47,9 @@ pub fn expand(meta: FungibleTokenMeta) -> Result<TokenStream, darling::Error> {
 
         generics,
         ident,
+
+        me,
+        near_sdk,
     } = meta;
 
     let expand_nep141 = nep141::expand(nep141::Nep141Meta {
@@ -49,6 +58,9 @@ pub fn expand(meta: FungibleTokenMeta) -> Result<TokenStream, darling::Error> {
 
         generics: generics.clone(),
         ident: ident.clone(),
+
+        me: me.clone(),
+        near_sdk: near_sdk.clone(),
     });
 
     let expand_nep148 = nep148::expand(nep148::Nep148Meta {
@@ -62,6 +74,9 @@ pub fn expand(meta: FungibleTokenMeta) -> Result<TokenStream, darling::Error> {
 
         generics,
         ident,
+
+        me,
+        near_sdk,
     });
 
     let mut e = darling::Error::accumulator();

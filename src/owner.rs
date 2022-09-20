@@ -3,7 +3,7 @@
 
 use near_sdk::{env, ext_contract, require, AccountId};
 
-use crate::{event, near_contract_tools, slot::Slot, standard::nep297::Event};
+use crate::{event, slot::Slot, standard::nep297::Event};
 
 const ONLY_OWNER_FAIL_MESSAGE: &str = "Owner only";
 const OWNER_INIT_FAIL_MESSAGE: &str = "Owner already initialized";
@@ -12,7 +12,12 @@ const ONLY_PROPOSED_OWNER_FAIL_MESSAGE: &str = "Proposed owner only";
 const NO_PROPOSED_OWNER_FAIL_MESSAGE: &str = "No proposed owner";
 
 /// Events emitted by function calls on an ownable contract
-#[event(standard = "x-own", version = "1.0.0")]
+#[event(
+    standard = "x-own",
+    version = "1.0.0",
+    crate = "crate",
+    macros = "near_contract_tools_macros"
+)]
 pub enum OwnerEvent {
     /// Emitted when the current owner of the contract changes
     Transfer {
@@ -257,11 +262,8 @@ mod tests {
         Owner,
     };
 
-    mod near_contract_tools {
-        pub use crate::*;
-    }
-
     #[derive(Owner)]
+    #[owner(crate = "crate")]
     #[near_bindgen]
     struct Contract {}
 
