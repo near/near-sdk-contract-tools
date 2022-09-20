@@ -10,29 +10,15 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build-and-test:
+  check-formatting:
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - name: Build
-        run: cargo build --verbose
-      - name: Run unit and integration tests
-        run: cargo test --verbose
-      - name: Run workspaces tests
+      - name: Check formatting
         run: >
-          cd workspaces-tests;
-          cargo install cargo-make;
-          cargo make test;
+          echo "::echo::on";
+          cargo fmt -- --check;
   lint:
     runs-on: ubuntu-latest
 
@@ -49,12 +35,39 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - name: Run linter
         run: cargo clippy -- -D warnings
-  check-formatting:
+  test:
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v3
-      - name: Check formatting
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Run unit and integration tests
+        run: cargo test --verbose
+  workspaces-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Run workspaces tests
         run: >
-          echo "::echo::on";
-          cargo fmt -- --check;
+          cd workspaces-tests;
+          cargo install cargo-make;
+          rustup target add wasm32-unknown-unknown;
+          cargo make test;
