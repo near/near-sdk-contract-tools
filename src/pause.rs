@@ -1,24 +1,33 @@
 //! Contract method pausing/unpausing
 #![allow(missing_docs)] // #[ext_contract(...)] does not play nicely with clippy
 
-use crate::{event, slot::Slot, standard::nep297::Event};
+use crate::{slot::Slot, standard::nep297::Event};
 use near_sdk::{ext_contract, require};
 
 const UNPAUSED_FAIL_MESSAGE: &str = "Disallowed while contract is unpaused";
 const PAUSED_FAIL_MESSAGE: &str = "Disallowed while contract is paused";
 
 /// Events emitted when contract pause state is changed
-#[event(
-    standard = "x-paus",
-    version = "1.0.0",
-    crate = "crate",
-    macros = "near_contract_tools_macros"
-)]
-pub enum PauseEvent {
+pub mod event {
+    use crate::event;
+
     /// Emitted when the contract is paused
-    Pause,
+    #[event(
+        standard = "x-paus",
+        version = "1.0.0",
+        crate = "crate",
+        macros = "near_contract_tools_macros"
+    )]
+    pub struct Pause;
+
     /// Emitted when the contract is unpaused
-    Unpause,
+    #[event(
+        standard = "x-paus",
+        version = "1.0.0",
+        crate = "crate",
+        macros = "near_contract_tools_macros"
+    )]
+    pub struct Unpause;
 }
 
 /// Internal-only interactions for a pausable contract
@@ -79,7 +88,7 @@ pub trait Pause {
     fn pause(&mut self) {
         Self::require_unpaused();
         self.set_is_paused(true);
-        PauseEvent::Pause.emit();
+        event::Pause.emit();
     }
 
     /// Unpauses the contract if it is currently paused, panics otherwise.
@@ -87,7 +96,7 @@ pub trait Pause {
     fn unpause(&mut self) {
         Self::require_paused();
         self.set_is_paused(false);
-        PauseEvent::Unpause.emit();
+        event::Unpause.emit();
     }
 
     /// Rejects if the contract is unpaused

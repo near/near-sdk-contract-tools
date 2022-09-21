@@ -10,7 +10,7 @@ use near_sdk::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{event, slot::Slot, standard::nep297::Event};
+use crate::{slot::Slot, standard::nep297::*};
 
 /// Gas value required for ft_resolve_transfer calls
 pub const GAS_FOR_RESOLVE_TRANSFER: Gas = Gas(5_000_000_000_000);
@@ -20,49 +20,72 @@ pub const GAS_FOR_FT_TRANSFER_CALL: Gas = Gas(25_000_000_000_000 + GAS_FOR_RESOL
 const MORE_GAS_FAIL_MESSAGE: &str = "More gas is required";
 
 /// NEP-141 standard events for minting, burning, and transferring tokens
-#[event(
-    crate = "crate",
-    macros = "crate",
-    serde = "serde",
-    standard = "nep141",
-    version = "1.0.0"
-)]
-pub enum Nep141Event<'a> {
+pub mod event {
+    use near_sdk::{json_types::U128, AccountId};
+
+    use crate::event;
+
     /// Token mint event. Emitted when tokens are created and total_supply is
     /// increased.
-    FtMint {
+    #[event(
+        crate = "crate",
+        macros = "crate",
+        serde = "serde",
+        standard = "nep141",
+        version = "1.0.0",
+        batch
+    )]
+    pub struct FtMint<'a> {
         /// Address to which new tokens were minted
-        owner_id: &'a AccountId,
+        pub owner_id: &'a AccountId,
         /// Amount of minted tokens
-        amount: &'a U128,
+        pub amount: &'a U128,
         /// Optional note
         #[serde(skip_serializing_if = "Option::is_none")]
-        memo: Option<&'a str>,
-    },
+        pub memo: Option<&'a str>,
+    }
+
     /// Token transfer event. Emitted when tokens are transferred between two
     /// accounts. No change to total_supply.
-    FtTransfer {
+    #[event(
+        crate = "crate",
+        macros = "crate",
+        serde = "serde",
+        standard = "nep141",
+        version = "1.0.0",
+        batch
+    )]
+    pub struct FtTransfer<'a> {
         /// Account ID of the sender
-        old_owner_id: &'a AccountId,
+        pub old_owner_id: &'a AccountId,
         /// Account ID of the receiver
-        new_owner_id: &'a AccountId,
+        pub new_owner_id: &'a AccountId,
         /// Amount of transferred tokens
-        amount: &'a U128,
+        pub amount: &'a U128,
         /// Optional note
         #[serde(skip_serializing_if = "Option::is_none")]
-        memo: Option<&'a str>,
-    },
+        pub memo: Option<&'a str>,
+    }
+
     /// Token burn event. Emitted when tokens are burned (removed from supply).
     /// Decrease in total_supply.
-    FtBurn {
+    #[event(
+        crate = "crate",
+        macros = "crate",
+        serde = "serde",
+        standard = "nep141",
+        version = "1.0.0",
+        batch
+    )]
+    pub struct FtBurn<'a> {
         /// Account ID from which tokens were burned
-        owner_id: &'a AccountId,
+        pub owner_id: &'a AccountId,
         /// Amount of burned tokens
-        amount: &'a U128,
+        pub amount: &'a U128,
         /// Optional note
         #[serde(skip_serializing_if = "Option::is_none")]
-        memo: Option<&'a str>,
-    },
+        pub memo: Option<&'a str>,
+    }
 }
 
 #[derive(BorshSerialize, BorshStorageKey)]
@@ -233,12 +256,12 @@ pub trait Nep141Controller {
     ) {
         self.transfer_unchecked(sender_account_id, receiver_account_id, amount);
 
-        Nep141Event::FtTransfer {
+        [event::FtTransfer {
             old_owner_id: sender_account_id,
             new_owner_id: receiver_account_id,
             amount: &amount.into(),
             memo,
-        }
+        }]
         .emit();
     }
 
@@ -250,11 +273,11 @@ pub trait Nep141Controller {
     fn mint(&mut self, account_id: &AccountId, amount: u128, memo: Option<&str>) {
         self.deposit_unchecked(account_id, amount);
 
-        Nep141Event::FtMint {
+        [event::FtMint {
             owner_id: account_id,
             amount: &amount.into(),
             memo,
-        }
+        }]
         .emit();
     }
 
@@ -266,11 +289,11 @@ pub trait Nep141Controller {
     fn burn(&mut self, account_id: &AccountId, amount: u128, memo: Option<&str>) {
         self.withdraw_unchecked(account_id, amount);
 
-        Nep141Event::FtBurn {
+        [event::FtBurn {
             owner_id: account_id,
             amount: &amount.into(),
             memo,
-        }
+        }]
         .emit();
     }
 
