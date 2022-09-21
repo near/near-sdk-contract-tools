@@ -38,12 +38,15 @@ use near_sdk::serde::Serialize;
 ///
 /// [BatchableEvent("one"), BatchableEvent("two")].emit();
 /// ```
-pub trait Event<T: Serialize + ?Sized> {
+pub trait Event<T: ?Sized> {
     /// Retrieves the event log before serialization
     fn event_log(&self) -> EventLog<&T>;
 
     /// Converts the event into an NEP-297 event-formatted string
-    fn to_event_string(&self) -> String {
+    fn to_event_string(&self) -> String
+    where
+        T: Serialize,
+    {
         format!(
             "EVENT_JSON:{}",
             serde_json::to_string(&self.event_log()).unwrap_or_else(|_| near_sdk::env::abort()),
@@ -51,7 +54,10 @@ pub trait Event<T: Serialize + ?Sized> {
     }
 
     /// Emits the event string to the blockchain
-    fn emit(&self) {
+    fn emit(&self)
+    where
+        T: Serialize,
+    {
         near_sdk::env::log_str(&self.to_event_string());
     }
 }
