@@ -9,7 +9,6 @@ use near_sdk::{
 pub fn main() {}
 
 #[derive(BorshSerialize, BorshDeserialize, PanicOnDefault)]
-#[near_bindgen]
 pub struct ContractOld {
     pub foo: u32,
 }
