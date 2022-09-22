@@ -3,7 +3,7 @@
 // Ignore
 pub fn main() {}
 
-use near_contract_tools::FungibleToken;
+use near_contract_tools::{standard::nep141::*, FungibleToken};
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
     env,

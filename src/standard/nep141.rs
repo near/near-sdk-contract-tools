@@ -10,7 +10,7 @@ use near_sdk::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{event, slot::Slot, standard::nep297::Event};
+use crate::{slot::Slot, standard::nep297::*};
 
 /// Gas value required for ft_resolve_transfer calls
 pub const GAS_FOR_RESOLVE_TRANSFER: Gas = Gas(5_000_000_000_000);
@@ -20,49 +20,132 @@ pub const GAS_FOR_FT_TRANSFER_CALL: Gas = Gas(25_000_000_000_000 + GAS_FOR_RESOL
 const MORE_GAS_FAIL_MESSAGE: &str = "More gas is required";
 
 /// NEP-141 standard events for minting, burning, and transferring tokens
-#[event(
-    crate = "crate",
-    macros = "crate",
-    serde = "serde",
-    standard = "nep141",
-    version = "1.0.0"
-)]
-pub enum Nep141Event<'a> {
+pub mod event {
+    use near_sdk::{json_types::U128, AccountId};
+    use serde::Serialize;
+
+    use crate::event;
+
     /// Token mint event. Emitted when tokens are created and total_supply is
     /// increased.
-    FtMint {
+    #[event(
+        crate = "crate",
+        macros = "crate",
+        serde = "serde",
+        standard = "nep141",
+        version = "1.0.0"
+    )]
+    pub struct FtMint<'a>(pub &'a [FtMintData<'a>]);
+
+    #[derive(Serialize, Debug, Clone)]
+    pub struct FtMintData<'a> {
         /// Address to which new tokens were minted
-        owner_id: &'a AccountId,
+        pub owner_id: &'a AccountId,
         /// Amount of minted tokens
-        amount: &'a U128,
+        pub amount: U128,
         /// Optional note
         #[serde(skip_serializing_if = "Option::is_none")]
-        memo: Option<&'a str>,
-    },
+        pub memo: Option<&'a str>,
+    }
+
     /// Token transfer event. Emitted when tokens are transferred between two
     /// accounts. No change to total_supply.
-    FtTransfer {
+    #[event(
+        crate = "crate",
+        macros = "crate",
+        serde = "serde",
+        standard = "nep141",
+        version = "1.0.0"
+    )]
+    pub struct FtTransfer<'a>(pub &'a [FtTransferData<'a>]);
+
+    #[derive(Serialize, Debug, Clone)]
+    pub struct FtTransferData<'a> {
         /// Account ID of the sender
-        old_owner_id: &'a AccountId,
+        pub old_owner_id: &'a AccountId,
         /// Account ID of the receiver
-        new_owner_id: &'a AccountId,
+        pub new_owner_id: &'a AccountId,
         /// Amount of transferred tokens
-        amount: &'a U128,
+        pub amount: U128,
         /// Optional note
         #[serde(skip_serializing_if = "Option::is_none")]
-        memo: Option<&'a str>,
-    },
+        pub memo: Option<&'a str>,
+    }
+
     /// Token burn event. Emitted when tokens are burned (removed from supply).
     /// Decrease in total_supply.
-    FtBurn {
+    #[event(
+        crate = "crate",
+        macros = "crate",
+        serde = "serde",
+        standard = "nep141",
+        version = "1.0.0"
+    )]
+    pub struct FtBurn<'a>(pub &'a [FtBurnData<'a>]);
+
+    #[derive(Serialize, Debug, Clone)]
+    pub struct FtBurnData<'a> {
         /// Account ID from which tokens were burned
-        owner_id: &'a AccountId,
+        pub owner_id: &'a AccountId,
         /// Amount of burned tokens
-        amount: &'a U128,
+        pub amount: U128,
         /// Optional note
         #[serde(skip_serializing_if = "Option::is_none")]
-        memo: Option<&'a str>,
-    },
+        pub memo: Option<&'a str>,
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::{super::Event, *};
+
+        #[test]
+        fn mint() {
+            assert_eq!(
+                FtMint(&[FtMintData {
+                    owner_id: &"foundation.near".parse().unwrap(),
+                    amount: 500u128.into(),
+                    memo: None,
+                }])
+                .to_event_string(),
+                r#"EVENT_JSON:{"standard":"nep141","version":"1.0.0","event":"ft_mint","data":[{"owner_id":"foundation.near","amount":"500"}]}"#,
+            );
+        }
+
+        #[test]
+        fn transfer() {
+            assert_eq!(
+                FtTransfer(&[
+                    FtTransferData {
+                        old_owner_id: &"from.near".parse().unwrap(),
+                        new_owner_id: &"to.near".parse().unwrap(),
+                        amount: 42u128.into(),
+                        memo: Some("hi hello bonjour"),
+                    },
+                    FtTransferData {
+                        old_owner_id: &"user1.near".parse().unwrap(),
+                        new_owner_id: &"user2.near".parse().unwrap(),
+                        amount: 7500u128.into(),
+                        memo: None
+                    },
+                ])
+                .to_event_string(),
+                r#"EVENT_JSON:{"standard":"nep141","version":"1.0.0","event":"ft_transfer","data":[{"old_owner_id":"from.near","new_owner_id":"to.near","amount":"42","memo":"hi hello bonjour"},{"old_owner_id":"user1.near","new_owner_id":"user2.near","amount":"7500"}]}"#,
+            );
+        }
+
+        #[test]
+        fn burn() {
+            assert_eq!(
+                FtBurn(&[FtBurnData {
+                    owner_id: &"foundation.near".parse().unwrap(),
+                    amount: 100u128.into(),
+                    memo: None,
+                }])
+                .to_event_string(),
+                r#"EVENT_JSON:{"standard":"nep141","version":"1.0.0","event":"ft_burn","data":[{"owner_id":"foundation.near","amount":"100"}]}"#,
+            );
+        }
+    }
 }
 
 #[derive(BorshSerialize, BorshStorageKey)]
@@ -233,12 +316,12 @@ pub trait Nep141Controller {
     ) {
         self.transfer_unchecked(sender_account_id, receiver_account_id, amount);
 
-        Nep141Event::FtTransfer {
+        event::FtTransfer(&[event::FtTransferData {
             old_owner_id: sender_account_id,
             new_owner_id: receiver_account_id,
-            amount: &amount.into(),
+            amount: amount.into(),
             memo,
-        }
+        }])
         .emit();
     }
 
@@ -250,11 +333,11 @@ pub trait Nep141Controller {
     fn mint(&mut self, account_id: &AccountId, amount: u128, memo: Option<&str>) {
         self.deposit_unchecked(account_id, amount);
 
-        Nep141Event::FtMint {
+        event::FtMint(&[event::FtMintData {
             owner_id: account_id,
-            amount: &amount.into(),
+            amount: amount.into(),
             memo,
-        }
+        }])
         .emit();
     }
 
@@ -266,11 +349,11 @@ pub trait Nep141Controller {
     fn burn(&mut self, account_id: &AccountId, amount: u128, memo: Option<&str>) {
         self.withdraw_unchecked(account_id, amount);
 
-        Nep141Event::FtBurn {
+        event::FtBurn(&[event::FtBurnData {
             owner_id: account_id,
-            amount: &amount.into(),
+            amount: amount.into(),
             memo,
-        }
+        }])
         .emit();
     }
 

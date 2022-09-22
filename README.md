@@ -2,8 +2,6 @@
 
 > Helpful functions and macros for developing smart contracts on NEAR Protocol.
 
-See https://docs.rs/near-contract-tools/latest/near_contract_tools/ for more docs.
-
 This package is a collection of common tools and patterns in NEAR smart contract development:
 
 - Storage fee management
@@ -122,26 +120,21 @@ fn own_accept_owner(&mut self);
 ### Events
 
 ```rust
-use serde::Serialize;
 use near_contract_tools::{event, standard::nep297::Event};
 
-#[derive(Serialize)]
-pub struct Nep171NftMintData {
+#[event(standard = "nft", version = "1.0.0")]
+pub struct MintEvent {
     pub owner_id: String,
-    pub token_ids: Vec<String>,
+    pub token_id: String,
 }
 
-#[event(standard = "nep171", version = "1.0.0")]
-pub enum Nep171 {
-    NftMint(Vec<Nep171NftMintData>),
-}
+let e = MintEvent {
+    owner_id: "account".to_string(),
+    token_id: "token_1".to_string(),
+};
 
-let my_event = Nep171::NftMint(vec![Nep171NftMintData {
-    owner_id: "owner".to_string(),
-    token_ids: vec!["token_1".to_string(), "token_2".to_string()],
-}]);
-
-my_event.emit(); // Emits event to the blockchain
+// Emits the event to the blockchain
+e.emit();
 ```
 
 ### Fungible Token
