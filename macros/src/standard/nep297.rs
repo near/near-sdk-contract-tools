@@ -1,4 +1,4 @@
-use darling::{util::Flag, FromDeriveInput, FromVariant};
+use darling::{FromDeriveInput, FromVariant};
 use proc_macro2::TokenStream;
 use quote::quote;
 
@@ -11,8 +11,6 @@ pub struct Nep297Meta {
     pub version: String,
     pub name: Option<String>,
     pub rename: Option<RenameStrategy>,
-    pub batch: Flag,
-
     pub ident: syn::Ident,
     pub generics: syn::Generics,
     pub data: darling::ast::Data<EventVariantReceiver, ()>,
@@ -37,7 +35,6 @@ pub fn expand(meta: Nep297Meta) -> Result<TokenStream, darling::Error> {
         version,
         name,
         rename,
-        batch,
         ident: type_name,
         generics,
         data,
@@ -62,32 +59,14 @@ pub fn expand(meta: Nep297Meta) -> Result<TokenStream, darling::Error> {
         _ => unreachable!(),
     };
 
-    Ok(if batch.is_present() {
-        quote! {
-            impl #imp #me::standard::nep297::BatchEvent for #type_name #ty #wher {
-                fn standard() -> &'static str {
-                    #standard
-                }
-
-                fn version() -> &'static str {
-                    #version
-                }
-
-                fn event() -> &'static str {
-                    #event
-                }
-            }
-        }
-    } else {
-        quote! {
-            impl #imp #me::standard::nep297::Event<#type_name #ty> for #type_name #ty #wher {
-                fn event_log<'geld>(&'geld self) -> #me::standard::nep297::EventLog<&'geld Self> {
-                    #me::standard::nep297::EventLog {
-                        standard: #standard,
-                        version: #version,
-                        event: #event,
-                        data: self,
-                    }
+    Ok(quote! {
+        impl #imp #me::standard::nep297::Event<#type_name #ty> for #type_name #ty #wher {
+            fn event_log<'geld>(&'geld self) -> #me::standard::nep297::EventLog<&'geld Self> {
+                #me::standard::nep297::EventLog {
+                    standard: #standard,
+                    version: #version,
+                    event: #event,
+                    data: self,
                 }
             }
         }

@@ -47,13 +47,7 @@ where
 ///
 /// Specify event standard parameters: `#[nep297(standard = "...", version = "...")]`
 ///
-/// Optional: `#[nep297(name = "..."), batch]`
-///
-/// The `batch` flag means that events will always be emitted as a homogenous array:
-///
-/// ```ignore
-/// [MyBatchableEvent("one"), MyBatchableEvent("two")].emit();
-/// ```
+/// Optional: `#[nep297(name = "...")]`
 ///
 /// Rename strategy for all variants (default: unchanged): `#[event(rename = "<strategy>")]`
 /// Options for `<strategy>`:

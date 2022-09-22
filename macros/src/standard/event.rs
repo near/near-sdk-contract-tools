@@ -1,4 +1,4 @@
-use darling::{util::Flag, FromMeta};
+use darling::FromMeta;
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::Item;
@@ -11,7 +11,6 @@ pub struct EventAttributeMeta {
     pub version: String,
     pub rename: Option<RenameStrategy>,
     pub name: Option<String>,
-    pub batch: Flag,
 
     #[darling(rename = "crate", default = "crate::default_crate_name")]
     pub me: syn::Path,
@@ -30,7 +29,6 @@ pub fn event_attribute(
         version,
         rename,
         name,
-        batch,
         serde,
         me,
         macros,
@@ -42,11 +40,9 @@ pub fn event_attribute(
     let serde_str = quote! { #serde }.to_string();
     let me_str = quote! { #me }.to_string();
 
-    let batch = batch.is_present().then_some(quote! {, batch});
-
     Ok(quote::quote! {
         #[derive(#macros::Nep297, #serde::Serialize)]
-        #[nep297(standard = #standard, version = #version, rename = #rename, crate = #me_str #name #batch)]
+        #[nep297(standard = #standard, version = #version, rename = #rename, crate = #me_str #name)]
         #[serde(crate = #serde_str)]
         #item
     })

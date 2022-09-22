@@ -124,18 +124,15 @@ fn own_accept_owner(&mut self);
 ```rust
 use near_contract_tools::{event, standard::nep297::Event};
 
-#[event(standard = "nep171", version = "1.0.0")]
+#[event(standard = "nft", version = "1.0.0")]
 pub struct MintEvent {
     pub owner_id: String,
-    pub token_ids: Vec<String>,
+    pub token_id: String,
 }
 
 let e = MintEvent {
     owner_id: "account".to_string(),
-    token_ids: vec![
-        "t1".to_string(),
-        "t2".to_string(),
-    ],
+    token_id: "token_1".to_string(),
 };
 
 // Emits the event to the blockchain
