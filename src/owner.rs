@@ -3,7 +3,7 @@
 
 use near_sdk::{env, ext_contract, require, AccountId};
 
-use crate::{event, slot::Slot, standard::nep297::Event};
+use crate::{slot::Slot, standard::nep297::Event};
 
 const ONLY_OWNER_FAIL_MESSAGE: &str = "Owner only";
 const OWNER_INIT_FAIL_MESSAGE: &str = "Owner already initialized";
@@ -12,27 +12,36 @@ const ONLY_PROPOSED_OWNER_FAIL_MESSAGE: &str = "Proposed owner only";
 const NO_PROPOSED_OWNER_FAIL_MESSAGE: &str = "No proposed owner";
 
 /// Events emitted by function calls on an ownable contract
-#[event(
-    standard = "x-own",
-    version = "1.0.0",
-    crate = "crate",
-    macros = "near_contract_tools_macros"
-)]
-pub enum OwnerEvent {
+pub mod event {
+    use near_sdk::AccountId;
+
+    use crate::event;
     /// Emitted when the current owner of the contract changes
-    Transfer {
+    #[event(
+        standard = "x-own",
+        version = "1.0.0",
+        crate = "crate",
+        macros = "near_contract_tools_macros"
+    )]
+    pub struct Transfer {
         /// Former owner of the contract. Will be `None` if the contract is being initialized.
-        old: Option<AccountId>,
+        pub old: Option<AccountId>,
         /// The new owner of the contract. Will be `None` if ownership is renounced.
-        new: Option<AccountId>,
-    },
+        pub new: Option<AccountId>,
+    }
     /// Emitted when the proposed owner of the contract changes
-    Propose {
+    #[event(
+        standard = "x-own",
+        version = "1.0.0",
+        crate = "crate",
+        macros = "near_contract_tools_macros"
+    )]
+    pub struct Propose {
         /// Old proposed owner.
-        old: Option<AccountId>,
+        pub old: Option<AccountId>,
         /// New proposed owner.
-        new: Option<AccountId>,
-    },
+        pub new: Option<AccountId>,
+    }
 }
 
 /// A contract with an owner
@@ -60,7 +69,7 @@ pub trait Owner {
         let owner = Self::slot_owner();
         let old = owner.read();
         if old != new {
-            OwnerEvent::Transfer {
+            event::Transfer {
                 old,
                 new: new.clone(),
             }
@@ -74,7 +83,7 @@ pub trait Owner {
         let proposed_owner = Self::slot_proposed_owner();
         let old = proposed_owner.read();
         if old != new {
-            OwnerEvent::Propose {
+            event::Propose {
                 old,
                 new: new.clone(),
             }
@@ -141,7 +150,7 @@ pub trait Owner {
         Self::slot_is_initialized().write(&true);
         Self::slot_owner().write(owner_id);
 
-        OwnerEvent::Transfer {
+        event::Transfer {
             old: None,
             new: Some(owner_id.clone()),
         }
@@ -219,7 +228,7 @@ pub trait Owner {
             ONLY_PROPOSED_OWNER_FAIL_MESSAGE,
         );
 
-        OwnerEvent::Propose {
+        event::Propose {
             old: Some(proposed_owner.clone()),
             new: None,
         }

@@ -51,15 +51,11 @@ pub fn expand(meta: Nep141Meta) -> Result<TokenStream, darling::Error> {
     });
 
     Ok(quote! {
-        use #me::standard::nep141::Nep141Controller;
-
         impl #imp #me::standard::nep141::Nep141Controller for #ident #ty #wher {
             fn root() -> #me::slot::Slot<()> {
                 #me::slot::Slot::root(#storage_key)
             }
         }
-
-        use #me::standard::nep141::Nep141;
 
         #[#near_sdk::near_bindgen]
         impl #imp #me::standard::nep141::Nep141 for #ident #ty #wher {
@@ -72,7 +68,7 @@ pub fn expand(meta: Nep141Meta) -> Result<TokenStream, darling::Error> {
             ) {
                 use #me::{
                     standard::{
-                        nep141::{Nep141Controller, Nep141Event},
+                        nep141::{Nep141Controller, event},
                         nep297::Event,
                     },
                 };
@@ -141,8 +137,6 @@ pub fn expand(meta: Nep141Meta) -> Result<TokenStream, darling::Error> {
                 <Self as #me::standard::nep141::Nep141Controller>::balance_of(&account_id).into()
             }
         }
-
-        use #me::standard::nep141::Nep141Resolver;
 
         #[#near_sdk::near_bindgen]
         impl #imp #me::standard::nep141::Nep141Resolver for #ident #ty #wher {

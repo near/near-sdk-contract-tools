@@ -1,4 +1,3 @@
-//! Helpful functions and macros for developing smart contracts on NEAR Protocol.
 #![doc = include_str!("../README.md")]
 
 pub mod standard;

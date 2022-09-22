@@ -1,32 +1,36 @@
-use near_contract_tools::{standard::nep297::*, Nep297};
-use serde::Serialize;
+use near_contract_tools::standard::nep297::Event;
 
-#[derive(Serialize)]
-pub struct Nep171NftMintData {
-    pub owner_id: String,
-    pub token_ids: Vec<String>,
-}
+use crate::macros::event::test_events::Nep171NftMintData;
 
-#[derive(Nep297, Serialize)]
-// Required fields
-#[nep297(standard = "nep171", version = "1.0.0")]
-// Optional. Default event name is the untransformed variant name, e.g. NftMint, AnotherEvent, CustomEvent
-#[nep297(rename_all = "snake_case")]
-// Variant name will not appear in the serialized output
-#[serde(untagged)]
-pub enum Nep171 {
-    NftMint(Vec<Nep171NftMintData>), // Name will be "nft_mint" because rename_all = snake_case
+mod test_events {
+    use near_contract_tools::Nep297;
+    use serde::Serialize;
 
-    #[nep297(name = "sneaky_event")]
-    AnotherEvent, // Name will be "sneaky_event"
+    #[derive(Serialize)]
+    pub struct Nep171NftMintData {
+        pub owner_id: String,
+        pub token_ids: Vec<String>,
+    }
 
-    #[nep297(rename = "SHOUTY-KEBAB-CASE")]
-    CustomEvent, // Name will be "CUSTOM-EVENT"
+    #[derive(Nep297, Serialize)]
+    // Required fields
+    #[nep297(standard = "nep171", version = "1.0.0")]
+    // Optional. Default event name is the untransformed variant name, e.g. NftMint, AnotherEvent, CustomEvent
+    #[nep297(rename = "snake_case")]
+    pub struct NftMint(pub Vec<Nep171NftMintData>); // Name will be "nft_mint" because rename = snake_case
+
+    #[derive(Nep297, Serialize)]
+    #[nep297(standard = "nep171", version = "1.0.0", name = "sneaky_event")]
+    pub struct AnotherEvent; // Name will be "sneaky_event"
+
+    #[derive(Nep297, Serialize)]
+    #[nep297(standard = "nep171", version = "1.0.0", rename = "SHOUTY-KEBAB-CASE")]
+    pub struct CustomEvent; // Name will be "CUSTOM-EVENT"
 }
 
 #[test]
 fn derive_event() {
-    let e = Nep171::NftMint(vec![Nep171NftMintData {
+    let e = test_events::NftMint(vec![Nep171NftMintData {
         owner_id: "owner".to_string(),
         token_ids: vec!["token_1".to_string(), "token_2".to_string()],
     }]);
@@ -36,28 +40,33 @@ fn derive_event() {
         r#"EVENT_JSON:{"standard":"nep171","version":"1.0.0","event":"nft_mint","data":[{"owner_id":"owner","token_ids":["token_1","token_2"]}]}"#
     );
 
-    assert_eq!(Nep171::AnotherEvent.event(), "sneaky_event");
+    assert_eq!(test_events::AnotherEvent.event_log().event, "sneaky_event");
 
-    assert_eq!(Nep171::CustomEvent.event(), "CUSTOM-EVENT");
+    assert_eq!(test_events::CustomEvent.event_log().event, "CUSTOM-EVENT");
 }
 
 mod event_attribute_macro {
-    use near_contract_tools::{event, standard::nep297::Event};
+    use near_contract_tools::standard::nep297::Event;
 
-    #[event(standard = "my_event_standard", version = "1")]
-    #[allow(unused)]
-    enum MyEvent {
-        One,
-        ThreePointFive { foo: &'static str },
-        Six,
+    mod my_event {
+        use near_contract_tools::event;
+
+        #[event(standard = "my_event_standard", version = "1")]
+        pub struct One;
+        #[event(standard = "my_event_standard", version = "1")]
+        pub struct ThreePointFive {
+            pub foo: &'static str,
+        }
+        #[event(standard = "my_event_standard", version = "1")]
+        pub struct Six;
     }
 
     #[test]
     fn test() {
-        let e = MyEvent::ThreePointFive { foo: "hello" };
+        let e = my_event::ThreePointFive { foo: "hello" };
         e.emit();
         assert_eq!(
-            e.to_string(),
+            e.to_event_string(),
             r#"EVENT_JSON:{"standard":"my_event_standard","version":"1","event":"three_point_five","data":{"foo":"hello"}}"#,
         );
     }
