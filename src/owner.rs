@@ -23,6 +23,7 @@ pub mod event {
         crate = "crate",
         macros = "near_contract_tools_macros"
     )]
+    #[derive(Debug, Clone)]
     pub struct Transfer {
         /// Former owner of the contract. Will be `None` if the contract is being initialized.
         pub old: Option<AccountId>,
@@ -36,6 +37,7 @@ pub mod event {
         crate = "crate",
         macros = "near_contract_tools_macros"
     )]
+    #[derive(Debug, Clone)]
     pub struct Propose {
         /// Old proposed owner.
         pub old: Option<AccountId>,

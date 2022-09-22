@@ -35,8 +35,10 @@ pub mod event {
         standard = "nep141",
         version = "1.0.0"
     )]
+    #[derive(Debug, Clone)]
     pub struct FtMint<'a>(pub &'a [FtMintData<'a>]);
 
+    /// Individual mint metadata
     #[derive(Serialize, Debug, Clone)]
     pub struct FtMintData<'a> {
         /// Address to which new tokens were minted
@@ -57,8 +59,10 @@ pub mod event {
         standard = "nep141",
         version = "1.0.0"
     )]
+    #[derive(Debug, Clone)]
     pub struct FtTransfer<'a>(pub &'a [FtTransferData<'a>]);
 
+    /// Individual transfer metadata
     #[derive(Serialize, Debug, Clone)]
     pub struct FtTransferData<'a> {
         /// Account ID of the sender
@@ -81,8 +85,10 @@ pub mod event {
         standard = "nep141",
         version = "1.0.0"
     )]
+    #[derive(Debug, Clone)]
     pub struct FtBurn<'a>(pub &'a [FtBurnData<'a>]);
 
+    /// Individual burn metadata
     #[derive(Serialize, Debug, Clone)]
     pub struct FtBurnData<'a> {
         /// Account ID from which tokens were burned
