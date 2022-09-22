@@ -1,6 +1,5 @@
 #![cfg(not(windows))]
 
-use near_contract_tools::approval::native_transaction_action::PromiseAction;
 use near_sdk::{serde_json::json, Gas};
 use workspaces::{network::Sandbox, prelude::*, Account, Contract, Worker};
 
@@ -24,10 +23,6 @@ struct Setup {
 /// Setup for individual tests
 async fn setup(num_accounts: usize, wasm: &[u8]) -> Setup {
     let worker = workspaces::sandbox().await.unwrap();
-
-    // Initialize contract
-    // let contract = worker.dev_deploy(&wasm.to_vec()).await.unwrap();
-    // contract.call(&worker, "new").transact().await.unwrap();
 
     // Initialize user accounts
     let mut accounts = vec![];
@@ -58,11 +53,9 @@ async fn upgrade() {
         worker,
         contract,
         accounts,
-    } = setup(3, WASM).await;
+    } = setup(1, WASM).await;
 
     let alice = &accounts[0];
-    let bob = &accounts[1];
-    let charlie = &accounts[2];
 
     alice
         .call(&worker, contract.id(), "increment_foo")
@@ -84,7 +77,7 @@ async fn upgrade() {
 
     assert_eq!(val, 1);
 
-    let request_id = alice
+    alice
         .call(&worker, contract.id(), "upgrade_all")
         .max_gas()
         .args(NEW_WASM.to_vec())
@@ -139,7 +132,6 @@ async fn upgrade_failure_blank_wasm() {
     alice
         .call(&worker, contract.id(), "upgrade_all")
         .max_gas()
-        .args(vec![])
         .transact()
         .await
         .unwrap();
@@ -199,7 +191,6 @@ async fn upgrade_failure_not_owner() {
 
     bob.call(&worker, contract.id(), "upgrade_all")
         .max_gas()
-        .args(vec![])
         .transact()
         .await
         .unwrap();

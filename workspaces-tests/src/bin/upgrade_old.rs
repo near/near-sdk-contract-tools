@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
 
-use near_contract_tools::upgrade::{self, upgrade as other_upgrade, Upgrade, UpgradeHook};
+use near_contract_tools::upgrade::{upgrade as other_upgrade, Upgrade, UpgradeHook};
 
 use near_contract_tools::{owner::Owner, owner::OwnerExternal, Owner};
 
