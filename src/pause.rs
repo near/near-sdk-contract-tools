@@ -18,6 +18,7 @@ pub mod event {
         crate = "crate",
         macros = "near_contract_tools_macros"
     )]
+    #[derive(Debug, Clone)]
     pub struct Pause;
 
     /// Emitted when the contract is unpaused
@@ -27,6 +28,7 @@ pub mod event {
         crate = "crate",
         macros = "near_contract_tools_macros"
     )]
+    #[derive(Debug, Clone)]
     pub struct Unpause;
 }
 
