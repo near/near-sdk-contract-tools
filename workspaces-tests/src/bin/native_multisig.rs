@@ -16,8 +16,10 @@ use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
     env, near_bindgen, AccountId, BorshStorageKey, PanicOnDefault, Promise,
 };
+use std::string::ToString;
+use strum_macros::Display;
 
-#[derive(Clone, Debug, BorshSerialize, BorshStorageKey)]
+#[derive(Display, Clone, Debug, BorshSerialize, BorshStorageKey)]
 pub enum Role {
     Multisig,
 }

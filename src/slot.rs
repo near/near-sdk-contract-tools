@@ -3,8 +3,9 @@
 //! Makes it easier to avoid storing storage keys in storage itself, helping to
 //! reduce IO in a transaction and save on gas.
 
-use std::marker::PhantomData;
+use core::marker::PhantomData;
 
+use alloc::vec::Vec;
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
     env, IntoStorageKey,

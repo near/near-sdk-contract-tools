@@ -5,7 +5,7 @@ use near_sdk::{
     env, require, AccountId, BorshStorageKey,
 };
 use serde::{Deserialize, Serialize};
-use thiserror::Error;
+use snafu::{Error, Snafu};
 
 use crate::slot::Slot;
 
@@ -29,13 +29,13 @@ pub trait Action<Cont: ?Sized> {
 /// approvals
 pub trait ApprovalConfiguration<A, S> {
     /// Errors when approving a request
-    type ApprovalError;
+    type ApprovalError: Error;
     /// Errors when removing a request
-    type RemovalError;
+    type RemovalError: Error;
     /// Errors when authorizing an account
-    type AuthorizationError;
+    type AuthorizationError: Error;
     /// Errors when evaluating a request for execution candidacy
-    type ExecutionEligibilityError;
+    type ExecutionEligibilityError: Error;
 
     /// Has the request reached full approval?
     fn is_approved_for_execution(
@@ -80,49 +80,75 @@ enum ApprovalStorageKey {
 }
 
 /// The account is ineligile to perform an action for some reason
-#[derive(Error, Clone, Debug)]
-#[error("Unauthorized account: '{0}' for {1}")]
-pub struct UnauthorizedAccountError<AuthErr>(AccountId, AuthErr);
+#[derive(Snafu, Clone, Debug)]
+#[snafu(display("Unauthorized account: '{account_id}'"))]
+pub struct UnauthorizedAccountError<AuthErr: Error + 'static> {
+    /// This account ID is unauthorized
+    pub account_id: AccountId,
+    /// Error source
+    pub source: AuthErr,
+}
 
 /// Top-level errors that may occur when attempting to approve a request
-#[derive(Error, Clone, Debug)]
-pub enum ApprovalError<AuthErr, AppErr> {
+#[derive(Snafu, Clone, Debug)]
+pub enum ApprovalError<AuthErr: Error + 'static, AppErr: Error + 'static> {
     /// The account is not allowed to act on requests
-    #[error(transparent)]
-    UnauthorizedAccount(#[from] UnauthorizedAccountError<AuthErr>),
+    #[snafu(context(false))]
+    UnauthorizedAccount {
+        /// Error source
+        source: UnauthorizedAccountError<AuthErr>,
+    },
     /// The approval function encountered another error
-    #[error("Approval error: {0}")]
-    ApprovalError(AppErr),
+    #[snafu(display("Approval error"))]
+    ApprovalError {
+        /// Error source
+        source: AppErr,
+    },
 }
 
 /// Errors that may occur when trying to execute a request
-#[derive(Error, Clone, Debug)]
-pub enum ExecutionError<AuthErr, ExecErr> {
+#[derive(Snafu, Clone, Debug)]
+pub enum ExecutionError<AuthErr: Error + 'static, ExecErr: Error + 'static> {
     /// The account is not allowed to act on requests
-    #[error(transparent)]
-    UnauthorizedAccount(#[from] UnauthorizedAccountError<AuthErr>),
+    #[snafu(context(false))]
+    UnauthorizedAccount {
+        /// Error source
+        source: UnauthorizedAccountError<AuthErr>,
+    },
     /// Unapproved requests cannot be executed
-    #[error("Request not approved: {0}")]
-    ExecutionEligibility(ExecErr),
+    #[snafu(display("Request not approved"))]
+    ExecutionEligibility {
+        /// Error source
+        source: ExecErr,
+    },
 }
 
 /// Errors that may occur when trying to create a request
-#[derive(Error, Clone, Debug)]
-pub enum CreationError<AuthErr> {
+#[derive(Snafu, Clone, Debug)]
+pub enum CreationError<AuthErr: Error + 'static> {
     /// The account is not allowed to act on requests
-    #[error(transparent)]
-    UnauthorizedAccount(#[from] UnauthorizedAccountError<AuthErr>),
+    #[snafu(context(false))]
+    UnauthorizedAccount {
+        /// Error source
+        source: UnauthorizedAccountError<AuthErr>,
+    },
 }
 
 /// Errors that may occur when trying to remove a request
-#[derive(Error, Clone, Debug)]
-pub enum RemovalError<AuthErr, RemErr> {
+#[derive(Snafu, Clone, Debug)]
+pub enum RemovalError<AuthErr: Error + 'static, RemErr: Error + 'static> {
     /// The account is not allowed to act on requests
-    #[error(transparent)]
-    UnauthorizedAccount(#[from] UnauthorizedAccountError<AuthErr>),
+    #[snafu(context(false))]
+    UnauthorizedAccount {
+        /// Error source
+        source: UnauthorizedAccountError<AuthErr>,
+    },
     /// This request is not (yet?) allowed to be removed
-    #[error("Removal not allowed: {0}")]
-    RemovalNotAllowed(RemErr),
+    #[snafu(display("Removal not allowed"))]
+    RemovalNotAllowed {
+        /// Error source
+        source: RemErr,
+    },
 }
 
 /// Collection of action requests that manages their approval state and
@@ -192,7 +218,10 @@ where
 
         config
             .is_account_authorized(&predecessor, &request)
-            .map_err(|e| UnauthorizedAccountError(predecessor, e))?;
+            .map_err(|source| UnauthorizedAccountError {
+                account_id: predecessor,
+                source,
+            })?;
 
         Self::slot_next_request_id().write(&(request_id + 1));
         Self::slot_request(request_id).write(&request);
@@ -208,7 +237,7 @@ where
     ) -> Result<A::Output, ExecutionError<C::AuthorizationError, C::ExecutionEligibilityError>>
     {
         Self::is_approved_for_execution(request_id)
-            .map_err(ExecutionError::ExecutionEligibility)?;
+            .map_err(|source| ExecutionError::ExecutionEligibility { source })?;
 
         let predecessor = env::predecessor_account_id();
         let config = Self::get_config();
@@ -218,7 +247,10 @@ where
 
         config
             .is_account_authorized(&predecessor, &request)
-            .map_err(|e| UnauthorizedAccountError(predecessor, e))?;
+            .map_err(|source| UnauthorizedAccountError {
+                account_id: predecessor,
+                source,
+            })?;
 
         let result = request.action.execute(self);
         request_slot.remove();
@@ -249,11 +281,14 @@ where
 
         config
             .is_account_authorized(&predecessor, &request)
-            .map_err(|e| UnauthorizedAccountError(predecessor.clone(), e))?;
+            .map_err(|source| UnauthorizedAccountError {
+                account_id: predecessor.clone(),
+                source,
+            })?;
 
         config
             .try_approve_with_authorized_account(predecessor, &mut request)
-            .map_err(ApprovalError::ApprovalError)?;
+            .map_err(|source| ApprovalError::ApprovalError { source })?;
 
         request_slot.write(&request);
 
@@ -273,11 +308,14 @@ where
 
         config
             .is_removable(&request)
-            .map_err(RemovalError::RemovalNotAllowed)?;
+            .map_err(|source| RemovalError::RemovalNotAllowed { source })?;
 
         config
             .is_account_authorized(&predecessor, &request)
-            .map_err(|e| UnauthorizedAccountError(predecessor, e))?;
+            .map_err(|source| UnauthorizedAccountError {
+                account_id: predecessor,
+                source,
+            })?;
 
         request_slot.remove();
 
@@ -287,6 +325,9 @@ where
 
 #[cfg(test)]
 mod tests {
+    use alloc::{format, string::ToString, vec::Vec};
+    use core::convert::Infallible;
+
     use near_contract_tools_macros::Rbac;
     use near_sdk::{
         borsh::{self, BorshDeserialize, BorshSerialize},
@@ -295,6 +336,7 @@ mod tests {
         testing_env, AccountId, BorshStorageKey,
     };
     use serde::Serialize;
+    use snafu::{whatever, Whatever};
 
     use crate::{rbac::Rbac, slot::Slot};
 
@@ -316,14 +358,8 @@ mod tests {
 
         fn execute(self, _contract: &mut Contract) -> Self::Output {
             match self {
-                Self::SayHello => {
-                    println!("Hello!");
-                    "hello"
-                }
-                Self::SayGoodbye => {
-                    println!("Goodbye!");
-                    "goodbye"
-                }
+                Self::SayHello => "hello",
+                Self::SayGoodbye => "goodbye",
             }
         }
     }
@@ -362,10 +398,10 @@ mod tests {
     }
 
     impl ApprovalConfiguration<MyAction, MultisigApprovalState> for MultisigConfig {
-        type ApprovalError = String;
-        type RemovalError = ();
-        type AuthorizationError = String;
-        type ExecutionEligibilityError = String;
+        type ApprovalError = Whatever;
+        type RemovalError = Infallible;
+        type AuthorizationError = Whatever;
+        type ExecutionEligibilityError = Whatever;
 
         fn is_approved_for_execution(
             &self,
@@ -383,7 +419,7 @@ mod tests {
             if valid_signatures >= threshold {
                 Ok(())
             } else {
-                Err("Insufficient signatures".to_string())
+                whatever!("Insufficient signatures")
             }
         }
 
@@ -402,7 +438,7 @@ mod tests {
             if Contract::has_role(account_id, &Role::Multisig) {
                 Ok(())
             } else {
-                Err("Account is missing Multisig role".to_string())
+                whatever!("Account is missing Multisig role")
             }
         }
 
@@ -416,7 +452,7 @@ mod tests {
                 .approved_by
                 .contains(&account_id)
             {
-                return Err("Already approved by account".to_string());
+                whatever!("Already approved by account");
             }
 
             action_request.approval_state.approved_by.push(account_id);

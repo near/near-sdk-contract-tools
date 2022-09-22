@@ -1,6 +1,7 @@
 //! Migrate default struct between two schemas
 #![allow(missing_docs)] // #[ext_contract(...)] does not play nicely with clippy
 
+use alloc::string::{String, ToString};
 use near_sdk::{
     borsh::{BorshDeserialize, BorshSerialize},
     env, ext_contract,

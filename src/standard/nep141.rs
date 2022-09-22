@@ -2,6 +2,8 @@
 //! <https://github.com/near/NEPs/blob/master/neps/nep-0141.md>
 #![allow(missing_docs)] // ext_contract doesn't play nice with #![warn(missing_docs)]
 
+use alloc::string::{String, ToString};
+use alloc::vec;
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
     env, ext_contract,
@@ -415,7 +417,7 @@ pub trait Nep141Controller {
             PromiseResult::NotReady => env::abort(),
             PromiseResult::Successful(value) => {
                 if let Ok(U128(unused_amount)) = serde_json::from_slice::<U128>(&value) {
-                    std::cmp::min(amount, unused_amount)
+                    core::cmp::min(amount, unused_amount)
                 } else {
                     amount
                 }
@@ -426,7 +428,7 @@ pub trait Nep141Controller {
         let refunded_amount = if unused_amount > 0 {
             let receiver_balance = Self::balance_of(&receiver_id);
             if receiver_balance > 0 {
-                let refund_amount = std::cmp::min(receiver_balance, unused_amount);
+                let refund_amount = core::cmp::min(receiver_balance, unused_amount);
                 self.transfer(&receiver_id, &sender_id, refund_amount, None);
                 refund_amount
             } else {

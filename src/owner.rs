@@ -1,6 +1,8 @@
 //! Owner pattern
 #![allow(missing_docs)] // #[ext_contract(...)] does not play nicely with clippy
 
+use alloc::{string::ToString, vec};
+
 use near_sdk::{env, ext_contract, require, AccountId};
 
 use crate::{slot::Slot, standard::nep297::Event};
@@ -254,6 +256,7 @@ pub trait OwnerExternal {
 
 #[cfg(test)]
 mod tests {
+    use alloc::{string::ToString, vec};
     use near_sdk::{near_bindgen, test_utils::VMContextBuilder, testing_env, AccountId};
 
     use crate::{

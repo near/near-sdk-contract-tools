@@ -59,7 +59,7 @@ pub fn expand(meta: SimpleMultisigMeta) -> Result<TokenStream, darling::Error> {
                 if <#ident as #me::rbac::Rbac>::has_role(account_id, &#role) {
                     Ok(())
                 } else {
-                    Err(#me::approval::simple_multisig::macro_types::MissingRole(#role))
+                    Err(#me::approval::simple_multisig::macro_types::MissingRole { role: #role })
                 }
             }
         }

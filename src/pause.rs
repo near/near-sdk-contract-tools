@@ -2,6 +2,7 @@
 #![allow(missing_docs)] // #[ext_contract(...)] does not play nicely with clippy
 
 use crate::{slot::Slot, standard::nep297::Event};
+use alloc::{string::ToString, vec};
 use near_sdk::{ext_contract, require};
 
 const UNPAUSED_FAIL_MESSAGE: &str = "Disallowed while contract is unpaused";

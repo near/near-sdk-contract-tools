@@ -2,6 +2,8 @@
 //! delete account, add key, delete key, deploy contract, function call, stake,
 //! transfer)
 
+use alloc::string::String;
+use alloc::vec::Vec;
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
     json_types::{U128, U64},

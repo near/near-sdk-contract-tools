@@ -2,7 +2,7 @@
 //! <https://github.com/near/NEPs/blob/master/neps/nep-0148.md>
 #![allow(missing_docs)] // ext_contract doesn't play nice with #![warn(missing_docs)]
 
-use std::borrow::Cow;
+use alloc::{borrow::Cow, string::ToString, vec};
 
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
@@ -45,9 +45,10 @@ pub trait Nep148 {
 
 #[cfg(test)]
 mod tests {
+    use crate::alloc::borrow::ToOwned;
     use crate::standard::nep148::FungibleTokenMetadata;
+    use alloc::borrow::Cow;
     use near_sdk::borsh::BorshSerialize;
-    use std::borrow::Cow;
 
     #[test]
     fn borsh_serialization_ignores_cow() {

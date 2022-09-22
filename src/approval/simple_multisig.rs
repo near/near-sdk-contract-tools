@@ -1,14 +1,14 @@
 //! Simple multi-signature wallet component. Generic over approvable actions.
 //! Use with NativeTransactionAction for multisig over native transactions.
 
-use std::marker::PhantomData;
-
+use alloc::vec::Vec;
+use core::marker::PhantomData;
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
     env, AccountId,
 };
 use serde::{Deserialize, Serialize};
-use thiserror::Error;
+use snafu::Snafu;
 
 use super::{ActionRequest, ApprovalConfiguration};
 
@@ -16,7 +16,7 @@ use super::{ActionRequest, ApprovalConfiguration};
 /// to an ApprovalManager
 pub trait AccountAuthorizer {
     /// Why can this account not be authorized?
-    type AuthorizationError;
+    type AuthorizationError: snafu::Error;
 
     /// Determines whether an account ID is allowed to submit an approval
     fn is_account_authorized(account_id: &AccountId) -> Result<(), Self::AuthorizationError>;
@@ -85,26 +85,31 @@ impl ApprovalState {
 }
 
 /// If a request has expired, some actions may not be performed
-#[derive(Error, Clone, Debug)]
-#[error("Validity period exceeded")]
+#[derive(Snafu, Clone, Debug)]
+#[snafu(display("Validity period exceeded"))]
 pub struct RequestExpiredError;
 
 /// Why might a simple multisig approval attempt fail?
-#[derive(Error, Clone, Debug)]
+#[derive(Snafu, Clone, Debug)]
 pub enum ApprovalError {
     /// The account has already approved this action request
-    #[error("Already approved by this account")]
+    #[snafu(display("Already approved by this account"))]
     AlreadyApprovedByAccount,
     /// The request has expired and cannot be approved or executed
-    #[error(transparent)]
-    RequestExpired(#[from] RequestExpiredError),
+    #[snafu(context(false))]
+    RequestExpired {
+        /// Error source
+        source: RequestExpiredError,
+    },
 }
 
 /// Errors when evaluating a request for execution
-#[derive(Error, Clone, Debug)]
+#[derive(Snafu, Clone, Debug)]
 pub enum ExecutionEligibilityError {
     /// The request does not have enough approvals
-    #[error("Insufficient approvals on request: required {required} but only has {current}")]
+    #[snafu(display(
+        "Insufficient approvals on request: required {required} but only has {current}"
+    ))]
     InsufficientApprovals {
         /// Current number of approvals
         current: usize,
@@ -112,15 +117,18 @@ pub enum ExecutionEligibilityError {
         required: usize,
     },
     /// The request has expired and cannot be approved or executed
-    #[error(transparent)]
-    RequestExpired(#[from] RequestExpiredError),
+    #[snafu(context(false))]
+    RequestExpired {
+        /// Error source
+        source: RequestExpiredError,
+    },
 }
 
 /// What errors may occur when removing a request?
-#[derive(Error, Clone, Debug)]
+#[derive(Snafu, Clone, Debug)]
 pub enum RemovalError {
     /// Requests may not be removed while they are still valid
-    #[error("Removal prohibited before expiration")]
+    #[snafu(display("Removal prohibited before expiration"))]
     RequestStillValid,
 }
 
@@ -195,23 +203,30 @@ where
 
 /// Types used by near-contract-tools-macros
 pub mod macro_types {
-    use thiserror::Error;
+    use core::fmt::Display;
+
+    use snafu::Snafu;
 
     /// Account that attempted an action is missing a role
-    #[derive(Error, Clone, Debug)]
-    #[error("Missing role '{0}' required for this action")]
-    pub struct MissingRole<R>(pub R);
+    #[derive(Snafu, Clone, Debug)]
+    #[snafu(display("Missing role '{role}' required for this action"))]
+    pub struct MissingRole<R: Display> {
+        /// The required role that is missing
+        pub role: R,
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::alloc::string::ToString;
+    use alloc::vec;
     use near_sdk::{
         borsh::{self, BorshDeserialize, BorshSerialize},
         env, near_bindgen,
         test_utils::VMContextBuilder,
         testing_env, AccountId, BorshStorageKey,
     };
-    use thiserror::Error;
+    use snafu::Snafu;
 
     use crate::{
         approval::{
@@ -256,9 +271,11 @@ mod tests {
         }
     }
 
-    #[derive(Error, Clone, Debug)]
-    #[error("Missing role: {0}")]
-    struct MissingRole(&'static str);
+    #[derive(Snafu, Clone, Debug)]
+    #[snafu(display("Missing role: {role}"))]
+    struct MissingRole {
+        pub role: &'static str,
+    }
 
     impl AccountAuthorizer for Contract {
         type AuthorizationError = MissingRole;
@@ -267,7 +284,7 @@ mod tests {
             if Self::has_role(account_id, &Role::Multisig) {
                 Ok(())
             } else {
-                Err(MissingRole("Multisig"))
+                Err(MissingRole { role: "Multisig" })
             }
         }
     }

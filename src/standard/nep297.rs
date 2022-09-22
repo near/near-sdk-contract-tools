@@ -1,5 +1,6 @@
 //! Helpers for `#[derive(near_contract_tools::Nep297)]`
 
+use alloc::{format, string::String};
 use near_sdk::serde::Serialize;
 
 /// Emit events according to the [NEP-297 event standard](https://nomicon.io/Standards/EventsFormat).
