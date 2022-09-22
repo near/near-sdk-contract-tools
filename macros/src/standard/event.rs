@@ -1,6 +1,7 @@
 use darling::FromMeta;
 use proc_macro2::TokenStream;
 use quote::quote;
+use syn::Item;
 
 use crate::rename::RenameStrategy;
 
@@ -8,11 +9,9 @@ use crate::rename::RenameStrategy;
 pub struct EventAttributeMeta {
     pub standard: String,
     pub version: String,
-    pub rename_all: Option<RenameStrategy>,
+    pub rename: Option<RenameStrategy>,
+    pub name: Option<String>,
 
-    // pub me: String,
-    // pub macros: String,
-    // pub serde: String,
     #[darling(rename = "crate", default = "crate::default_crate_name")]
     pub me: syn::Path,
     #[darling(default = "crate::default_macros")]
@@ -23,26 +22,28 @@ pub struct EventAttributeMeta {
 
 pub fn event_attribute(
     attr: EventAttributeMeta,
-    item: TokenStream,
+    item: Item,
 ) -> Result<TokenStream, darling::Error> {
     let EventAttributeMeta {
         standard,
         version,
-        rename_all,
+        rename,
+        name,
         serde,
         me,
         macros,
     } = attr;
 
-    let rename_all = rename_all.unwrap_or(RenameStrategy::SnakeCase).to_string();
+    let rename = rename.unwrap_or(RenameStrategy::SnakeCase).to_string();
+    let name = name.map(|n| quote! { , name = #n });
 
     let serde_str = quote! { #serde }.to_string();
     let me_str = quote! { #me }.to_string();
 
     Ok(quote::quote! {
         #[derive(#macros::Nep297, #serde::Serialize)]
-        #[nep297(standard = #standard, version = #version, rename_all = #rename_all, crate = #me_str)]
-        #[serde(crate = #serde_str, untagged)]
+        #[nep297(standard = #standard, version = #version, rename = #rename, crate = #me_str #name)]
+        #[serde(crate = #serde_str)]
         #item
     })
 }

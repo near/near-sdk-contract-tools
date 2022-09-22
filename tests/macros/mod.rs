@@ -4,7 +4,7 @@ use near_contract_tools::{
     pause::Pause,
     rbac::Rbac,
     standard::nep297::Event,
-    Migrate, Nep297, Owner, Pause, Rbac,
+    Migrate, Owner, Pause, Rbac,
 };
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
@@ -12,7 +12,6 @@ use near_sdk::{
     test_utils::VMContextBuilder,
     testing_env, AccountId, BorshStorageKey,
 };
-use serde::Serialize;
 
 mod event;
 mod migrate;
@@ -20,12 +19,23 @@ mod owner;
 mod pause;
 mod standard;
 
-#[derive(Serialize, Nep297)]
-#[nep297(standard = "x-myevent", version = "1.0.0", rename_all = "snake_case")]
-#[serde(untagged)]
-enum MyEvent {
-    ValueChanged { from: u32, to: u32 },
-    PermissionGranted { to: AccountId },
+mod my_event {
+    use near_contract_tools::Nep297;
+    use near_sdk::AccountId;
+    use serde::Serialize;
+
+    #[derive(Serialize, Nep297)]
+    #[nep297(standard = "x-myevent", version = "1.0.0", rename = "snake_case")]
+    pub struct ValueChanged {
+        pub from: u32,
+        pub to: u32,
+    }
+
+    #[derive(Serialize, Nep297)]
+    #[nep297(standard = "x-myevent", version = "1.0.0", rename = "snake_case")]
+    pub struct PermissionGranted {
+        pub to: AccountId,
+    }
 }
 
 #[derive(BorshSerialize, BorshStorageKey)]
@@ -68,7 +78,7 @@ impl Integration {
 
         self.add_role(&account_id, &Role::CanSetValue);
 
-        MyEvent::PermissionGranted { to: account_id }.emit();
+        my_event::PermissionGranted { to: account_id }.emit();
     }
 
     pub fn set_value(&mut self, value: u32) {
@@ -79,7 +89,7 @@ impl Integration {
 
         self.value = value;
 
-        MyEvent::ValueChanged {
+        my_event::ValueChanged {
             from: old,
             to: value,
         }
@@ -131,7 +141,7 @@ impl MigrateIntegration {
 
         self.add_role(&account_id, &Role::CanSetValue);
 
-        MyEvent::PermissionGranted { to: account_id }.emit();
+        my_event::PermissionGranted { to: account_id }.emit();
     }
 
     pub fn set_value(&mut self, value: u32) {
@@ -142,7 +152,7 @@ impl MigrateIntegration {
 
         self.moved_value = value;
 
-        MyEvent::ValueChanged {
+        my_event::ValueChanged {
             from: old,
             to: value,
         }
@@ -345,7 +355,7 @@ fn integration_fail_migrate_paused() {
 mod pausable_fungible_token {
     use near_contract_tools::{
         pause::Pause,
-        standard::nep141::{Nep141Hook, Nep141Transfer},
+        standard::nep141::{Nep141, Nep141Controller, Nep141Hook, Nep141Transfer},
         FungibleToken, Pause,
     };
     use near_sdk::{

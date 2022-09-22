@@ -2,7 +2,7 @@
 
 use darling::{FromDeriveInput, FromMeta};
 use proc_macro::TokenStream;
-use syn::{parse_macro_input, AttributeArgs, DeriveInput};
+use syn::{parse_macro_input, AttributeArgs, DeriveInput, Item};
 
 mod approval;
 mod migrate;
@@ -47,7 +47,9 @@ where
 ///
 /// Specify event standard parameters: `#[nep297(standard = "...", version = "...")]`
 ///
-/// Rename strategy for all variants (default: unchanged): `#[event(..., rename_all = "<strategy>")]`
+/// Optional: `#[nep297(name = "...")]`
+///
+/// Rename strategy for all variants (default: unchanged): `#[event(rename = "<strategy>")]`
 /// Options for `<strategy>`:
 /// - `UpperCamelCase`
 /// - `lowerCamelCase`
@@ -167,9 +169,10 @@ pub fn derive_simple_multisig(input: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn event(attr: TokenStream, item: TokenStream) -> TokenStream {
     let attr = parse_macro_input!(attr as AttributeArgs);
+    let item = parse_macro_input!(item as Item);
 
     standard::event::EventAttributeMeta::from_list(&attr)
-        .and_then(|meta| standard::event::event_attribute(meta, item.into()))
+        .and_then(|meta| standard::event::event_attribute(meta, item))
         .map(Into::into)
         .unwrap_or_else(|e| e.write_errors().into())
 }
