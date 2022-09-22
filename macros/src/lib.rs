@@ -43,7 +43,7 @@ where
         .unwrap_or_else(|e| e.write_errors().into())
 }
 
-/// Use on an enum to emit NEP-297 event strings.
+/// Use on a struct to emit NEP-297 event strings.
 ///
 /// Specify event standard parameters: `#[nep297(standard = "...", version = "...")]`
 ///
