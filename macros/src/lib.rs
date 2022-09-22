@@ -165,7 +165,7 @@ pub fn derive_simple_multisig(input: TokenStream) -> TokenStream {
     make_derive(input, approval::simple_multisig::expand)
 }
 
-/// Smart #[event] macro
+/// Smart `#[event]` macro
 #[proc_macro_attribute]
 pub fn event(attr: TokenStream, item: TokenStream) -> TokenStream {
     let attr = parse_macro_input!(attr as AttributeArgs);
