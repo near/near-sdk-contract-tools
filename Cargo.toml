@@ -1,6 +1,6 @@
 [package]
 authors = ["Jacob Lindahl <jacob@near.foundation>"]
-categories = ["wasm", "cryptography::cryptocurrencies"]
+categories = ["wasm", "cryptography::cryptocurrencies", "no-std"]
 description = """
 Helpful functions and macros for developing smart contracts on NEAR Protocol.
 """
