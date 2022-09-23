@@ -13,16 +13,12 @@ pub trait Upgrade {
 }
 
 /// Contracts may implement this trait to inject code into Upgrade functions.
-///
-/// `T` is an optional value for passing state between different lifecycle
-/// hooks. This may be useful for charging callers for storage usage, for
-/// example.
 pub trait UpgradeHook {
     /// Executed before a upgrade call is conducted
     fn on_upgrade();
 }
 
-/// naked upgrade function which calls migrate method on the contract
+/// Naked upgrade function which calls migrate method on the contract
 pub fn upgrade<T>()
 where
     T: BorshDeserialize + BorshSerialize,

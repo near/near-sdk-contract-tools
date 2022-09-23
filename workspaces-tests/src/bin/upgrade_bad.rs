@@ -1,11 +1,11 @@
 #![allow(missing_docs)]
 
-use near_contract_tools::upgrade::upgrade as other_upgrade;
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
     near_bindgen, PanicOnDefault,
 };
-pub fn main() {}
+
+pub fn main() {} // Ignore
 
 #[derive(BorshSerialize, BorshDeserialize, PanicOnDefault)]
 #[near_bindgen]
