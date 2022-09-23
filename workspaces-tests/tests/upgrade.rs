@@ -1,6 +1,5 @@
 #![cfg(not(windows))]
 
-use near_sdk::{serde_json::json, Gas};
 use workspaces::{network::Sandbox, prelude::*, Account, Contract, Worker};
 
 const WASM: &[u8] = include_bytes!("../../target/wasm32-unknown-unknown/release/upgrade_old.wasm");
@@ -45,6 +44,7 @@ async fn setup(num_accounts: usize, wasm: &[u8]) -> Setup {
         accounts,
     }
 }
+
 #[tokio::test]
 async fn upgrade() {
     // Deploy old contract ** LIKE HERE
@@ -59,16 +59,12 @@ async fn upgrade() {
 
     alice
         .call(&worker, contract.id(), "increment_foo")
-        .args_json(json!({}))
-        .unwrap()
         .transact()
         .await
         .unwrap();
 
     let val = alice
         .call(&worker, contract.id(), "get_foo")
-        .args_json(json!({}))
-        .unwrap()
         .transact()
         .await
         .unwrap()
@@ -87,8 +83,6 @@ async fn upgrade() {
 
     let new_val = alice
         .call(&worker, contract.id(), "get_bar")
-        .args_json(json!({}))
-        .unwrap()
         .transact()
         .await
         .unwrap()
@@ -99,16 +93,12 @@ async fn upgrade() {
 
     alice
         .call(&worker, contract.id(), "decrement_bar")
-        .args_json(json!({}))
-        .unwrap()
         .transact()
         .await
         .unwrap();
 
     let end_val = alice
         .call(&worker, contract.id(), "get_bar")
-        .args_json(json!({}))
-        .unwrap()
         .transact()
         .await
         .unwrap()
@@ -151,7 +141,6 @@ async fn upgrade_failure_no_upgrade() {
     alice
         .call(&worker, contract.id(), "upgrade_all")
         .max_gas()
-        .args(vec![])
         .transact()
         .await
         .unwrap();
@@ -171,7 +160,6 @@ async fn upgrade_failure_random_wasm() {
     alice
         .call(&worker, contract.id(), "upgrade_all")
         .max_gas()
-        .args(vec![])
         .transact()
         .await
         .unwrap();
@@ -186,8 +174,7 @@ async fn upgrade_failure_not_owner() {
         accounts,
     } = setup(2, WASM).await;
 
-    let alice = &accounts[0];
-    let bob: &Account = &accounts[1];
+    let bob = &accounts[1];
 
     bob.call(&worker, contract.id(), "upgrade_all")
         .max_gas()
