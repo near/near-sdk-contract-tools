@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
 
-use near_contract_tools::upgrade::{upgrade as other_upgrade, Upgrade, UpgradeHook};
+use near_contract_tools::upgrade::{upgrade, Upgrade, UpgradeHook};
 
 use near_contract_tools::{owner::Owner, owner::OwnerExternal, Owner};
 
@@ -43,8 +43,8 @@ impl UpgradeHook for ContractOld {
 
 impl Upgrade for ContractOld {
     #[no_mangle]
-    fn upgrade_all() {
-        Self::require_owner();
-        other_upgrade::<ContractOld>();
+    fn upgrade_contract() {
+        Self::on_upgrade();
+        upgrade::<ContractOld>();
     }
 }

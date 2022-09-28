@@ -8,8 +8,8 @@ use near_sdk::borsh::{BorshDeserialize, BorshSerialize};
 
 /// Upgrade Trait
 pub trait Upgrade {
-    /// upgrade_all - Upgrades the code and the state of the contract
-    fn upgrade_all();
+    /// upgrade_contract - Upgrades the code and the state of the contract
+    fn upgrade_contract();
 }
 
 /// Contracts may implement this trait to inject code into Upgrade functions.

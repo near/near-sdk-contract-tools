@@ -74,7 +74,7 @@ async fn upgrade() {
     assert_eq!(val, 1);
 
     alice
-        .call(&worker, contract.id(), "upgrade_all")
+        .call(&worker, contract.id(), "upgrade_contract")
         .max_gas()
         .args(NEW_WASM.to_vec())
         .transact()
@@ -120,7 +120,7 @@ async fn upgrade_failure_blank_wasm() {
     let alice = &accounts[0];
 
     alice
-        .call(&worker, contract.id(), "upgrade_all")
+        .call(&worker, contract.id(), "upgrade_contract")
         .max_gas()
         .transact()
         .await
@@ -139,7 +139,7 @@ async fn upgrade_failure_no_upgrade() {
     let alice = &accounts[0];
 
     alice
-        .call(&worker, contract.id(), "upgrade_all")
+        .call(&worker, contract.id(), "upgrade_contract")
         .max_gas()
         .transact()
         .await
@@ -158,7 +158,7 @@ async fn upgrade_failure_random_wasm() {
     let alice = &accounts[0];
 
     alice
-        .call(&worker, contract.id(), "upgrade_all")
+        .call(&worker, contract.id(), "upgrade_contract")
         .max_gas()
         .transact()
         .await
@@ -176,7 +176,7 @@ async fn upgrade_failure_not_owner() {
 
     let bob = &accounts[1];
 
-    bob.call(&worker, contract.id(), "upgrade_all")
+    bob.call(&worker, contract.id(), "upgrade_contract")
         .max_gas()
         .transact()
         .await
