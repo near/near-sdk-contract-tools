@@ -33,7 +33,6 @@ pub trait MigrateHook: MigrateController {
     /// arguments from caller, and replaces it with the new schema.
     fn on_migrate(
         old_schema: <Self as MigrateController>::OldSchema,
-        args: Option<String>,
     ) -> <Self as MigrateController>::NewSchema;
 }
 
@@ -41,5 +40,5 @@ pub trait MigrateHook: MigrateController {
 #[ext_contract(ext_migrate)]
 pub trait MigrateExternal {
     /// Perform the migration with optional arguments
-    fn migrate(args: Option<String>) -> Self;
+    fn migrate() -> Self;
 }
