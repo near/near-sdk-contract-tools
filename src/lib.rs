@@ -8,6 +8,7 @@ pub mod owner;
 pub mod pause;
 pub mod rbac;
 pub mod slot;
+pub mod upgrade;
 pub mod utils;
 
 pub use near_contract_tools_macros::*;

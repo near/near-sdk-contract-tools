@@ -106,6 +106,18 @@ pub trait Owner {
         proposed_owner.set(new.as_ref());
     }
 
+    /// Same as require_owner but as a method
+    fn assert_owner(&self) {
+        require!(
+            &env::predecessor_account_id()
+                == Self::slot_owner()
+                    .read()
+                    .as_ref()
+                    .unwrap_or_else(|| env::panic_str(NO_OWNER_FAIL_MESSAGE)),
+            ONLY_OWNER_FAIL_MESSAGE,
+        );
+    }
+
     /// Initializes the contract owner. Can only be called once.
     ///
     /// Emits an `OwnerEvent::Transfer` event.

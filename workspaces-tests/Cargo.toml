@@ -6,6 +6,15 @@ publish = false
 version = "0.1.0"
 
 [[bin]]
+name = "upgrade_bad"
+
+[[bin]]
+name = "upgrade_old"
+
+[[bin]]
+name = "upgrade_new"
+
+[[bin]]
 name = "counter_multisig"
 
 [[bin]]
@@ -22,7 +31,7 @@ name = "simple_multisig"
 
 [dependencies]
 near-contract-tools = {path = "../"}
-near-sdk = "4.0.0"
+near-sdk = {version = "4.0.0", features = ["unstable"]}
 strum = "0.24.1"
 strum_macros = "0.24.3"
 thiserror = "1.0.34"
