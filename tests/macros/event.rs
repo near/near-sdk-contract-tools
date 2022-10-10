@@ -1,4 +1,4 @@
-use near_contract_tools::standard::nep297::Event;
+use near_contract_tools::standard::nep297::{Event, ToEventLog};
 
 use crate::macros::event::test_events::Nep171NftMintData;
 
@@ -66,35 +66,43 @@ fn derive_event() {
         r#"EVENT_JSON:{"standard":"nep171","version":"1.0.0","event":"nft_mint","data":[{"owner_id":"owner","token_ids":["token_1","token_2"]}]}"#
     );
 
-    assert_eq!(test_events::AnotherEvent.event_log().event, "sneaky_event");
-    assert_eq!(test_events::CustomEvent.event_log().event, "CUSTOM-EVENT");
     assert_eq!(
-        test_events::EnumEvent::VariantOne.event_log().event,
+        test_events::AnotherEvent.to_event_log().event,
+        "sneaky_event"
+    );
+    assert_eq!(
+        test_events::CustomEvent.to_event_log().event,
+        "CUSTOM-EVENT"
+    );
+    assert_eq!(
+        test_events::EnumEvent::VariantOne.to_event_log().event,
         "VariantOne"
     );
     assert_eq!(
-        test_events::EnumEvent::VariantTwo().event_log().event,
+        test_events::EnumEvent::VariantTwo().to_event_log().event,
         "genuine_variant_two"
     );
     assert_eq!(
-        test_events::EnumEvent::VariantThree(0, 0).event_log().event,
+        test_events::EnumEvent::VariantThree(0, 0)
+            .to_event_log()
+            .event,
         "VARIANT_THREE"
     );
     assert_eq!(
         test_events::EnumEventRenameAll::VariantOne
-            .event_log()
+            .to_event_log()
             .event,
         "variant_one"
     );
     assert_eq!(
         test_events::EnumEventRenameAll::VariantTwo
-            .event_log()
+            .to_event_log()
             .event,
         "variantTwo"
     );
     assert_eq!(
         test_events::EnumEventRenameAll::VariantThree
-            .event_log()
+            .to_event_log()
             .event,
         "threedom!"
     );
@@ -117,6 +125,7 @@ mod event_attribute_macro {
     }
 
     #[event(standard = "my_event_standard", version = "1")]
+    #[allow(unused)]
     enum MyEvent {
         One,
         ThreePointFive { foo: &'static str },
