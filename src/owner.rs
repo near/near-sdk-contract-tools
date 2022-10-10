@@ -1,4 +1,21 @@
 //! Owner pattern
+//!
+//! Provides operations to read, proposed and accept ownership of the contract
+//!
+//! A proposed owner is nominated by the current owner with [`Owner::own_propose_owner`].
+//! Once the proposed owner accepts the nomination with [`Owner::own_accept_owner`]
+//! it becomes the new current owner.
+//!
+//! # Safety
+//! The default implementation assumes the following invariants.
+//!
+//! * The owner root storage key is not used or modified. Default key is "~o".
+//! * Only the current owner can call [`Owner::own_propose_owner`] and
+//!   [`Owner::own_renounce_owner`]
+//! * Only the currently proposed owner can call [`Owner::own_accept_owner`].
+//!   Once the proposed owner accepts the ownership, it becomes the current
+//!   owner and there does not exist a proposed owner anymore.
+//!
 #![allow(missing_docs)] // #[ext_contract(...)] does not play nicely with clippy
 
 use near_sdk::{env, ext_contract, require, AccountId};
