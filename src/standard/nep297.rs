@@ -26,28 +26,35 @@ use near_sdk::serde::Serialize;
 ///
 /// e.emit();
 /// ```
-pub trait Event<T: ?Sized> {
-    /// Retrieves the event log before serialization
-    fn event_log(&self) -> EventLog<&T>;
-
+pub trait Event {
     /// Converts the event into an NEP-297 event-formatted string
-    fn to_event_string(&self) -> String
-    where
-        T: Serialize,
-    {
+    fn to_event_string(&self) -> String;
+
+    /// Emits the event string to the blockchain
+    fn emit(&self);
+}
+
+impl<T: ToEventLog> Event for T
+where
+    T::Data: Serialize,
+{
+    fn to_event_string(&self) -> String {
         format!(
             "EVENT_JSON:{}",
-            serde_json::to_string(&self.event_log()).unwrap_or_else(|_| near_sdk::env::abort()),
+            serde_json::to_string(&self.to_event_log()).unwrap_or_else(|_| near_sdk::env::abort()),
         )
     }
 
-    /// Emits the event string to the blockchain
-    fn emit(&self)
-    where
-        T: Serialize,
-    {
+    fn emit(&self) {
         near_sdk::env::log_str(&self.to_event_string());
     }
+}
+
+pub trait ToEventLog {
+    type Data: ?Sized;
+
+    /// Retrieves the event log before serialization
+    fn to_event_log(&self) -> EventLog<&Self::Data>;
 }
 
 /// NEP-297 Event Log Data
@@ -63,3 +70,5 @@ pub struct EventLog<T> {
     /// Data type of the event metadata
     pub data: T,
 }
+
+pub trait EventConsumer<I, E> {}

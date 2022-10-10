@@ -82,6 +82,14 @@ pub enum Nep171TransferError {
     SenderIsNotOwner,
 }
 
+pub trait Nep171Extension<T> {
+    type Event: crate::standard::nep297::Event;
+
+    fn handle_transfer(
+        result: Result<event::NftTransfer, Nep171TransferError>,
+    ) -> Result<Self::Event, Nep171TransferError>;
+}
+
 pub trait Nep171Controller {
     fn root() -> Slot<()>;
 
