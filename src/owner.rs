@@ -1,7 +1,10 @@
 //! Owner pattern
 #![allow(missing_docs)] // #[ext_contract(...)] does not play nicely with clippy
 
-use near_sdk::{env, ext_contract, require, AccountId};
+use near_sdk::{
+    borsh::{self, BorshSerialize},
+    env, ext_contract, require, AccountId, BorshStorageKey,
+};
 
 use crate::{slot::Slot, standard::nep297::Event};
 
@@ -46,6 +49,13 @@ pub mod event {
     }
 }
 
+#[derive(BorshSerialize, BorshStorageKey, Debug, Clone)]
+enum StorageKey {
+    IsInitialized,
+    Owner,
+    ProposedOwner,
+}
+
 /// A contract with an owner
 pub trait Owner {
     /// Storage root
@@ -53,17 +63,17 @@ pub trait Owner {
 
     /// Storage slot for initialization state
     fn slot_is_initialized() -> Slot<bool> {
-        Self::root().field(b"i")
+        Self::root().field(StorageKey::IsInitialized)
     }
 
     /// Storage slot for owner account ID
     fn slot_owner() -> Slot<AccountId> {
-        Self::root().field(b"o")
+        Self::root().field(StorageKey::Owner)
     }
 
     /// Storage slot for proposed owner account ID
     fn slot_proposed_owner() -> Slot<AccountId> {
-        Self::root().field(b"p")
+        Self::root().field(StorageKey::ProposedOwner)
     }
 
     /// Updates the current owner and emits relevant event
