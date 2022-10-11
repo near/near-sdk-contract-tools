@@ -1,21 +1,32 @@
-//! Owner pattern
+//! Owner pattern provides operations to query, manage and transfer ownership
+//! of the contract.
 //!
-//! Provides operations to read, proposed and accept ownership of the contract
+//! An owned contract has to be initialized with an owner. The account that
+//! currently owns the contract is the "current owner". It can propose
+//! an account to transfer ownership to. This proposed account is the
+//! "proposed owner". If the proposed owner accepts the transfer, it becomes
+//! the current owner. The current owner can also renounce ownership of the
+//! contract.
 //!
-//! A proposed owner is nominated by the current owner with [`Owner::own_propose_owner`].
-//! Once the proposed owner accepts the nomination with [`Owner::own_accept_owner`]
-//! it becomes the new current owner.
+//! Note: There is no way to recover ownership of a renounced contract.
+//!
+//! The pattern consists of methods in [`Owner`] and [`OwnerExternal`]. The
+//! latter exposes methods externally and can be called by other contracts.
+//! The provided [derive_macro][`near_contract_tools_macros::Owner`]
+//! derives default implementation both these traits.
 //!
 //! # Safety
-//! The default implementation assumes the following invariants.
+//! The default implementation will throw an error or display unexpected
+//! behaviour if the following invariants are not met.
 //!
 //! * The owner root storage key is not used or modified. Default key is "~o".
-//! * Only the current owner can call [`Owner::own_propose_owner`] and
-//!   [`Owner::own_renounce_owner`]
-//! * Only the currently proposed owner can call [`Owner::own_accept_owner`].
-//!   Once the proposed owner accepts the ownership, it becomes the current
-//!   owner and there does not exist a proposed owner anymore.
-//!
+//! * Only the current owner [`Owner::renounce_owner`] and [`Owner::propose_owner`]
+//! * Only the proposed owner can call [`Owner::accept_owner`]
+//! * These external functions call internal functions with the similar name
+//!   and expect the same invariants.
+//!     * [`OwnerExternal::own_renounce_owner`]
+//!     * [`OwnerExternal::own_propose_owner`]
+//!     * [`OwnerExternal::own_accept_owner`]
 #![allow(missing_docs)] // #[ext_contract(...)] does not play nicely with clippy
 
 use near_sdk::{env, ext_contract, require, AccountId};
