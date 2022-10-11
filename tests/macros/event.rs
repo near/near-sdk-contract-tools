@@ -101,7 +101,7 @@ fn derive_event() {
 }
 
 mod event_attribute_macro {
-    use near_contract_tools::standard::nep297::Event;
+    use near_contract_tools::{event, standard::nep297::Event};
 
     mod my_event {
         use near_contract_tools::event;
@@ -116,6 +116,13 @@ mod event_attribute_macro {
         pub struct Six;
     }
 
+    #[event(standard = "my_event_standard", version = "1")]
+    enum MyEvent {
+        One,
+        ThreePointFive { foo: &'static str },
+        Six,
+    }
+
     #[test]
     fn test() {
         let e = my_event::ThreePointFive { foo: "hello" };
@@ -124,5 +131,9 @@ mod event_attribute_macro {
             e.to_event_string(),
             r#"EVENT_JSON:{"standard":"my_event_standard","version":"1","event":"three_point_five","data":{"foo":"hello"}}"#,
         );
+
+        let f = MyEvent::ThreePointFive { foo: "hello" };
+        f.emit();
+        assert_eq!(e.to_event_string(), f.to_event_string());
     }
 }
