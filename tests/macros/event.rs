@@ -26,6 +26,32 @@ mod test_events {
     #[derive(Nep297, Serialize)]
     #[nep297(standard = "nep171", version = "1.0.0", rename = "SHOUTY-KEBAB-CASE")]
     pub struct CustomEvent; // Name will be "CUSTOM-EVENT"
+
+    #[derive(Nep297, Serialize)]
+    #[nep297(standard = "enum-event", version = "1.0.0")]
+    pub enum EnumEvent {
+        VariantOne,
+        #[nep297(name = "genuine_variant_two")]
+        VariantTwo(),
+        #[nep297(rename = "SHOUTY_SNAKE_CASE")]
+        VariantThree(u32, u64),
+        #[nep297(rename = "kebab-case")]
+        #[allow(unused)] // just here to make sure it compiles
+        VariantFour {
+            foo: u32,
+            bar: u64,
+        },
+    }
+
+    #[derive(Nep297, Serialize)]
+    #[nep297(standard = "enum-event", version = "1.0.0", rename_all = "snake_case")]
+    pub enum EnumEventRenameAll {
+        VariantOne,
+        #[nep297(rename = "lowerCamelCase")]
+        VariantTwo,
+        #[nep297(name = "threedom!")]
+        VariantThree,
+    }
 }
 
 #[test]
@@ -41,8 +67,37 @@ fn derive_event() {
     );
 
     assert_eq!(test_events::AnotherEvent.event_log().event, "sneaky_event");
-
     assert_eq!(test_events::CustomEvent.event_log().event, "CUSTOM-EVENT");
+    assert_eq!(
+        test_events::EnumEvent::VariantOne.event_log().event,
+        "VariantOne"
+    );
+    assert_eq!(
+        test_events::EnumEvent::VariantTwo().event_log().event,
+        "genuine_variant_two"
+    );
+    assert_eq!(
+        test_events::EnumEvent::VariantThree(0, 0).event_log().event,
+        "VARIANT_THREE"
+    );
+    assert_eq!(
+        test_events::EnumEventRenameAll::VariantOne
+            .event_log()
+            .event,
+        "variant_one"
+    );
+    assert_eq!(
+        test_events::EnumEventRenameAll::VariantTwo
+            .event_log()
+            .event,
+        "variantTwo"
+    );
+    assert_eq!(
+        test_events::EnumEventRenameAll::VariantThree
+            .event_log()
+            .event,
+        "threedom!"
+    );
 }
 
 mod event_attribute_macro {
