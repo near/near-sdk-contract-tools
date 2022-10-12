@@ -40,4 +40,4 @@ thiserror = "1.0.34"
 tokio = "1.21.1"
 
 [target.'cfg(not(windows))'.dev-dependencies]
-workspaces = "0.4"
+workspaces = "0.6"
