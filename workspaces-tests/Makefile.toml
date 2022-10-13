@@ -1,3 +1,9 @@
+[tasks.build]
+clear = true
+script = """
+cargo build --target wasm32-unknown-unknown --release --all
+"""
+
 [tasks.test]
 clear = true
 script = """

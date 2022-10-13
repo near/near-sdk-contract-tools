@@ -1,6 +1,6 @@
 #![cfg(not(windows))]
 
-use workspaces::{network::Sandbox, prelude::*, Account, Contract, Worker};
+use workspaces::{Account, Contract};
 
 const WASM: &[u8] = include_bytes!("../../target/wasm32-unknown-unknown/release/upgrade_old.wasm");
 
@@ -14,7 +14,6 @@ const RANDOM_WASM: &[u8] =
     include_bytes!("../../target/wasm32-unknown-unknown/release/counter_multisig.wasm");
 
 struct Setup {
-    pub worker: Worker<Sandbox>,
     pub contract: Contract,
     pub accounts: Vec<Account>,
 }
@@ -31,40 +30,27 @@ async fn setup(num_accounts: usize, wasm: &[u8]) -> Setup {
 
     let alice = &accounts[0].clone();
 
-    let contract = alice
-        .deploy(&worker, &wasm.to_vec())
-        .await
-        .unwrap()
-        .unwrap();
-    contract.call(&worker, "new").transact().await.unwrap();
+    let contract = alice.deploy(&wasm.to_vec()).await.unwrap().unwrap();
+    contract.call("new").transact().await.unwrap().unwrap();
 
-    Setup {
-        worker,
-        contract,
-        accounts,
-    }
+    Setup { contract, accounts }
 }
 
 #[tokio::test]
 async fn upgrade() {
-    // Deploy old contract ** LIKE HERE
-    // Initialize old contract
-    let Setup {
-        worker,
-        contract,
-        accounts,
-    } = setup(1, WASM).await;
+    let Setup { contract, accounts } = setup(1, WASM).await;
 
     let alice = &accounts[0];
 
     alice
-        .call(&worker, contract.id(), "increment_foo")
+        .call(contract.id(), "increment_foo")
         .transact()
         .await
+        .unwrap()
         .unwrap();
 
     let val = alice
-        .call(&worker, contract.id(), "get_foo")
+        .call(contract.id(), "get_foo")
         .transact()
         .await
         .unwrap()
@@ -74,15 +60,16 @@ async fn upgrade() {
     assert_eq!(val, 1);
 
     alice
-        .call(&worker, contract.id(), "upgrade_contract")
+        .call(contract.id(), "upgrade_contract")
         .max_gas()
         .args(NEW_WASM.to_vec())
         .transact()
         .await
+        .unwrap()
         .unwrap();
 
     let new_val = alice
-        .call(&worker, contract.id(), "get_bar")
+        .call(contract.id(), "get_bar")
         .transact()
         .await
         .unwrap()
@@ -92,13 +79,14 @@ async fn upgrade() {
     assert_eq!(new_val, 1);
 
     alice
-        .call(&worker, contract.id(), "decrement_bar")
+        .call(contract.id(), "decrement_bar")
         .transact()
         .await
+        .unwrap()
         .unwrap();
 
     let end_val = alice
-        .call(&worker, contract.id(), "get_bar")
+        .call(contract.id(), "get_bar")
         .transact()
         .await
         .unwrap()
@@ -109,76 +97,64 @@ async fn upgrade() {
 }
 
 #[tokio::test]
-#[should_panic = "called `Result::unwrap()` on an `Err` value: Action #1: CompilationError(PrepareError(Deserialization))"]
+#[should_panic = "CompilationError(PrepareError(Deserialization))"]
 async fn upgrade_failure_blank_wasm() {
-    let Setup {
-        worker,
-        contract,
-        accounts,
-    } = setup(1, WASM).await;
+    let Setup { contract, accounts } = setup(1, WASM).await;
 
     let alice = &accounts[0];
 
     alice
-        .call(&worker, contract.id(), "upgrade_contract")
+        .call(contract.id(), "upgrade_contract")
         .max_gas()
         .transact()
         .await
+        .unwrap()
         .unwrap();
 }
 
 #[tokio::test]
-#[should_panic = "called `Result::unwrap()` on an `Err` value: Action #0: MethodResolveError(MethodNotFound)"]
+#[should_panic = "MethodResolveError(MethodNotFound)"]
 async fn upgrade_failure_no_upgrade() {
-    let Setup {
-        worker,
-        contract,
-        accounts,
-    } = setup(1, BAD_WASM).await;
+    let Setup { contract, accounts } = setup(1, BAD_WASM).await;
 
     let alice = &accounts[0];
 
     alice
-        .call(&worker, contract.id(), "upgrade_contract")
+        .call(contract.id(), "upgrade_contract")
         .max_gas()
         .transact()
         .await
+        .unwrap()
         .unwrap();
 }
 
 #[tokio::test]
-#[should_panic = "called `Result::unwrap()` on an `Err` value: Action #0: MethodResolveError(MethodNotFound)"]
+#[should_panic = "MethodResolveError(MethodNotFound)"]
 async fn upgrade_failure_random_wasm() {
-    let Setup {
-        worker,
-        contract,
-        accounts,
-    } = setup(1, RANDOM_WASM).await;
+    let Setup { contract, accounts } = setup(1, RANDOM_WASM).await;
 
     let alice = &accounts[0];
 
     alice
-        .call(&worker, contract.id(), "upgrade_contract")
+        .call(contract.id(), "upgrade_contract")
         .max_gas()
         .transact()
         .await
+        .unwrap()
         .unwrap();
 }
 
 #[tokio::test]
-#[should_panic = "called `Result::unwrap()` on an `Err` value: Action #0: ExecutionError(\"Smart contract panicked: Owner only\")"]
+#[should_panic = "Smart contract panicked: Owner only"]
 async fn upgrade_failure_not_owner() {
-    let Setup {
-        worker,
-        contract,
-        accounts,
-    } = setup(2, WASM).await;
+    let Setup { contract, accounts } = setup(2, WASM).await;
 
     let bob = &accounts[1];
 
-    bob.call(&worker, contract.id(), "upgrade_contract")
+    bob.call(contract.id(), "upgrade_contract")
         .max_gas()
         .transact()
         .await
+        .unwrap()
         .unwrap();
 }
