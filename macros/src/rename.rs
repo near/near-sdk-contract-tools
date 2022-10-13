@@ -19,7 +19,8 @@ pub enum RenameStrategy {
 }
 
 impl RenameStrategy {
-    pub fn transform(&self, s: &str) -> String {
+    pub fn transform<T: AsRef<str>>(&self, s: T) -> String {
+        let s = s.as_ref();
         match self {
             RenameStrategy::UpperCamelCase => s.to_upper_camel_case(),
             RenameStrategy::LowerCamelCase => s.to_lower_camel_case(),
