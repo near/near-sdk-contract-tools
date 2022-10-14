@@ -1,7 +1,7 @@
-//! Owner pattern provides operations to query, manage and transfer ownership
+//! Owner pattern provides methods to query, manage and transfer ownership
 //! of the contract.
 //!
-//! An owned contract has to be initialized with an owner. The account that
+//! An owned contract is initialized with an owner. The account that
 //! currently owns the contract is the "current owner". It can propose
 //! an account to transfer ownership to. This proposed account is the
 //! "proposed owner". If the proposed owner accepts the transfer, it becomes
@@ -16,10 +16,10 @@
 //! derives default implementation both these traits.
 //!
 //! # Safety
-//! The default implementation will throw an error or display unexpected
-//! behaviour if the following invariants are not met.
+//! The default implementation throws an error or shows unexpected behaviour,
+//! if the following invariants are not met.
 //!
-//! * The owner root storage key is not used or modified. Default key is "~o".
+//! * The owner root storage key is not used or modified. The default key is "~o".
 //! * Only the current owner [`Owner::renounce_owner`] and [`Owner::propose_owner`]
 //! * Only the proposed owner can call [`Owner::accept_owner`]
 //! * These external functions call internal functions with the similar name

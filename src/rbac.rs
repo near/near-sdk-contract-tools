@@ -1,5 +1,25 @@
-//! Role-based access control
-
+//! Role-Based Access Control pattern provides methods to manage roles for
+//! accounts and control their access.
+//!
+//! RBAC expects the user to provide a type for [`Role`][Rbac::Role]. Typically
+//! this is an enum and it's variants are the distinct roles. An account can be
+//! associated with multiple roles. [`Rbac`] implements methods to add, remove
+//! and check an account for a role. It also provides "guard" methods to require
+//! or prohibit a particular role. Typically these are used to guard access to
+//! external functions exposed by the contract.
+//!
+//! The provided [derive_macro][`near_contract_tools_macros::Rbac`] derives
+//! a default implementation for Rbac.
+//!
+//! # Safety
+//! The default implementation throws an error or shows unexpected behaviour,
+//! if the following invariants are not met.
+//!
+//! * The rbac root storage key is not used or modified. The default key is "~r".
+//! * [`require_role`][Rbac::require_role] only allows accounts with the required
+//!   role
+//! * [`prohibit_role`][Rbac::prohibit_role] does not allow accounts with
+//!   the prohibited role
 use near_sdk::{borsh::BorshSerialize, env, require, AccountId, IntoStorageKey};
 
 use crate::slot::Slot;
