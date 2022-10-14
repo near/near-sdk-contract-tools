@@ -6,14 +6,14 @@
 //! is emitted. A contract starts off as "unpaused" by default. [`PauseExternal`]
 //! exposes an external function to check the status of the contract.
 //!
-//! The provided [derive_macro][`near_contract_tools_macros::Pause`]
+//! This [derive_macro][`near_contract_tools_macros::Pause`]
 //! derives a default implementation for both these traits.
 //!
 //! # Safety
 //! The default implementation will throw an error or display unexpected
 //! behaviour if the following invariants are not met.
 //!
-//! * The pause root storage key is not used or modified. The default key is "~p".
+//! * The pause root storage key is not used or modified. The default key is `~p`.
 //! * Only an "unpaused" contract can call `pause`
 //! * Only a "paused" contract can call `unpause`
 #![allow(missing_docs)] // #[ext_contract(...)] does not play nicely with clippy

@@ -12,14 +12,14 @@
 //!
 //! The pattern consists of methods in [`Owner`] and [`OwnerExternal`]. The
 //! latter exposes methods externally and can be called by other contracts.
-//! The provided [derive_macro][`near_contract_tools_macros::Owner`]
+//! This [derive_macro][`near_contract_tools_macros::Owner`]
 //! derives default implementation both these traits.
 //!
 //! # Safety
 //! The default implementation throws an error or shows unexpected behaviour,
 //! if the following invariants are not met.
 //!
-//! * The owner root storage key is not used or modified. The default key is "~o".
+//! * The owner root storage key is not used or modified. The default key is `~o`.
 //! * Only the current owner [`Owner::renounce_owner`] and [`Owner::propose_owner`]
 //! * Only the proposed owner can call [`Owner::accept_owner`]
 //! * These external functions call internal functions with the similar name

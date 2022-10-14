@@ -8,14 +8,14 @@
 //! or prohibit a particular role. Typically these are used to guard access to
 //! external functions exposed by the contract.
 //!
-//! The provided [derive_macro][`near_contract_tools_macros::Rbac`] derives
+//! This [derive_macro][`near_contract_tools_macros::Rbac`] derives
 //! a default implementation for Rbac.
 //!
 //! # Safety
 //! The default implementation throws an error or shows unexpected behaviour,
 //! if the following invariants are not met.
 //!
-//! * The rbac root storage key is not used or modified. The default key is "~r".
+//! * The rbac root storage key is not used or modified. The default key is `~r`.
 //! * [`require_role`][Rbac::require_role] only allows accounts with the required
 //!   role
 //! * [`prohibit_role`][Rbac::prohibit_role] does not allow accounts with
