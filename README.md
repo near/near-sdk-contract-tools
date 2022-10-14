@@ -119,6 +119,8 @@ fn own_accept_owner(&mut self);
 
 ### Events
 
+The `#[event]` macro can be applied to structs or enums.
+
 ```rust
 use near_contract_tools::{event, standard::nep297::Event};
 
