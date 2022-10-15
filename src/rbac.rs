@@ -1,4 +1,4 @@
-//! Role-Based Access Control pattern provides methods to manage roles for
+//! Role-Based Access Control pattern implements methods to manage roles for
 //! accounts and control their access.
 //!
 //! RBAC expects the user to provide a type for [`Role`][Rbac::Role]. Typically
@@ -9,16 +9,20 @@
 //! external functions exposed by the contract.
 //!
 //! This [derive_macro][`near_contract_tools_macros::Rbac`] derives
-//! a default implementation for Rbac.
+//! a default implementation for Rbac. For a complete example check out
+//! [counter_multisig.rs](https://github.com/NEARFoundation/near-contract-tools/blob/develop/workspaces-tests/src/bin/counter_multisig.rs)
+//! in workspace-tests directory.
 //!
 //! # Safety
-//! The default implementation throws an error or shows unexpected behaviour,
-//! if the following invariants are not met.
+//! The default implementation assumes or enforces the following invariants.
+//! Violating assumed invariants may corrupt contract state and show unexpected
+//! behavior [UB]. "guard" methods enforce invariants and throw an error [ERR]
+//! when accessed by unauthorized accounts.
 //!
-//! * The rbac root storage key is not used or modified. The default key is `~r`.
-//! * [`require_role`][Rbac::require_role] only allows accounts with the required
+//! * [UB] The rbac root storage slot is not used or modified. The default key is `~r`.
+//! * [ERR] [`require_role`][Rbac::require_role] only allows accounts with the required
 //!   role
-//! * [`prohibit_role`][Rbac::prohibit_role] does not allow accounts with
+//! * [ERR] [`prohibit_role`][Rbac::prohibit_role] does not allow accounts with
 //!   the prohibited role
 use near_sdk::{borsh::BorshSerialize, env, require, AccountId, IntoStorageKey};
 

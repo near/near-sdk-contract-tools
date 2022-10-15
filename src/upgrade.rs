@@ -1,7 +1,14 @@
-//! Upgrade Mod
+//! Upgrade pattern implements methods to upgrade the contract state and code.
 //!
-//! Makes it easier to upgrade your contract by providing a simple interface for upgrading the code and the state of your contract.
-
+//! Upgrade does not have a default implementation and must be implemented
+//! by the user. For a complete example checkout [upgrade_old.rs](https://github.com/NEARFoundation/near-contract-tools/blob/develop/workspaces-tests/src/bin/upgrade_old.rs)
+//! in workspace-tests.
+//!
+//! # Safety
+//! Upgrade internally calls migrate and has the same invariants. The contract
+//! state must conform to the old schema
+//! The contract state must conform to the old schema otherwise deserializing it
+//! will fail and throw an error.
 use near_sdk::{env, sys, Gas};
 
 use near_sdk::borsh::{BorshDeserialize, BorshSerialize};

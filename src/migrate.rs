@@ -1,4 +1,20 @@
-//! Migrate default struct between two schemas
+//! Migrate pattern implements methods to change the storage representation of a struct.
+//!
+//! The migration controller takes the old and new schema and deserializes
+//! the contract state from the old schema. The [`on_migrate`][`MigrateHook::on_migrate`]
+//! method takes this state and replaces it with the new schema.
+//! [`MigrateExternal`] exposes this functionality as publicly. This
+//! [derive_macro][`near_contract_tools_macros::Migrate`] derives a default implementation
+//! for migration.
+//!
+//! Note: [`MigrateHook`] must be implemented by the user and is not derived
+//! by default. It must convert data in the old schema to the new schema without
+//! failing. For a complete example checkout [upgrade_new.rs](https://github.com/NEARFoundation/near-contract-tools/blob/develop/workspaces-tests/src/bin/upgrade_new.rs)
+//! in workspace-tests.
+//!
+//! # Safety
+//! The contract state must conform to the old schema otherwise deserializing it
+//! will fail and throw an error.
 #![allow(missing_docs)] // #[ext_contract(...)] does not play nicely with clippy
 
 use near_sdk::{
@@ -36,7 +52,7 @@ pub trait MigrateHook: MigrateController {
     ) -> <Self as MigrateController>::NewSchema;
 }
 
-/// Migrate-able contracts expose this trait publically
+/// Migrate-able contracts expose this trait publicly
 #[ext_contract(ext_migrate)]
 pub trait MigrateExternal {
     /// Perform the migration with optional arguments

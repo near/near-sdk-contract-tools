@@ -1,4 +1,4 @@
-//! Owner pattern provides methods to query, manage and transfer ownership
+//! Owner pattern implements methods to query, manage and transfer ownership
 //! of the contract.
 //!
 //! An owned contract is initialized with an owner. The account that
@@ -16,17 +16,16 @@
 //! derives default implementation both these traits.
 //!
 //! # Safety
-//! The default implementation throws an error or shows unexpected behaviour,
-//! if the following invariants are not met.
+//! The default implementation assumes or enforces the following invariants.
+//! Violating assumed invariants may corrupt contract state and show unexpected
+//! behavior [UB]. Enforced invariants throw an error [ERR] but contract
+//! state remains intact.
 //!
-//! * The owner root storage key is not used or modified. The default key is `~o`.
-//! * Only the current owner [`Owner::renounce_owner`] and [`Owner::propose_owner`]
-//! * Only the proposed owner can call [`Owner::accept_owner`]
-//! * These external functions call internal functions with the similar name
-//!   and expect the same invariants.
-//!     * [`OwnerExternal::own_renounce_owner`]
-//!     * [`OwnerExternal::own_propose_owner`]
-//!     * [`OwnerExternal::own_accept_owner`]
+//! * [UB] The owner root storage slot is not used or modified. The default key is `~o`.
+//! * [ERR] Only the current owner can call [`Owner::renounce_owner`] and [`Owner::propose_owner`]
+//! * [ERR] Only the proposed owner can call [`Owner::accept_owner`]
+//! * [ERR] The external functions exposed in [`OwnerExternal`] call their
+//!   respective [`Owner`] methods and expect the same invariants.
 #![allow(missing_docs)] // #[ext_contract(...)] does not play nicely with clippy
 
 use near_sdk::{env, ext_contract, require, AccountId};
