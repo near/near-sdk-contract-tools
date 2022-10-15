@@ -8,7 +8,7 @@
 //! or prohibit a particular role. Typically these are used to guard access to
 //! external functions exposed by the contract.
 //!
-//! This [derive_macro][`near_contract_tools_macros::Rbac`] derives
+//! This [derive_macro](near_contract_tools_macros::Rbac) derives
 //! a default implementation for Rbac. For a complete example check out
 //! [counter_multisig.rs](https://github.com/NEARFoundation/near-contract-tools/blob/develop/workspaces-tests/src/bin/counter_multisig.rs)
 //! in workspace-tests directory.

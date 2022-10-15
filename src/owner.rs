@@ -12,7 +12,7 @@
 //!
 //! The pattern consists of methods in [`Owner`] and [`OwnerExternal`]. The
 //! latter exposes methods externally and can be called by other contracts.
-//! This [derive_macro][`near_contract_tools_macros::Owner`]
+//! This [derive_macro](near_contract_tools_macros::Owner)
 //! derives default implementation both these traits.
 //!
 //! # Safety

@@ -5,10 +5,9 @@
 //! in workspace-tests.
 //!
 //! # Safety
-//! Upgrade internally calls migrate and has the same invariants. The contract
-//! state must conform to the old schema
-//! The contract state must conform to the old schema otherwise deserializing it
-//! will fail and throw an error.
+//! Upgrade internally calls [migrate](super::migrate::MigrateExternal)
+//! and has the same invariants. The contract state must conform to the old
+//! schema otherwise deserializing it will fail and throw an error.
 use near_sdk::{env, sys, Gas};
 
 use near_sdk::borsh::{BorshDeserialize, BorshSerialize};

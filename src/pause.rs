@@ -6,7 +6,7 @@
 //! is emitted. A contract starts off as "unpaused" by default. [`PauseExternal`]
 //! exposes an external function to check the status of the contract.
 //!
-//! This [derive_macro][`near_contract_tools_macros::Pause`]
+//! This [derive_macro](near_contract_tools_macros::Pause)
 //! derives a default implementation for both these traits.
 //!
 //! # Safety
