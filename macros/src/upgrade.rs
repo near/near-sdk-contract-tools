@@ -1,9 +1,6 @@
 use darling::FromDeriveInput;
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::Expr;
-
-const DEFAULT_STORAGE_KEY: &str = r#"(b"~o" as &[u8])"#;
 
 #[derive(Debug, FromDeriveInput)]
 #[darling(attributes(upgrade), supports(struct_named))]
@@ -15,8 +12,6 @@ pub struct UpgradeMeta {
     // crates
     #[darling(rename = "crate", default = "crate::default_crate_name")]
     pub me: syn::Path,
-    #[darling(default = "crate::default_near_sdk")]
-    pub near_sdk: syn::Path,
 }
 
 pub fn expand(meta: UpgradeMeta) -> Result<TokenStream, darling::Error> {
@@ -26,7 +21,6 @@ pub fn expand(meta: UpgradeMeta) -> Result<TokenStream, darling::Error> {
         generics,
 
         me,
-        near_sdk,
     } = meta;
 
     let (imp, ty, wher) = generics.split_for_impl();
