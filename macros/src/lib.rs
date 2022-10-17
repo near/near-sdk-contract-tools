@@ -11,6 +11,7 @@ mod pause;
 mod rbac;
 mod rename;
 mod standard;
+mod upgrade;
 
 fn default_crate_name() -> syn::Path {
     syn::parse_str("::near_contract_tools").unwrap()
@@ -175,4 +176,16 @@ pub fn event(attr: TokenStream, item: TokenStream) -> TokenStream {
         .and_then(|meta| standard::event::event_attribute(meta, item))
         .map(Into::into)
         .unwrap_or_else(|e| e.write_errors().into())
+}
+
+/// Create an upgrade component. Does not expose any functions to the
+/// blockchain.
+///
+/// Fields may be specified in the `#[upgrade(...)]` attribute.
+///
+/// Fields include:
+///  - `no_default_hook` Flag to determine if there is not a default hook (optional, default: False)
+#[proc_macro_derive(Upgrade, attributes(upgrade))]
+pub fn derive_upgrade(input: TokenStream) -> TokenStream {
+    make_derive(input, upgrade::expand)
 }

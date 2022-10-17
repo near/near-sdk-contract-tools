@@ -3,11 +3,11 @@
 //! Makes it easier to upgrade your contract by providing a simple interface for upgrading the code and the state of your contract.
 
 use near_sdk::{env, sys, Gas};
-
-use near_sdk::borsh::{BorshDeserialize, BorshSerialize};
-
 /// Upgrade Trait
-pub trait Upgrade {
+pub trait Upgrade
+where
+    Self: UpgradeHook,
+{
     /// upgrade_contract - Upgrades the code and the state of the contract
     fn upgrade_contract();
 }
@@ -21,7 +21,7 @@ pub trait UpgradeHook {
 /// Naked upgrade function which calls migrate method on the contract
 pub fn upgrade<T>()
 where
-    T: BorshDeserialize + BorshSerialize,
+    T: UpgradeHook + ?Sized,
 {
     env::setup_panic_hook();
 
