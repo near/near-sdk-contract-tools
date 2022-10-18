@@ -15,8 +15,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
-      - name: Configure Rust
-        uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt
       - name: Check formatting
@@ -28,19 +27,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
-      - name: Configure Rust
-        uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
-      - uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - name: Run linter
         run: cargo clippy -- -D warnings
   test:
@@ -48,17 +37,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
-      - name: Configure Rust
-        uses: dtolnay/rust-toolchain@stable
-      - uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - uses: dtolnay/rust-toolchain@stable
       - name: Run unit and integration tests
         run: cargo test --verbose
   workspaces-test:
@@ -66,19 +45,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
-      - name: Configure Rust
-        uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-unknown-unknown
-      - uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - name: Run workspaces tests
         run: >
           cd workspaces-tests;
