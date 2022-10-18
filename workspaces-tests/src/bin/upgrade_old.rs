@@ -45,6 +45,6 @@ impl Upgrade for ContractOld {
     #[no_mangle]
     fn upgrade_contract() {
         Self::on_upgrade();
-        upgrade::<ContractOld>();
+        upgrade();
     }
 }

@@ -2,12 +2,11 @@
 //!
 //! Makes it easier to upgrade your contract by providing a simple interface for upgrading the code and the state of your contract.
 
+use crate::owner::Owner;
 use near_sdk::{env, sys, Gas};
+/// Upgrades the contract to the new code and state.
 /// Upgrade Trait
-pub trait Upgrade
-where
-    Self: UpgradeHook,
-{
+pub trait Upgrade {
     /// upgrade_contract - Upgrades the code and the state of the contract
     fn upgrade_contract();
 }
@@ -19,10 +18,7 @@ pub trait UpgradeHook {
 }
 
 /// Naked upgrade function which calls migrate method on the contract
-pub fn upgrade<T>()
-where
-    T: UpgradeHook + ?Sized,
-{
+pub fn upgrade() {
     env::setup_panic_hook();
 
     const MIGRATE_METHOD_NAME: &[u8; 7] = b"migrate";
