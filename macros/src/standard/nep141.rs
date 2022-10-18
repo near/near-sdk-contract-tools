@@ -87,7 +87,13 @@ pub fn expand(meta: Nep141Meta) -> Result<TokenStream, darling::Error> {
 
                 #before_transfer
 
-                Nep141Controller::transfer(self, &sender_id, &receiver_id, amount, memo.as_deref());
+                Nep141Controller::transfer(
+                    self,
+                    sender_id.clone(),
+                    receiver_id.clone(),
+                    amount,
+                    memo,
+                );
 
                 #after_transfer
             }
@@ -119,7 +125,7 @@ pub fn expand(meta: Nep141Meta) -> Result<TokenStream, darling::Error> {
                     sender_id.clone(),
                     receiver_id.clone(),
                     amount,
-                    memo.as_deref(),
+                    memo,
                     msg.clone(),
                     #near_sdk::env::prepaid_gas(),
                 );
@@ -147,7 +153,12 @@ pub fn expand(meta: Nep141Meta) -> Result<TokenStream, darling::Error> {
                 receiver_id: #near_sdk::AccountId,
                 amount: #near_sdk::json_types::U128,
             ) -> #near_sdk::json_types::U128 {
-                #me::standard::nep141::Nep141Controller::resolve_transfer(self, sender_id, receiver_id, amount.into()).into()
+                #me::standard::nep141::Nep141Controller::resolve_transfer(
+                    self,
+                    sender_id,
+                    receiver_id,
+                    amount.into(),
+                ).into()
             }
         }
     })

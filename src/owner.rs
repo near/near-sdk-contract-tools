@@ -28,7 +28,11 @@
 //!   respective [`Owner`] methods and expect the same invariants.
 #![allow(missing_docs)] // #[ext_contract(...)] does not play nicely with clippy
 
-use near_sdk::{env, ext_contract, require, AccountId};
+use near_contract_tools_macros::event;
+use near_sdk::{
+    borsh::{self, BorshSerialize},
+    env, ext_contract, require, AccountId, BorshStorageKey,
+};
 
 use crate::{slot::Slot, standard::nep297::Event};
 
@@ -39,38 +43,35 @@ const ONLY_PROPOSED_OWNER_FAIL_MESSAGE: &str = "Proposed owner only";
 const NO_PROPOSED_OWNER_FAIL_MESSAGE: &str = "No proposed owner";
 
 /// Events emitted by function calls on an ownable contract
-pub mod event {
-    use near_sdk::AccountId;
-
-    use crate::event;
+#[event(
+    standard = "x-own",
+    version = "1.0.0",
+    crate = "crate",
+    macros = "near_contract_tools_macros"
+)]
+#[derive(Debug, Clone)]
+pub enum OwnerEvent {
     /// Emitted when the current owner of the contract changes
-    #[event(
-        standard = "x-own",
-        version = "1.0.0",
-        crate = "crate",
-        macros = "near_contract_tools_macros"
-    )]
-    #[derive(Debug, Clone)]
-    pub struct Transfer {
+    Transfer {
         /// Former owner of the contract. Will be `None` if the contract is being initialized.
-        pub old: Option<AccountId>,
+        old: Option<AccountId>,
         /// The new owner of the contract. Will be `None` if ownership is renounced.
-        pub new: Option<AccountId>,
-    }
+        new: Option<AccountId>,
+    },
     /// Emitted when the proposed owner of the contract changes
-    #[event(
-        standard = "x-own",
-        version = "1.0.0",
-        crate = "crate",
-        macros = "near_contract_tools_macros"
-    )]
-    #[derive(Debug, Clone)]
-    pub struct Propose {
+    Propose {
         /// Old proposed owner.
-        pub old: Option<AccountId>,
+        old: Option<AccountId>,
         /// New proposed owner.
-        pub new: Option<AccountId>,
-    }
+        new: Option<AccountId>,
+    },
+}
+
+#[derive(BorshSerialize, BorshStorageKey, Debug, Clone)]
+enum StorageKey {
+    IsInitialized,
+    Owner,
+    ProposedOwner,
 }
 
 /// A contract with an owner
@@ -80,17 +81,17 @@ pub trait Owner {
 
     /// Storage slot for initialization state
     fn slot_is_initialized() -> Slot<bool> {
-        Self::root().field(b"i")
+        Self::root().field(StorageKey::IsInitialized)
     }
 
     /// Storage slot for owner account ID
     fn slot_owner() -> Slot<AccountId> {
-        Self::root().field(b"o")
+        Self::root().field(StorageKey::Owner)
     }
 
     /// Storage slot for proposed owner account ID
     fn slot_proposed_owner() -> Slot<AccountId> {
-        Self::root().field(b"p")
+        Self::root().field(StorageKey::ProposedOwner)
     }
 
     /// Updates the current owner and emits relevant event
@@ -98,7 +99,7 @@ pub trait Owner {
         let owner = Self::slot_owner();
         let old = owner.read();
         if old != new {
-            event::Transfer {
+            OwnerEvent::Transfer {
                 old,
                 new: new.clone(),
             }
@@ -112,7 +113,7 @@ pub trait Owner {
         let proposed_owner = Self::slot_proposed_owner();
         let old = proposed_owner.read();
         if old != new {
-            event::Propose {
+            OwnerEvent::Propose {
                 old,
                 new: new.clone(),
             }
@@ -179,7 +180,7 @@ pub trait Owner {
         Self::slot_is_initialized().write(&true);
         Self::slot_owner().write(owner_id);
 
-        event::Transfer {
+        OwnerEvent::Transfer {
             old: None,
             new: Some(owner_id.clone()),
         }
@@ -257,7 +258,7 @@ pub trait Owner {
             ONLY_PROPOSED_OWNER_FAIL_MESSAGE,
         );
 
-        event::Propose {
+        OwnerEvent::Propose {
             old: Some(proposed_owner.clone()),
             new: None,
         }
