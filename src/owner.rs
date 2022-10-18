@@ -1,9 +1,9 @@
 //! Owner pattern implements methods to query, manage and transfer ownership
 //! of the contract.
 //!
-//! An owned contract is initialized with an owner. The account that
-//! currently owns the contract is the "current owner". It can propose
-//! an account to transfer ownership to. This proposed account is the
+//! The account that owns the contract is called the "current" owner. A contract
+//! is always initialized with an owner account. The current owner can propose an
+//! ownership transfer to a different account. This proposed account is the
 //! "proposed owner". If the proposed owner accepts the transfer, it becomes
 //! the current owner. The current owner can also renounce ownership of the
 //! contract.

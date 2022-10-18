@@ -3,7 +3,7 @@
 //! The migration controller takes the old and new schema and deserializes
 //! the contract state from the old schema. The [`on_migrate`][`MigrateHook::on_migrate`]
 //! method takes this state and replaces it with the new schema.
-//! [`MigrateExternal`] exposes this functionality as publicly. This
+//! [`MigrateExternal`] exposes this functionality publicly. This
 //! [derive_macro](near_contract_tools_macros::Migrate) derives a default implementation
 //! for migration.
 //!
