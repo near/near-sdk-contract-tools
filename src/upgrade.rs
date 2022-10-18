@@ -2,7 +2,6 @@
 //!
 //! Makes it easier to upgrade your contract by providing a simple interface for upgrading the code and the state of your contract.
 
-use crate::owner::Owner;
 use near_sdk::{env, sys, Gas};
 /// Upgrades the contract to the new code and state.
 /// Upgrade Trait
