@@ -16,13 +16,13 @@
 //! # Safety
 //! The default implementation assumes or enforces the following invariants.
 //! Violating assumed invariants may corrupt contract state and show unexpected
-//! behavior [UB]. "guard" methods enforce invariants and throw an error [ERR]
+//! behavior (UB). "guard" methods enforce invariants and throw an error (ERR)
 //! when accessed by unauthorized accounts.
 //!
-//! * [UB] The rbac root storage slot is not used or modified. The default key is `~r`.
-//! * [ERR] [`require_role`][Rbac::require_role] only allows accounts with the required
+//! * (UB) The rbac root storage slot is not used or modified. The default key is `~r`.
+//! * (ERR) [`require_role`][Rbac::require_role] only allows accounts with the required
 //!   role
-//! * [ERR] [`prohibit_role`][Rbac::prohibit_role] does not allow accounts with
+//! * (ERR) [`prohibit_role`][Rbac::prohibit_role] does not allow accounts with
 //!   the prohibited role
 use near_sdk::{borsh::BorshSerialize, env, require, AccountId, IntoStorageKey};
 

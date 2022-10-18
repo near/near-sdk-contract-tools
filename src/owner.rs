@@ -18,13 +18,13 @@
 //! # Safety
 //! The default implementation assumes or enforces the following invariants.
 //! Violating assumed invariants may corrupt contract state and show unexpected
-//! behavior [UB]. Enforced invariants throw an error [ERR] but contract
+//! behavior (UB). Enforced invariants throw an error (ERR) but contract
 //! state remains intact.
 //!
-//! * [UB] The owner root storage slot is not used or modified. The default key is `~o`.
-//! * [ERR] Only the current owner can call [`Owner::renounce_owner`] and [`Owner::propose_owner`]
-//! * [ERR] Only the proposed owner can call [`Owner::accept_owner`]
-//! * [ERR] The external functions exposed in [`OwnerExternal`] call their
+//! * (UB) The owner root storage slot is not used or modified. The default key is `~o`.
+//! * (ERR) Only the current owner can call [`Owner::renounce_owner`] and [`Owner::propose_owner`]
+//! * (ERR) Only the proposed owner can call [`Owner::accept_owner`]
+//! * (ERR) The external functions exposed in [`OwnerExternal`] call their
 //!   respective [`Owner`] methods and expect the same invariants.
 #![allow(missing_docs)] // #[ext_contract(...)] does not play nicely with clippy
 

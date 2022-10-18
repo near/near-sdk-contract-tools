@@ -12,12 +12,12 @@
 //! # Safety
 //! The default implementation assumes or enforces the following invariants.
 //! Violating assumed invariants may corrupt contract state and show unexpected
-//! behavior [UB]. Enforced invariants throw an error [ERR] but contract
+//! behavior (UB). Enforced invariants throw an error (ERR) but contract
 //! state remains intact.
 //!
-//! * [UB] The pause root storage slot is not used or modified. The default key is `~p`.
-//! * [ERR] Only an "unpaused" contract can call `pause`
-//! * [ERR] Only a "paused" contract can call `unpause`
+//! * (UB) The pause root storage slot is not used or modified. The default key is `~p`.
+//! * (ERR) Only an "unpaused" contract can call `pause`
+//! * (ERR) Only a "paused" contract can call `unpause`
 #![allow(missing_docs)] // #[ext_contract(...)] does not play nicely with clippy
 
 use crate::{slot::Slot, standard::nep297::Event};
