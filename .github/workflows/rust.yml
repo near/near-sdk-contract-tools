@@ -16,10 +16,8 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Configure Rust
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@1.64
         with:
-            toolchain: stable
-            override: true
             components: rustfmt
       - name: Check formatting
         run: >
@@ -31,10 +29,8 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Configure Rust
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@1.64
         with:
-            toolchain: stable
-            override: true
             components: clippy
       - uses: actions/cache@v3
         with:
@@ -53,10 +49,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Configure Rust
-        uses: actions-rs/toolchain@v1
-        with:
-            toolchain: stable
-            override: true
+        uses: dtolnay/rust-toolchain@1.64
       - uses: actions/cache@v3
         with:
           path: |
@@ -74,11 +67,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Configure Rust
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@1.64
         with:
-            toolchain: stable
-            override: true
-            target: wasm32-unknown-unknown
+            targets: wasm32-unknown-unknown
       - uses: actions/cache@v3
         with:
           path: |
