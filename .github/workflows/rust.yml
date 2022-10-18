@@ -18,7 +18,7 @@ jobs:
       - name: Configure Rust
         uses: dtolnay/rust-toolchain@1.64.0
         with:
-            components: rustfmt
+          components: rustfmt
       - name: Check formatting
         run: >
           echo "::echo::on";
@@ -31,7 +31,7 @@ jobs:
       - name: Configure Rust
         uses: dtolnay/rust-toolchain@1.64.0
         with:
-            components: clippy
+          components: clippy
       - uses: actions/cache@v3
         with:
           path: |
@@ -69,7 +69,7 @@ jobs:
       - name: Configure Rust
         uses: dtolnay/rust-toolchain@1.64.0
         with:
-            targets: wasm32-unknown-unknown
+          targets: wasm32-unknown-unknown
       - uses: actions/cache@v3
         with:
           path: |
