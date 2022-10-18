@@ -17,7 +17,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: stable
+          toolchain: 1.64
           components: rustfmt
       - name: Check formatting
         run: >
@@ -30,7 +30,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: stable
+          toolchain: 1.64
           components: clippy
       - name: Run linter
         run: cargo clippy -- -D warnings
@@ -41,7 +41,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: stable
+          toolchain: 1.64
       - name: Run unit and integration tests
         run: cargo test --verbose
   workspaces-test:
@@ -51,7 +51,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: stable
+          toolchain: 1.64
           targets: wasm32-unknown-unknown
       - name: Run workspaces tests
         run: >
