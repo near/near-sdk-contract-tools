@@ -42,7 +42,7 @@ near dev-deploy $(raen build --release -q)
 
 ### Example Usage
 
-After installing NEAR CLI (https://docs.near.org/tools/near-cli#near-call), call like:
+After [installing NEAR CLI](https://docs.near.org/tools/near-cli#installation), call like:
 
 ```text
 near call dev-1662491554455-22903649156976 new --account-id example-acct-alice.testnet
