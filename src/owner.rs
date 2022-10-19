@@ -8,11 +8,14 @@
 //! the current owner. The current owner can also renounce ownership of the
 //! contract.
 //!
+//! The owner of the contract may be initialized once (e.g. at contract
+//! creation) using [`Owner::init`].
+//!
 //! Note: There is no way to recover ownership of a renounced contract.
 //!
 //! The pattern consists of methods in [`Owner`] and [`OwnerExternal`]. The
 //! latter exposes methods externally and can be called by other contracts.
-//! This [derive_macro](near_contract_tools_macros::Owner)
+//! This [derive macro](near_contract_tools_macros::Owner)
 //! derives default implementation both these traits.
 //!
 //! # Safety
@@ -22,8 +25,9 @@
 //! state remains intact.
 //!
 //! * (UB) The owner root storage slot is not used or modified. The default key is `~o`.
-//! * (ERR) Only the current owner can call [`Owner::renounce_owner`] and [`Owner::propose_owner`]
-//! * (ERR) Only the proposed owner can call [`Owner::accept_owner`]
+//! * (ERR) [`Owner::init`] may be called a maximum of one time.
+//! * (ERR) Only the current owner can call [`Owner::renounce_owner`] and [`Owner::propose_owner`].
+//! * (ERR) Only the proposed owner can call [`Owner::accept_owner`].
 //! * (ERR) The external functions exposed in [`OwnerExternal`] call their
 //!   respective [`Owner`] methods and expect the same invariants.
 #![allow(missing_docs)] // #[ext_contract(...)] does not play nicely with clippy

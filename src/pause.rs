@@ -6,7 +6,7 @@
 //! is emitted. A contract starts off as "unpaused" by default. [`PauseExternal`]
 //! exposes an external function to check the status of the contract.
 //!
-//! This [derive_macro](near_contract_tools_macros::Pause)
+//! This [derive macro](near_contract_tools_macros::Pause)
 //! derives a default implementation for both these traits.
 //!
 //! # Safety
@@ -15,9 +15,12 @@
 //! behavior (UB). Enforced invariants throw an error (ERR) but contract
 //! state remains intact.
 //!
+//! * Initial state is unpaused.
 //! * (UB) The pause root storage slot is not used or modified. The default key is `~p`.
-//! * (ERR) Only an "unpaused" contract can call `pause`
-//! * (ERR) Only a "paused" contract can call `unpause`
+//! * (ERR) Only an "unpaused" contract can call `pause`.
+//! * (ERR) Only a "paused" contract can call `unpause`.
+//! * (ERR) [`Pause::require_paused`] may only be called when the contract is paused.
+//! * (ERR) [`Pause::require_unpaused`] may only be called when the contract is unpaused.
 #![allow(missing_docs)] // #[ext_contract(...)] does not play nicely with clippy
 
 use crate::{slot::Slot, standard::nep297::Event};

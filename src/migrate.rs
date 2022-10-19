@@ -5,7 +5,7 @@
 //! method takes this state and replaces it with the new schema.
 //! [`MigrateExternal`] exposes this functionality publicly.
 //!
-//! The crate exports a [derive_macro](near_contract_tools_macros::Migrate)
+//! The crate exports a [derive macro](near_contract_tools_macros::Migrate)
 //! that derives a default implementation for migration.
 //!
 //! Note: [`MigrateHook`] must be implemented by the user and is not derived
