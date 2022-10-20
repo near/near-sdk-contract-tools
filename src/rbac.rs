@@ -1,5 +1,30 @@
-//! Role-based access control
-
+//! Role-Based Access Control pattern implements methods to manage roles for
+//! accounts and control their access.
+//!
+//! RBAC expects the user to provide a type for [`Rbac::Role`]. Typically,
+//! this is an enum and its variants are the distinct roles. An account can be
+//! associated with multiple roles. [`Rbac`] implements methods to add, remove,
+//! and check an account for a role. It also provides "guard" methods to require
+//! or prohibit a particular role. Typically, these are used to guard access to
+//! external functions exposed by the contract.
+//!
+//! This [derive macro](near_contract_tools_macros::Rbac) derives
+//! a default implementation for RBAC. For a complete example check out
+//! [`counter_multisig.rs`](https://github.com/NEARFoundation/near-contract-tools/blob/develop/workspaces-tests/src/bin/counter_multisig.rs)
+//! in workspace-tests directory.
+//!
+//! # Safety
+//! The default implementation assumes or enforces the following invariants.
+//! Violating assumed invariants may corrupt contract state and show unexpected
+//! behavior (UB). "guard" methods enforce invariants and throw an error (ERR)
+//! when accessed by unauthorized accounts.
+//!
+//! * (UB) The rbac root storage slot is not used or modified. The default key
+//!     is `~r`.
+//! * (ERR) [`Rbac::require_role`] may only be called when the predecessor
+//!     account has the specified role.
+//! * (ERR) [`Rbac::prohibit_role`] may only be called when the predecessor
+//!     account does not have the specified role.
 use near_sdk::{borsh::BorshSerialize, env, require, AccountId, IntoStorageKey};
 
 use crate::slot::Slot;
