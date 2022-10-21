@@ -11,7 +11,7 @@ use near_sdk::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{slot::Slot, standard::nep297::*};
+use crate::{slot::Slot, standard::nep297::*, DefaultStorageKey};
 
 /// Gas value required for ft_resolve_transfer calls
 pub const GAS_FOR_RESOLVE_TRANSFER: Gas = Gas(5_000_000_000_000);
@@ -194,7 +194,9 @@ impl Nep141Transfer {
 /// Non-public implementations of functions for managing a fungible token.
 pub trait Nep141Controller {
     /// Root storage slot
-    fn root() -> Slot<()>;
+    fn root() -> Slot<()> {
+        Slot::new(DefaultStorageKey::Nep141)
+    }
 
     /// Slot for account data
     fn slot_account(account_id: &AccountId) -> Slot<u128> {

@@ -38,7 +38,7 @@ use near_sdk::{
     env, ext_contract, require, AccountId, BorshStorageKey,
 };
 
-use crate::{slot::Slot, standard::nep297::Event};
+use crate::{slot::Slot, standard::nep297::Event, DefaultStorageKey};
 
 const ONLY_OWNER_FAIL_MESSAGE: &str = "Owner only";
 const OWNER_INIT_FAIL_MESSAGE: &str = "Owner already initialized";
@@ -81,7 +81,9 @@ enum StorageKey {
 /// A contract with an owner
 pub trait Owner {
     /// Storage root
-    fn root() -> Slot<()>;
+    fn root() -> Slot<()> {
+        Slot::new(DefaultStorageKey::Owner)
+    }
 
     /// Storage slot for initialization state
     fn slot_is_initialized() -> Slot<bool> {
