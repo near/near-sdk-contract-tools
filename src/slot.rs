@@ -62,8 +62,7 @@ impl<T> Slot<T> {
     /// # Warning
     ///
     /// If the data in the slot is not parsable into the new type, methods like
-    /// [`Slot::read`](struct.Slot.html#method.read) and
-    /// [`Slot::take`](struct.Slot.html#method.take) will panic.
+    /// [`Slot::read`] and [`Slot::take`] will panic.
     pub fn transmute<U>(&self) -> Slot<U> {
         Slot {
             key: self.key.clone(),
