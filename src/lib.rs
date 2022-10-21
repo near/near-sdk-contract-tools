@@ -3,15 +3,15 @@
 /// Default storage keys used by various traits' `root()` functions.
 #[derive(Clone, Debug)]
 pub enum DefaultStorageKey {
-    /// Default storage key for [`ApprovalManager`]
+    /// Default storage key for [`approval::ApprovalManager::root`]
     ApprovalManager,
-    /// Default storage key for [`Nep141Controller`]
+    /// Default storage key for [`standard::nep141::Nep141Controller::root`]
     Nep141,
-    /// Default storage key for [`Owner`]
+    /// Default storage key for [`owner::Owner::root`]
     Owner,
-    /// Default storage key for [`Pause`]
+    /// Default storage key for [`pause::Pause::root`]
     Pause,
-    /// Default storage key for [`Rbac`]
+    /// Default storage key for [`rbac::Rbac::root`]
     Rbac,
 }
 
