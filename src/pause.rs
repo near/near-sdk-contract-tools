@@ -23,7 +23,7 @@
 //! * (ERR) [`Pause::require_unpaused`] may only be called when the contract is unpaused.
 #![allow(missing_docs)] // #[ext_contract(...)] does not play nicely with clippy
 
-use crate::{slot::Slot, standard::nep297::Event};
+use crate::{slot::Slot, standard::nep297::Event, DefaultStorageKey};
 use near_contract_tools_macros::event;
 use near_sdk::{ext_contract, require};
 
@@ -80,7 +80,9 @@ pub enum PauseEvent {
 /// ```
 pub trait Pause {
     /// Storage root
-    fn root() -> Slot<()>;
+    fn root() -> Slot<()> {
+        Slot::new(DefaultStorageKey::Pause)
+    }
 
     /// Storage slot for pause state
     fn slot_paused() -> Slot<bool> {

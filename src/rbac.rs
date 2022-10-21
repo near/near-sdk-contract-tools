@@ -27,7 +27,7 @@
 //!     account does not have the specified role.
 use near_sdk::{borsh::BorshSerialize, env, require, AccountId, IntoStorageKey};
 
-use crate::slot::Slot;
+use crate::{slot::Slot, DefaultStorageKey};
 
 const REQUIRE_ROLE_FAIL_MESSAGE: &str = "Unauthorized role";
 const PROHIBIT_ROLE_FAIL_MESSAGE: &str = "Prohibited role";
@@ -38,7 +38,9 @@ pub trait Rbac {
     type Role: BorshSerialize + IntoStorageKey;
 
     /// Storage slot namespace for items
-    fn root() -> Slot<()>;
+    fn root() -> Slot<()> {
+        Slot::new(DefaultStorageKey::Rbac)
+    }
 
     /// Returns whether a given account has been given a certain role.
     fn has_role(account_id: &AccountId, role: &Self::Role) -> bool {

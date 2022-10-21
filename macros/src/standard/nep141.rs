@@ -5,8 +5,6 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::Expr;
 
-const DEFAULT_STORAGE_KEY: &str = r#"(b"~$141" as &[u8])"#;
-
 #[derive(Debug, FromDeriveInput)]
 #[darling(attributes(nep141), supports(struct_named))]
 pub struct Nep141Meta {
@@ -35,8 +33,13 @@ pub fn expand(meta: Nep141Meta) -> Result<TokenStream, darling::Error> {
 
     let (imp, ty, wher) = generics.split_for_impl();
 
-    let storage_key =
-        storage_key.unwrap_or_else(|| syn::parse_str::<Expr>(DEFAULT_STORAGE_KEY).unwrap());
+    let root = storage_key.map(|storage_key| {
+        quote! {
+            fn root() -> #me::slot::Slot<()> {
+                #me::slot::Slot::root(#storage_key)
+            }
+        }
+    });
 
     let before_transfer = no_hooks.is_present().not().then(|| {
         quote! {
@@ -52,9 +55,7 @@ pub fn expand(meta: Nep141Meta) -> Result<TokenStream, darling::Error> {
 
     Ok(quote! {
         impl #imp #me::standard::nep141::Nep141Controller for #ident #ty #wher {
-            fn root() -> #me::slot::Slot<()> {
-                #me::slot::Slot::root(#storage_key)
-            }
+            #root
         }
 
         #[#near_sdk::near_bindgen]
