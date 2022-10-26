@@ -1,8 +1,7 @@
 //! Managed storage slots
 //!
-//! Makes it easier to avoid storing storage keys in storage itself, helping to
-//! reduce IO in a transaction and save on gas.
-
+//! Makes it easy to create and manage storage keys and avoid unnecessary
+//! writes to contract storage. This reduces transaction IO  and saves on gas.
 use std::marker::PhantomData;
 
 use near_sdk::{

@@ -12,8 +12,8 @@ use thiserror::Error;
 
 use super::{ActionRequest, ApprovalConfiguration};
 
-/// An AccountAuthorizer gatekeeps which accounts are eligible to submit approvals
-/// to an ApprovalManager
+/// Check which accounts are eligible to submit approvals to an
+/// [ApprovalManager](super::ApprovalManager)
 pub trait AccountAuthorizer {
     /// Why can this account not be authorized?
     type AuthorizationError;
