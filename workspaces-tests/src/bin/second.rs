@@ -14,7 +14,7 @@ pub struct Contract {}
 #[near_bindgen]
 impl Contract {
     pub fn say_hello(&self) -> String {
-        "hello!".to_string()
+        "I am the second contract".to_string()
     }
 
     #[init(ignore_state)]

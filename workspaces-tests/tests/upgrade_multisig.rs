@@ -31,14 +31,13 @@ async fn setup(num_accounts: usize, wasm: &[u8]) -> Setup {
 }
 
 #[tokio::test]
-async fn upgrade() {
+async fn upgrade_multisig() {
     let Setup { contract, accounts } = setup(1, WASM).await;
 
     let alice = &accounts[0];
 
     let code = Base64VecU8::from(Vec::from(NEW_WASM));
 
-    println!("request");
     let request_id: u32 = alice
         .call(contract.id(), "request")
         .max_gas()
@@ -56,7 +55,6 @@ async fn upgrade() {
         .json()
         .unwrap();
 
-    println!("approve");
     alice
         .call(contract.id(), "approve")
         .max_gas()
@@ -68,8 +66,7 @@ async fn upgrade() {
         .unwrap()
         .unwrap();
 
-    println!("execute");
-    alice
+    let res = alice
         .call(contract.id(), "execute")
         .max_gas()
         .args_json(json!({
@@ -80,7 +77,11 @@ async fn upgrade() {
         .unwrap()
         .unwrap();
 
-    println!("say_hello");
+    assert_eq!(
+        res.logs(),
+        vec!["executing request", "creating promise", "migrate called!"]
+    );
+
     let hello: String = alice
         .view(contract.id(), "say_hello", vec![])
         .await
@@ -88,5 +89,5 @@ async fn upgrade() {
         .json()
         .unwrap();
 
-    assert_eq!(hello, "hello!");
+    assert_eq!(hello, "I am the second contract");
 }

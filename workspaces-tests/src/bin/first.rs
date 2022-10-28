@@ -12,7 +12,7 @@ use near_sdk::{
     json_types::Base64VecU8,
     near_bindgen,
     serde::{Deserialize, Serialize},
-    sys, BorshStorageKey, Gas, PanicOnDefault,
+    BorshStorageKey, Gas, GasWeight, PanicOnDefault, Promise,
 };
 
 #[derive(BorshStorageKey, BorshSerialize, Debug, Clone)]
@@ -27,11 +27,11 @@ pub enum ContractAction {
 }
 
 impl approval::Action<Contract> for ContractAction {
-    type Output = ();
+    type Output = Promise;
 
     fn execute(self, _contract: &mut Contract) -> Self::Output {
         match self {
-            ContractAction::Upgrade { code } => upgrade(code.into()),
+            ContractAction::Upgrade { code } => Upgrade::new(code.into()).run(),
         }
     }
 }
@@ -64,53 +64,48 @@ impl Contract {
     pub fn approve(&mut self, request_id: u32) {
         self.approve_request(request_id).unwrap()
     }
+
+    pub fn execute(&mut self, request_id: u32) -> Promise {
+        env::log_str("executing request");
+        self.execute_request(request_id).unwrap()
+    }
 }
 
-#[no_mangle]
-pub fn execute() {
-    env::setup_panic_hook();
+pub struct Upgrade {
+    pub code: Vec<u8>,
+    pub function_name: String,
+    pub args: Vec<u8>,
+    pub minimum_gas: Gas,
+}
 
-    #[derive(Deserialize)]
-    #[serde(crate = "near_sdk::serde")]
-    struct Args {
-        request_id: u32,
+impl Upgrade {
+    pub fn new(code: Vec<u8>) -> Self {
+        Self {
+            code,
+            function_name: "migrate".to_string(),
+            args: vec![],
+            minimum_gas: Gas(15_000_000_000_000),
+        }
     }
 
-    let Args { request_id } = near_sdk::serde_json::from_slice(&env::input().unwrap()).unwrap();
+    pub fn then(self, function_name: String, args: Vec<u8>) -> Self {
+        Self {
+            function_name,
+            args,
+            ..self
+        }
+    }
 
-    let mut contract: Contract = env::state_read().unwrap();
-    contract.execute_request(request_id).unwrap();
-}
-
-fn upgrade(new_wasm: Vec<u8>) {
-    const MIGRATE_METHOD_NAME: &[u8] = b"migrate";
-    const UPGRADE_GAS_LEFTOVER: Gas = Gas(5_000_000_000_000);
-
-    unsafe {
-        // Load code into register 0 result from the input argument if factory call or from promise if callback.
-        sys::input(0);
-        // Create a promise batch to upgrade current contract with code from register 0.
-        let promise_id = sys::promise_batch_create(
-            env::current_account_id().as_bytes().len() as u64,
-            env::current_account_id().as_bytes().as_ptr() as u64,
-        );
-        // Deploy the contract code from register 0.
-        sys::promise_batch_action_deploy_contract(
-            promise_id,
-            new_wasm.len() as u64,
-            new_wasm.as_ptr() as u64,
-        );
-        // Call promise to migrate the state.
-        // Batched together to fail upgrade if migration fails.
-        sys::promise_batch_action_function_call(
-            promise_id,
-            MIGRATE_METHOD_NAME.len() as u64,
-            MIGRATE_METHOD_NAME.as_ptr() as u64,
-            0,
-            0,
-            0,
-            (env::prepaid_gas() - env::used_gas() - UPGRADE_GAS_LEFTOVER).0,
-        );
-        sys::promise_return(promise_id);
+    pub fn run(self) -> Promise {
+        env::log_str("creating promise");
+        Promise::new(env::current_account_id())
+            .deploy_contract(self.code)
+            .function_call_weight(
+                self.function_name,
+                self.args,
+                0,
+                self.minimum_gas,
+                GasWeight(u64::MAX),
+            )
     }
 }
