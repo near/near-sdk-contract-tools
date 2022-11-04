@@ -1,5 +1,7 @@
 #![allow(missing_docs)]
 pub fn main() {}
+use near_contract_tools::upgrade::{upgrade, Upgrade, UpgradeHook};
+const WASM: &[u8] = include_bytes!("../../../target/wasm32-unknown-unknown/release/first.wasm");
 
 use near_contract_tools::{
     approval::{self, ApprovalManager},
@@ -27,11 +29,11 @@ pub enum ContractAction {
 }
 
 impl approval::Action<Contract> for ContractAction {
-    type Output = Promise;
+    type Output = ();
 
     fn execute(self, _contract: &mut Contract) -> Self::Output {
         match self {
-            ContractAction::Upgrade { code } => Upgrade::new(code.into()).run(),
+            ContractAction::Upgrade { code } => upgrade::<Contract>(code.into()),
         }
     }
 }
@@ -65,47 +67,21 @@ impl Contract {
         self.approve_request(request_id).unwrap()
     }
 
-    pub fn execute(&mut self, request_id: u32) -> Promise {
+    pub fn execute(&mut self, request_id: u32) {
         env::log_str("executing request");
         self.execute_request(request_id).unwrap()
     }
 }
 
-pub struct Upgrade {
-    pub code: Vec<u8>,
-    pub function_name: String,
-    pub args: Vec<u8>,
-    pub minimum_gas: Gas,
+impl UpgradeHook for Contract {
+    fn on_upgrade() {}
 }
 
-impl Upgrade {
-    pub fn new(code: Vec<u8>) -> Self {
-        Self {
-            code,
-            function_name: "migrate".to_string(),
-            args: vec![],
-            minimum_gas: Gas(15_000_000_000_000),
-        }
-    }
-
-    pub fn then(self, function_name: String, args: Vec<u8>) -> Self {
-        Self {
-            function_name,
-            args,
-            ..self
-        }
-    }
-
-    pub fn run(self) -> Promise {
-        env::log_str("creating promise");
-        Promise::new(env::current_account_id())
-            .deploy_contract(self.code)
-            .function_call_weight(
-                self.function_name,
-                self.args,
-                0,
-                self.minimum_gas,
-                GasWeight(u64::MAX),
-            )
+impl Upgrade for Contract {
+    #[no_mangle]
+    fn upgrade_contract() {
+        Self::on_upgrade();
+        let code = Base64VecU8::from(Vec::from(WASM));
+        upgrade::<Contract>(code.try_to_vec().unwrap());
     }
 }

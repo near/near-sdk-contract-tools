@@ -1,6 +1,7 @@
 #![cfg(not(windows))]
 
-use near_sdk::{json_types::Base64VecU8, serde_json::json};
+use near_contract_tools::upgrade::upgrade;
+use near_sdk::{env, json_types::Base64VecU8, serde_json::json};
 use workspaces::{Account, Contract};
 
 const WASM: &[u8] = include_bytes!("../../target/wasm32-unknown-unknown/release/first.wasm");
@@ -14,7 +15,7 @@ struct Setup {
 
 /// Setup for individual tests
 async fn setup(num_accounts: usize, wasm: &[u8]) -> Setup {
-    let worker = workspaces::sandbox().await.unwrap();
+    let worker = workspaces::testnet().await.unwrap();
 
     // Initialize user accounts
     let mut accounts = vec![];
@@ -38,6 +39,8 @@ async fn upgrade_multisig() {
 
     let code = Base64VecU8::from(Vec::from(NEW_WASM));
 
+    env::log_str("creating promise");
+
     let request_id: u32 = alice
         .call(contract.id(), "request")
         .max_gas()
@@ -55,6 +58,8 @@ async fn upgrade_multisig() {
         .json()
         .unwrap();
 
+    env::log_str("Approving ...");
+
     alice
         .call(contract.id(), "approve")
         .max_gas()
@@ -66,6 +71,8 @@ async fn upgrade_multisig() {
         .unwrap()
         .unwrap();
 
+    env::log_str("Executing ...");
+
     let res = alice
         .call(contract.id(), "execute")
         .max_gas()
@@ -76,6 +83,8 @@ async fn upgrade_multisig() {
         .await
         .unwrap()
         .unwrap();
+
+    env::log_str("Done Executing ...");
 
     assert_eq!(
         res.logs(),
@@ -90,4 +99,19 @@ async fn upgrade_multisig() {
         .unwrap();
 
     assert_eq!(hello, "I am the second contract");
+}
+
+#[tokio::test]
+async fn upgrade_idk_blank_wasm() {
+    let Setup { contract, accounts } = setup(1, WASM).await;
+
+    let alice = &accounts[0];
+
+    alice
+        .call(contract.id(), "upgrade_contract")
+        .max_gas()
+        .transact()
+        .await
+        .unwrap()
+        .unwrap();
 }

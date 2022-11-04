@@ -28,7 +28,6 @@ impl IntoStorageKey for DefaultStorageKey {
 }
 
 pub mod standard;
-
 pub mod approval;
 pub mod migrate;
 pub mod owner;

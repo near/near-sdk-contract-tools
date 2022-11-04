@@ -25,7 +25,7 @@ pub trait UpgradeHook {
 }
 
 /// Naked upgrade function which calls migrate method on the contract
-pub fn upgrade<T>()
+pub fn upgrade<T>(code: Vec<u8>)
 where
     T: BorshDeserialize + BorshSerialize,
 {
@@ -34,16 +34,41 @@ where
     const MIGRATE_METHOD_NAME: &[u8; 7] = b"migrate";
     const UPDATE_GAS_LEFTOVER: Gas = Gas(5_000_000_000_000);
 
+    env::log_str("Calling Upgrade ...");
+
     unsafe {
         // Load code into register 0 result from the input argument if factory call or from promise if callback.
         sys::input(0);
+        env::log_str("Creating Promise ...");
+
         // Create a promise batch to update current contract with code from register 0.
         let promise_id = sys::promise_batch_create(
             env::current_account_id().as_bytes().len() as u64,
             env::current_account_id().as_bytes().as_ptr() as u64,
         );
+
+        env::log_str("Deploying ...");
+        env::log_str(&format!(
+            "prepaid {:?} , used {:?}",
+            env::prepaid_gas(),
+            env::used_gas()
+        ));
+
         // Deploy the contract code from register 0.
-        sys::promise_batch_action_deploy_contract(promise_id, u64::MAX, 0);
+        sys::promise_batch_action_deploy_contract(
+            promise_id,
+            code.len() as u64,
+            code.as_ptr() as u64,
+        );
+
+        env::log_str("Calling migrate ...");
+        env::log_str(&format!(
+            "prepaid {:?} , used {:?}, {}",
+            env::prepaid_gas(),
+            env::used_gas(),
+            (env::prepaid_gas() - env::used_gas() - UPDATE_GAS_LEFTOVER).0
+        ));
+
         // Call promise to migrate the state.
         // Batched together to fail upgrade if migration fails.
         sys::promise_batch_action_function_call(
@@ -55,6 +80,11 @@ where
             0,
             (env::prepaid_gas() - env::used_gas() - UPDATE_GAS_LEFTOVER).0,
         );
+
+        env::log_str("after Return ...");
+
         sys::promise_return(promise_id);
+
+        env::log_str("End of upgrade");
     }
 }

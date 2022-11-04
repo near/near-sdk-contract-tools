@@ -222,8 +222,15 @@ where
             .is_account_authorized(&predecessor, &request)
             .map_err(|e| UnauthorizedAccountError(predecessor, e))?;
 
+        env::log_str("Before Execute Request:: execute ...");
         let result = request.action.execute(self);
+        env::log_str(&format!(
+            "Execute_request: prepaid {:?} , used {:?}",
+            env::prepaid_gas(),
+            env::used_gas()
+        ));
         request_slot.remove();
+        env::log_str("Result returned successfully");
 
         Ok(result)
     }
