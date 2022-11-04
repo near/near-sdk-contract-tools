@@ -127,7 +127,7 @@ pub trait Pause {
     }
 }
 
-/// External methods for `Pause`
+/// External methods for [Pause]
 #[ext_contract(ext_pause)]
 pub trait PauseExternal {
     /// Returns `true` if the contract is paused, `false` otherwise

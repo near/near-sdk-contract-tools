@@ -76,8 +76,8 @@ pub enum PromiseAction {
     },
 }
 
-/// A NativeTransactionAction represents a native protocol-level transaction,
-/// and is easily (de)serializable into many different formats
+/// A native protocol-level transaction that (de)serializes into many different
+/// formats
 #[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize, Eq, PartialEq, Clone, Debug)]
 pub struct NativeTransactionAction {
     /// Receiver of the transaction
