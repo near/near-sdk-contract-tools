@@ -15,9 +15,9 @@ pub fn prefix_key(prefix: &dyn AsRef<[u8]>, key: &dyn AsRef<[u8]>) -> Vec<u8> {
     [prefix.as_ref(), key.as_ref()].concat()
 }
 
-/// Calculate the storage fee of an action, given an initial storage amount,
-/// and refund the predecessor a portion of the attached deposit if necessary.
-/// Return a refund Promise if refund was applied.
+/// Calculates the storage fee of an action, given an initial storage amount,
+/// and refunds the predecessor a portion of the attached deposit if necessary.
+/// Returns refund Promise if refund was applied.
 ///
 /// # Examples
 ///

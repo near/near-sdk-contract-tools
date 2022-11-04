@@ -84,6 +84,10 @@ pub fn derive_pause(input: TokenStream) -> TokenStream {
 
 /// Adds role-based access control. No external methods are exposed.
 ///
+/// The roles prefix must be specify a type using #[rbac(roles = "MyRoles")].
+/// Typically "MyRoles" is an enum and it's variants are the different role
+/// names.
+///
 /// The storage key prefix for the fields can be optionally specified (default:
 /// `"~r"`) using `#[rbac(storage_key = "<expression>")]`.
 #[proc_macro_derive(Rbac, attributes(rbac))]
