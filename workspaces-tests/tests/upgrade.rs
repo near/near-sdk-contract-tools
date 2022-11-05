@@ -1,5 +1,6 @@
 #![cfg(not(windows))]
 
+use near_sdk::borsh::{self, BorshSerialize};
 use workspaces::{Account, Contract};
 
 const WASM: &[u8] = include_bytes!("../../target/wasm32-unknown-unknown/release/upgrade_old.wasm");
@@ -12,6 +13,11 @@ const BAD_WASM: &[u8] =
 
 const RANDOM_WASM: &[u8] =
     include_bytes!("../../target/wasm32-unknown-unknown/release/counter_multisig.wasm");
+
+#[derive(BorshSerialize)]
+struct Args {
+    pub code: Vec<u8>,
+}
 
 struct Setup {
     pub contract: Contract,
@@ -60,9 +66,11 @@ async fn upgrade() {
     assert_eq!(val, 1);
 
     alice
-        .call(contract.id(), "upgrade_contract")
+        .call(contract.id(), "upgrade")
         .max_gas()
-        .args(NEW_WASM.to_vec())
+        .args_borsh(Args {
+            code: NEW_WASM.to_vec(),
+        })
         .transact()
         .await
         .unwrap()
@@ -97,15 +105,16 @@ async fn upgrade() {
 }
 
 #[tokio::test]
-#[should_panic = "CompilationError(PrepareError(Deserialization))"]
+#[should_panic = "Failed to deserialize input from Borsh."]
 async fn upgrade_failure_blank_wasm() {
     let Setup { contract, accounts } = setup(1, WASM).await;
 
     let alice = &accounts[0];
 
     alice
-        .call(contract.id(), "upgrade_contract")
+        .call(contract.id(), "upgrade")
         .max_gas()
+        .args_borsh([0u8; 0])
         .transact()
         .await
         .unwrap()
@@ -120,7 +129,7 @@ async fn upgrade_failure_no_upgrade() {
     let alice = &accounts[0];
 
     alice
-        .call(contract.id(), "upgrade_contract")
+        .call(contract.id(), "upgrade")
         .max_gas()
         .transact()
         .await
@@ -136,7 +145,7 @@ async fn upgrade_failure_random_wasm() {
     let alice = &accounts[0];
 
     alice
-        .call(contract.id(), "upgrade_contract")
+        .call(contract.id(), "upgrade")
         .max_gas()
         .transact()
         .await
@@ -151,8 +160,11 @@ async fn upgrade_failure_not_owner() {
 
     let bob = &accounts[1];
 
-    bob.call(contract.id(), "upgrade_contract")
+    bob.call(contract.id(), "upgrade")
         .max_gas()
+        .args_borsh(Args {
+            code: NEW_WASM.to_vec(),
+        })
         .transact()
         .await
         .unwrap()

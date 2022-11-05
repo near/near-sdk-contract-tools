@@ -11,6 +11,7 @@ use near_sdk::{
 pub fn main() {}
 
 #[derive(BorshSerialize, BorshDeserialize, PanicOnDefault, Owner, Upgrade)]
+#[upgrade(serializer = "borsh")]
 #[near_bindgen]
 pub struct ContractOld {
     pub foo: u32,
