@@ -8,7 +8,9 @@ use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
     env,
     json_types::U128,
-    near_bindgen, PanicOnDefault,
+    near_bindgen,
+    serde::Deserialize,
+    PanicOnDefault,
 };
 
 #[derive(PanicOnDefault, BorshSerialize, BorshDeserialize, FungibleToken)]

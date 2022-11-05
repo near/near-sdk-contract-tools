@@ -23,4 +23,5 @@ members = [
   ".",
   "macros",
   "workspaces-tests",
+  "fuzz",
 ]

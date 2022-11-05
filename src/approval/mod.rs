@@ -46,7 +46,7 @@ pub trait ApprovalConfiguration<A, S> {
     /// Can this request be removed by an allowed account?
     fn is_removable(&self, action_request: &ActionRequest<A, S>) -> Result<(), Self::RemovalError>;
 
-    /// Is the account allowed to execute, approve, or remove this request?
+    /// Is the account allowed to create, approve, execute, or remove this request?
     fn is_account_authorized(
         &self,
         account_id: &AccountId,
