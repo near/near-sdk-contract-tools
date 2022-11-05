@@ -10,7 +10,7 @@ pub enum Hook {
     None,
     Custom,
     Owner,
-    Role(syn::Expr),
+    Role(Box<syn::Expr>),
 }
 
 impl FromMeta for Hook {
@@ -30,7 +30,7 @@ impl FromMeta for Hook {
             r.captures(value)
                 .and_then(|c| c.get(1))
                 .and_then(|s| syn::parse_str::<Expr>(s.as_str()).ok())
-                .map(Hook::Role)
+                .map(|e| Hook::Role(Box::new(e)))
                 .ok_or_else(|| {
                     darling::Error::custom(&format!(
                         r#"Invalid value "{value}", expected "none", "owner", or "role(...)""#,
