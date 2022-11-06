@@ -1,5 +1,10 @@
 //! Accepts contract deployment as raw binary.
 //!
+//! This pattern was common in NEAR smart contracts at the time of writing,
+//! but is included here mostly for compatibility/legacy reasons. Unless you
+//! are really sure you know what you are doing, you should probably be using
+//! [`super::serialized`].
+//!
 //! # Warning
 //!
 //! Functions in this module are generally _not callable_ from any call tree
@@ -20,6 +25,12 @@ use super::{
 ///
 /// This function is called by this module's other public functions:
 /// [`upgrade_from_transaction_input`] and [`upgrade_from_vec`].
+///
+/// # Safety
+///
+/// `len` and `ptr` must be valid values to pass into
+/// `near_sys::promise_batch_action_deploy_contract` (i.e. pointer to a valid
+/// WASM blob or a register descriptor).
 pub unsafe fn finish_upgrade(
     len: u64,
     ptr: u64,
@@ -27,12 +38,12 @@ pub unsafe fn finish_upgrade(
     migrate_method_args: Vec<u8>,
     migrate_minimum_gas: Gas,
 ) {
-    // Create a promise batch to update current contract with code from register 0.
+    // Create a promise batch
     let promise_id = sys::promise_batch_create(
         env::current_account_id().as_bytes().len() as u64,
         env::current_account_id().as_bytes().as_ptr() as u64,
     );
-    // Deploy the contract code from register 0.
+    // Deploy the contract code
     sys::promise_batch_action_deploy_contract(promise_id, len, ptr);
     // Call promise to migrate the state.
     // Batched together to fail upgrade if migration fails.
@@ -50,6 +61,8 @@ pub unsafe fn finish_upgrade(
     sys::promise_return(promise_id);
 }
 
+/// Upgrades the contract using the raw VM input as the code to deploy and
+/// common defaults for the subsequent migration method invocation.
 pub fn upgrade_from_transaction_input() {
     unsafe {
         sys::input(0);
@@ -63,6 +76,8 @@ pub fn upgrade_from_transaction_input() {
     }
 }
 
+/// Upgrades the contract by deploying the provided code as the new contract
+/// and using common defaults for the subsequent migration method invocation.
 pub fn upgrade_from_vec(code: Vec<u8>) {
     unsafe {
         finish_upgrade(
