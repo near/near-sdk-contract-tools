@@ -188,7 +188,14 @@ pub fn event(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// Fields may be specified in the `#[upgrade(...)]` attribute.
 ///
 /// Fields include:
-///  - `no_default_hook` Flag to determine if there is not a default hook (optional, default: False)
+///  - `hook` - If included, provides an implementation of `UpgradeHook`. An implementation must be explicity provided otherwise. Options include:
+///     - `"none"` - Empty upgrade hook.
+///     - `"owner"` - The upgrade function may only be called by the owner of the contract as specified by an `Owner` implementation.
+///     - `"role(r)"` - The upgrade function may only be called by an account that has been assigned the role `r` as determined by an `Rbac` implementation.
+///  - `serializer` - `"borsh"` or `"jsonbase64"` (default). Indicates the serialization format of code the `upgrade` function will accept.
+///  - `migrate_method_name` - The name of the method to call after the upgrade. Default `"migrate"`.
+///  - `migrate_method_args` - The input to send to the migrate function. Default empty vector.
+///  - `migrate_minimum_gas` - How much gas to guarantee the migrate function, otherwise reject. Default 15T.
 #[proc_macro_derive(Upgrade, attributes(upgrade))]
 pub fn derive_upgrade(input: TokenStream) -> TokenStream {
     make_derive(input, upgrade::expand)
