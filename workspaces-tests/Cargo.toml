@@ -29,6 +29,9 @@ name = "native_multisig"
 [[bin]]
 name = "simple_multisig"
 
+[[bin]]
+name = "payroll_example"
+
 [dependencies]
 near-contract-tools = {path = "../"}
 near-sdk = {version = "4.0.0", features = ["unstable"]}
