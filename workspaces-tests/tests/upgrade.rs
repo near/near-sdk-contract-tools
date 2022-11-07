@@ -1,6 +1,9 @@
 #![cfg(not(windows))]
 
-use near_sdk::borsh::{self, BorshSerialize};
+use near_sdk::{
+    borsh::{self, BorshSerialize},
+    serde::Serialize,
+};
 use workspaces::{Account, Contract};
 
 const WASM_BORSH: &[u8] =
@@ -22,8 +25,14 @@ const RANDOM_WASM: &[u8] =
     include_bytes!("../../target/wasm32-unknown-unknown/release/counter_multisig.wasm");
 
 #[derive(BorshSerialize)]
-struct Args {
+struct ArgsBorsh {
     pub code: Vec<u8>,
+}
+
+#[derive(Serialize)]
+#[serde(crate = "near_sdk::serde")]
+struct ArgsJson {
+    pub code: near_sdk::json_types::Base64VecU8,
 }
 
 struct Setup {
@@ -49,9 +58,8 @@ async fn setup(num_accounts: usize, wasm: &[u8]) -> Setup {
     Setup { contract, accounts }
 }
 
-#[tokio::test]
-async fn upgrade_borsh() {
-    let Setup { contract, accounts } = setup(1, WASM_BORSH).await;
+async fn perform_upgrade_test(wasm: &[u8], args: Vec<u8>) {
+    let Setup { contract, accounts } = setup(1, wasm).await;
 
     let alice = &accounts[0];
 
@@ -75,9 +83,7 @@ async fn upgrade_borsh() {
     alice
         .call(contract.id(), "upgrade")
         .max_gas()
-        .args_borsh(Args {
-            code: NEW_WASM.to_vec(),
-        })
+        .args(args)
         .transact()
         .await
         .unwrap()
@@ -92,40 +98,42 @@ async fn upgrade_borsh() {
         .unwrap();
 
     assert_eq!(new_val, 1);
+}
 
-    alice
-        .call(contract.id(), "decrement_bar")
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
+#[tokio::test]
+async fn upgrade_borsh() {
+    perform_upgrade_test(
+        WASM_BORSH,
+        ArgsBorsh {
+            code: NEW_WASM.to_vec(),
+        }
+        .try_to_vec()
+        .unwrap(),
+    )
+    .await;
+}
 
-    let end_val = alice
-        .call(contract.id(), "get_bar")
-        .transact()
-        .await
-        .unwrap()
-        .json::<u32>()
-        .unwrap();
+#[tokio::test]
+async fn upgrade_jsonbase64() {
+    perform_upgrade_test(
+        WASM_JSON,
+        near_sdk::serde_json::to_vec(&ArgsJson {
+            code: NEW_WASM.to_vec().into(),
+        })
+        .unwrap(),
+    )
+    .await;
+}
 
-    assert_eq!(end_val, 0);
+#[tokio::test]
+async fn upgrade_raw() {
+    perform_upgrade_test(WASM_RAW, NEW_WASM.to_vec()).await;
 }
 
 #[tokio::test]
 #[should_panic = "Failed to deserialize input from Borsh."]
 async fn upgrade_failure_blank_wasm() {
-    let Setup { contract, accounts } = setup(1, WASM).await;
-
-    let alice = &accounts[0];
-
-    alice
-        .call(contract.id(), "upgrade")
-        .max_gas()
-        .args_borsh([0u8; 0])
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
+    perform_upgrade_test(WASM_BORSH, vec![]).await;
 }
 
 #[tokio::test]
@@ -160,20 +168,49 @@ async fn upgrade_failure_random_wasm() {
         .unwrap();
 }
 
-#[tokio::test]
-#[should_panic = "Smart contract panicked: Owner only"]
-async fn upgrade_failure_not_owner() {
-    let Setup { contract, accounts } = setup(2, WASM).await;
+async fn fail_owner(wasm: &[u8], args: Vec<u8>) {
+    let Setup { contract, accounts } = setup(2, wasm).await;
 
     let bob = &accounts[1];
 
     bob.call(contract.id(), "upgrade")
         .max_gas()
-        .args_borsh(Args {
-            code: NEW_WASM.to_vec(),
-        })
+        .args(args)
         .transact()
         .await
         .unwrap()
         .unwrap();
+}
+
+#[tokio::test]
+#[should_panic = "Smart contract panicked: Owner only"]
+async fn upgrade_failure_not_owner_borsh() {
+    fail_owner(
+        WASM_BORSH,
+        ArgsBorsh {
+            code: NEW_WASM.to_vec(),
+        }
+        .try_to_vec()
+        .unwrap(),
+    )
+    .await;
+}
+
+#[tokio::test]
+#[should_panic = "Smart contract panicked: Owner only"]
+async fn upgrade_failure_not_owner_jsonbase64() {
+    fail_owner(
+        WASM_JSON,
+        near_sdk::serde_json::to_vec(&ArgsJson {
+            code: NEW_WASM.to_vec().into(),
+        })
+        .unwrap(),
+    )
+    .await;
+}
+
+#[tokio::test]
+#[should_panic = "Smart contract panicked: Owner only"]
+async fn upgrade_failure_not_owner_raw() {
+    fail_owner(WASM_RAW, NEW_WASM.to_vec()).await;
 }
