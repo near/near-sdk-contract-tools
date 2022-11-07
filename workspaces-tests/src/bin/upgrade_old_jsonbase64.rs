@@ -11,7 +11,7 @@ use near_sdk::{
 pub fn main() {}
 
 #[derive(BorshSerialize, BorshDeserialize, PanicOnDefault, Owner, Upgrade)]
-#[upgrade(serializer = "borsh")]
+#[upgrade(serializer = "jsonbase64", hook = "owner")]
 #[near_bindgen]
 pub struct ContractOld {
     pub foo: u32,
@@ -33,11 +33,5 @@ impl ContractOld {
 
     pub fn get_foo(&self) -> u32 {
         self.foo
-    }
-}
-
-impl UpgradeHook for ContractOld {
-    fn on_upgrade(&self) {
-        Self::require_owner();
     }
 }

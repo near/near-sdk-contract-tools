@@ -3,7 +3,14 @@
 use near_sdk::borsh::{self, BorshSerialize};
 use workspaces::{Account, Contract};
 
-const WASM: &[u8] = include_bytes!("../../target/wasm32-unknown-unknown/release/upgrade_old.wasm");
+const WASM_BORSH: &[u8] =
+    include_bytes!("../../target/wasm32-unknown-unknown/release/upgrade_old_borsh.wasm");
+
+const WASM_JSON: &[u8] =
+    include_bytes!("../../target/wasm32-unknown-unknown/release/upgrade_old_jsonbase64.wasm");
+
+const WASM_RAW: &[u8] =
+    include_bytes!("../../target/wasm32-unknown-unknown/release/upgrade_old_raw.wasm");
 
 const NEW_WASM: &[u8] =
     include_bytes!("../../target/wasm32-unknown-unknown/release/upgrade_new.wasm");
@@ -43,8 +50,8 @@ async fn setup(num_accounts: usize, wasm: &[u8]) -> Setup {
 }
 
 #[tokio::test]
-async fn upgrade() {
-    let Setup { contract, accounts } = setup(1, WASM).await;
+async fn upgrade_borsh() {
+    let Setup { contract, accounts } = setup(1, WASM_BORSH).await;
 
     let alice = &accounts[0];
 

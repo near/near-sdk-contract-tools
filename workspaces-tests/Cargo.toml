@@ -9,7 +9,13 @@ version = "0.1.0"
 name = "upgrade_bad"
 
 [[bin]]
-name = "upgrade_old"
+name = "upgrade_old_borsh"
+
+[[bin]]
+name = "upgrade_old_jsonbase64"
+
+[[bin]]
+name = "upgrade_old_raw"
 
 [[bin]]
 name = "upgrade_new"
