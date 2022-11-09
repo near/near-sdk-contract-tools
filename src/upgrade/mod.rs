@@ -16,29 +16,35 @@
 //! more difficult to use and has more sharp edges.
 use near_sdk::Gas;
 
-/// The function that will be called after upgrade (usually a migrate function)
-pub const DEFAULT_MIGRATE_METHOD_NAME: &str = "migrate";
-/// Input to send to the function called after upgrade
-pub const DEFAULT_MIGRATE_METHOD_ARGS: Vec<u8> = vec![];
-/// Guarantee the migrate function receives at least this much gas
-pub const DEFAULT_MIGRATE_MINIMUM_GAS: Gas = Gas(15_000_000_000_000);
+/// Default value for the name of the function that will be called after
+/// upgrade (usually a migrate function).
+pub const DEFAULT_POST_UPGRADE_METHOD_NAME: &str = "migrate";
+/// Default input to send to the post-upgrade function.
+pub const DEFAULT_POST_UPGRADE_METHOD_ARGS: Vec<u8> = vec![];
+/// Guarantee the post-upgrade function receives at least this much gas by
+/// default.
+pub const DEFAULT_POST_UPGRADE_MINIMUM_GAS: Gas = Gas(15_000_000_000_000);
 
 pub mod raw;
 pub mod serialized;
 
+/// Function call after upgrade descriptor
 #[derive(Debug, Clone)]
 pub struct PostUpgrade {
+    /// Function name
     pub method: String,
+    /// Serialized function input
     pub args: Vec<u8>,
+    /// Guarantee minimum gas
     pub minimum_gas: Gas,
 }
 
 impl Default for PostUpgrade {
     fn default() -> Self {
         Self {
-            method: DEFAULT_MIGRATE_METHOD_NAME.to_string(),
-            args: DEFAULT_MIGRATE_METHOD_ARGS,
-            minimum_gas: DEFAULT_MIGRATE_MINIMUM_GAS,
+            method: DEFAULT_POST_UPGRADE_METHOD_NAME.to_string(),
+            args: DEFAULT_POST_UPGRADE_METHOD_ARGS,
+            minimum_gas: DEFAULT_POST_UPGRADE_MINIMUM_GAS,
         }
     }
 }

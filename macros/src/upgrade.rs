@@ -99,13 +99,13 @@ pub fn expand(meta: UpgradeMeta) -> Result<TokenStream, darling::Error> {
     // #[darling(default = "...")] because they are different types.
     let migrate_method_name = migrate_method_name
         .map(|e| quote! { #e })
-        .unwrap_or_else(|| quote! { #me::upgrade::DEFAULT_MIGRATE_METHOD_NAME });
+        .unwrap_or_else(|| quote! { #me::upgrade::DEFAULT_POST_UPGRADE_METHOD_NAME });
     let migrate_method_args = migrate_method_args
         .map(|e| quote! { #e })
-        .unwrap_or_else(|| quote! { #me::upgrade::DEFAULT_MIGRATE_METHOD_ARGS });
+        .unwrap_or_else(|| quote! { #me::upgrade::DEFAULT_POST_UPGRADE_METHOD_ARGS });
     let migrate_minimum_gas = migrate_minimum_gas
         .map(|e| quote! { #e })
-        .unwrap_or_else(|| quote! { #me::upgrade::DEFAULT_MIGRATE_MINIMUM_GAS });
+        .unwrap_or_else(|| quote! { #me::upgrade::DEFAULT_POST_UPGRADE_MINIMUM_GAS });
 
     let hook_implementation = match &hook {
         // Should we generate an UpgradeHook implementation with body?
@@ -151,9 +151,11 @@ pub fn expand(meta: UpgradeMeta) -> Result<TokenStream, darling::Error> {
                 #code_conversion
                 #me::upgrade::serialized::upgrade(
                     code,
-                    #migrate_method_name.to_string(),
-                    #migrate_method_args,
-                    #migrate_minimum_gas,
+                    Some(#me::upgrade::PostUpgrade {
+                        method: #migrate_method_name.to_string(),
+                        args: #migrate_method_args,
+                        minimum_gas: #migrate_minimum_gas,
+                    }),
                 );
             }
         }
