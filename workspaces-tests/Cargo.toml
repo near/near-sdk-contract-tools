@@ -21,6 +21,9 @@ name = "upgrade_old_raw"
 name = "upgrade_new"
 
 [[bin]]
+name = "upgrade_old_multisig"
+
+[[bin]]
 name = "counter_multisig"
 
 [[bin]]
