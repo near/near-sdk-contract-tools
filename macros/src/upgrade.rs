@@ -6,14 +6,14 @@ use regex::Regex;
 use syn::Expr;
 
 #[derive(Debug, Clone)]
-pub enum Hook {
-    None,
+pub enum HookBody {
+    Empty,
     Custom,
     Owner,
     Role(Box<syn::Expr>),
 }
 
-impl FromMeta for Hook {
+impl FromMeta for HookBody {
     fn from_none() -> Option<Self> {
         Some(Self::Custom)
     }
@@ -21,19 +21,19 @@ impl FromMeta for Hook {
     fn from_string(value: &str) -> darling::Result<Self> {
         static REGEX: OnceCell<Regex> = OnceCell::new();
 
-        if value == "none" {
-            Ok(Hook::None)
+        if value == "empty" {
+            Ok(HookBody::Empty)
         } else if value == "owner" {
-            Ok(Hook::Owner)
+            Ok(HookBody::Owner)
         } else {
             let r = REGEX.get_or_init(|| Regex::new(r"^role\((.+)\)$").unwrap());
             r.captures(value)
                 .and_then(|c| c.get(1))
                 .and_then(|s| syn::parse_str::<Expr>(s.as_str()).ok())
-                .map(|e| Hook::Role(Box::new(e)))
+                .map(|e| HookBody::Role(Box::new(e)))
                 .ok_or_else(|| {
                     darling::Error::custom(&format!(
-                        r#"Invalid value "{value}", expected "none", "owner", or "role(...)""#,
+                        r#"Invalid value "{value}", expected "empty", "owner", or "role(...)""#,
                     ))
                 })
         }
@@ -61,7 +61,7 @@ impl FromMeta for Serializer {
 #[derive(Debug, FromDeriveInput)]
 #[darling(attributes(upgrade), supports(struct_named))]
 pub struct UpgradeMeta {
-    pub hook: Hook,
+    pub hook: HookBody,
     pub serializer: Option<Serializer>,
     pub migrate_method_name: Option<String>,
     pub migrate_method_args: Option<Expr>,
@@ -109,12 +109,12 @@ pub fn expand(meta: UpgradeMeta) -> Result<TokenStream, darling::Error> {
 
     let hook_implementation = match &hook {
         // Should we generate an UpgradeHook implementation with body?
-        Hook::None => Some(quote! {}), // empty implementation
-        Hook::Custom => None,          // user-provided implementation
-        Hook::Owner => Some(quote! {
+        HookBody::Empty => Some(quote! {}), // empty implementation
+        HookBody::Custom => None,           // user-provided implementation
+        HookBody::Owner => Some(quote! {
             <Self as #me::owner::Owner>::require_owner();
         }),
-        Hook::Role(role) => Some(quote! {
+        HookBody::Role(role) => Some(quote! {
             #me::rbac::Rbac::require_role(self, &#role);
         }),
     }
