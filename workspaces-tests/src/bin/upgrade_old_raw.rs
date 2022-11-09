@@ -1,6 +1,11 @@
 #![allow(missing_docs)]
 
-use near_contract_tools::{owner::Owner, owner::OwnerExternal, Owner};
+use near_contract_tools::{
+    owner::Owner,
+    owner::OwnerExternal,
+    upgrade::{raw::RawUpgradeSource, PostUpgrade},
+    Owner,
+};
 
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
@@ -39,5 +44,10 @@ pub fn upgrade() {
 
     ContractOld::require_owner();
 
-    near_contract_tools::upgrade::raw::upgrade_from_transaction_input();
+    unsafe {
+        near_contract_tools::upgrade::raw::upgrade(
+            RawUpgradeSource::TransactionInput,
+            Some(PostUpgrade::default()),
+        );
+    }
 }

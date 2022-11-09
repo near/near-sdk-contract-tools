@@ -14,7 +14,11 @@
 //! and for the niche efficiency use-case, since it allows for the most
 //! efficient binary serialization (though only by a little). However, it is
 //! more difficult to use and has more sharp edges.
-use near_sdk::Gas;
+use near_sdk::{
+    borsh::{self, BorshDeserialize, BorshSerialize},
+    Gas,
+};
+use serde::{Deserialize, Serialize};
 
 /// The function that will be called after upgrade (usually a migrate function)
 pub const DEFAULT_MIGRATE_METHOD_NAME: &str = "migrate";
@@ -25,3 +29,20 @@ pub const DEFAULT_MIGRATE_MINIMUM_GAS: Gas = Gas(15_000_000_000_000);
 
 pub mod raw;
 pub mod serialized;
+
+#[derive(Debug, Clone)]
+pub struct PostUpgrade {
+    pub method: String,
+    pub args: Vec<u8>,
+    pub minimum_gas: Gas,
+}
+
+impl Default for PostUpgrade {
+    fn default() -> Self {
+        Self {
+            method: DEFAULT_MIGRATE_METHOD_NAME.to_string(),
+            args: DEFAULT_MIGRATE_METHOD_ARGS,
+            minimum_gas: DEFAULT_MIGRATE_MINIMUM_GAS,
+        }
+    }
+}
