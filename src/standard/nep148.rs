@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 pub const FT_METADATA_SPEC: &str = "ft-1.0.0";
 
 /// NEP-148-compatible metadata struct
-#[derive(BorshDeserialize, BorshSerialize, Deserialize, Serialize, Clone, PartialEq, Debug)]
+#[derive(BorshDeserialize, BorshSerialize, Deserialize, Serialize, Eq, PartialEq, Clone, Debug)]
 pub struct FungibleTokenMetadata<'a> {
     /// Version of the NEP-148 spec
     pub spec: Cow<'a, str>,
