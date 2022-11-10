@@ -21,9 +21,11 @@
 //!
 //! # Safety
 //!
-//! If the contract state is migrated. It should be deserializable
-//! according to the [old schema](crate::migrate::MigrateController) otherwise
-//! it will fail and throw an error.
+//! If the contract state is migrated, the new contract logic must deserialize
+//! the existing state according to the old schema and migrate it to the new
+//! schema. If the new contract has a different storage schema from the old
+//! contract and does not migrate the state schema, the contract may become
+//! unusable.
 use near_sdk::Gas;
 
 /// Default value for the name of the function that will be called after

@@ -2,8 +2,7 @@
 pub fn main() {}
 use near_contract_tools::{
     approval::{self, ApprovalManager},
-    owner::Owner,
-    owner::OwnerExternal,
+    owner::{Owner, OwnerExternal},
     rbac::Rbac,
     Owner, Rbac, SimpleMultisig, Upgrade,
 };

@@ -151,11 +151,11 @@ pub fn expand(meta: UpgradeMeta) -> Result<TokenStream, darling::Error> {
                 #code_conversion
                 #me::upgrade::serialized::upgrade(
                     code,
-                    Some(#me::upgrade::PostUpgrade {
+                    #me::upgrade::PostUpgrade {
                         method: #migrate_method_name.to_string(),
                         args: #migrate_method_args,
                         minimum_gas: #migrate_minimum_gas,
-                    }),
+                    },
                 );
             }
         }
