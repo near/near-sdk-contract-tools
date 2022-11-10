@@ -10,10 +10,20 @@
 //! This module provides a few different ways to perform an upgrade. Most new
 //! projects should probably start with the [`serialized`] module.
 //!
+//! By default, after updating the contract logic the contract state is
+//! migrated. This behaviour can be changed by providing a
+//! custom [`PostUpgrade`].
+//!
 //! The [`raw`] module is included mostly for legacy / compatibility reasons,
 //! and for the niche efficiency use-case, since it allows for the most
 //! efficient binary serialization (though only by a little). However, it is
 //! more difficult to use and has more sharp edges.
+//!
+//! # Safety
+//!
+//! If the contract state is migrated. It should be deserializable
+//! according to the [old schema](crate::migrate::MigrateController) otherwise
+//! it will fail and throw an error.
 use near_sdk::Gas;
 
 /// Default value for the name of the function that will be called after
