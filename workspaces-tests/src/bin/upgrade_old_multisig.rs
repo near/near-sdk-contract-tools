@@ -65,9 +65,11 @@ impl Contract {
 
         let mut contract = Self { foo: 0 };
 
-        Owner::init(&mut contract, &env::predecessor_account_id());
+        let predecessor = env::predecessor_account_id();
 
-        contract.add_role(&env::predecessor_account_id(), &Role::Multisig);
+        Owner::init(&mut contract, &predecessor);
+
+        contract.add_role(predecessor, &Role::Multisig);
 
         contract
     }
