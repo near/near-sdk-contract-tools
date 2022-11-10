@@ -1,7 +1,5 @@
-use near_contract_tools::{
-    rbac::{self, Rbac},
-    Rbac,
-};
+//! Payroll system manages employee and their pay
+use near_contract_tools::{rbac::Rbac, Rbac};
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
     collections::UnorderedMap,
@@ -54,17 +52,17 @@ impl Payroll {
         self.logged_time.insert(account_id, &0);
 
         // write updated time log to state
-        env::state_write(&self.logged_time);
+        env::state_write(self);
     }
 
-    /// Manager can start payment
-    pub fn disburse_pay(&self) {
-        self.require_role(&Role::Manager);
-        self.logged_time
-            .iter()
-            .for_each(|(account_id, logged_time)| {
-                Promise::new(account_id).transfer(logged_time as u128 * self.hourly_fee as u128);
-            });
+    /// Employee can request pay
+    pub fn request_pay(&self) -> Promise {
+        self.require_role(&Role::Employee);
+        let employee_id = env::predecessor_account_id();
+        let logged_time = self.logged_time.get(&employee_id).unwrap_or_else(|| {
+            env::panic_str(format!("No employee exists for account: {}", employee_id).as_str())
+        });
+        Promise::new(employee_id).transfer(logged_time as u128 * self.hourly_fee as u128)
     }
 
     /// Employee can log time
@@ -80,16 +78,19 @@ impl Payroll {
             .insert(&employee_id, &(current_hours + hours));
 
         // write updated time log to state
-        env::state_write(&self.logged_time);
+        env::state_write(self);
     }
 }
 
-/// External methods for payroll
 #[ext_contract(ext_payroll)]
+/// External methods for payroll
 pub trait PayrollExternal {
+    /// Manager can add new employees
     fn payroll_add_employee(&mut self, account_id: AccountId);
-    fn disburse_pay(&self);
-    fn log_time(&mut self, hours: u8);
+    /// Employee can log time
+    fn payroll_log_time(&mut self, hours: u8);
+    /// Employee can request for pay
+    fn payroll_request_pay(&self) -> Promise;
 }
 
 impl PayrollExternal for Payroll {
@@ -97,12 +98,12 @@ impl PayrollExternal for Payroll {
         self.add_employee(&account_id);
     }
 
-    fn disburse_pay(&self) {
-        self.disburse_pay();
+    fn payroll_log_time(&mut self, hours: u8) {
+        self.log_time(hours);
     }
 
-    fn log_time(&mut self, hours: u8) {
-        self.log_time(hours);
+    fn payroll_request_pay(&self) -> Promise {
+        self.request_pay()
     }
 }
 
