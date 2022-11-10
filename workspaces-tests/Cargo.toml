@@ -39,8 +39,8 @@ name = "native_multisig"
 name = "simple_multisig"
 
 [dependencies]
-near-contract-tools = {path = "../"}
-near-sdk = {version = "4.0.0", features = ["unstable"]}
+near-contract-tools = {path = "../", features = ["unstable"]}
+near-sdk = "4.1.0"
 strum = "0.24.1"
 strum_macros = "0.24.3"
 thiserror = "1.0.34"

@@ -37,6 +37,7 @@ pub const DEFAULT_POST_UPGRADE_METHOD_ARGS: Vec<u8> = vec![];
 /// default.
 pub const DEFAULT_POST_UPGRADE_MINIMUM_GAS: Gas = Gas(15_000_000_000_000);
 
+#[cfg(feature = "unstable")]
 pub mod raw;
 pub mod serialized;
 
