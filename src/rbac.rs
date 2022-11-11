@@ -25,6 +25,8 @@
 //!     account has the specified role.
 //! * (ERR) [`Rbac::prohibit_role`] may only be called when the predecessor
 //!     account does not have the specified role.
+use std::marker::PhantomData;
+
 use near_sdk::{
     borsh::{self, BorshSerialize},
     env, require,
@@ -62,7 +64,7 @@ pub trait Rbac {
     }
 
     fn iter_members_of(role: &Self::Role) -> Iter {
-        todo!()
+        Iter::new(Self::members_of(role))
     }
 
     /// Returns whether a given account has been given a certain role.
@@ -99,15 +101,27 @@ pub trait Rbac {
     }
 }
 
-pub struct Iter<'a> {
-    inner_iterator: &'a mut dyn Iterator<Item = AccountId>,
+pub struct Iter {
+    inner_collection: UnorderedSet<AccountId>,
+    index: usize,
 }
 
-impl<'a> Iterator for Iter<'a> {
+impl Iter {
+    pub fn new(s: UnorderedSet<AccountId>) -> Self {
+        Self {
+            inner_collection: s,
+            index: 0,
+        }
+    }
+}
+
+impl Iterator for Iter {
     type Item = AccountId;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.inner_iterator.next()
+        let value = self.inner_collection.iter().nth(self.index);
+        self.index += 1;
+        value.map(ToOwned::to_owned)
     }
 }
 
