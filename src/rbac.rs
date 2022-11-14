@@ -58,28 +58,39 @@ pub trait Rbac {
         Self::root().field::<UnorderedSet<AccountId>>(StorageKey::Role(role))
     }
 
-    fn members_of(role: &Self::Role) -> UnorderedSet<AccountId> {
-        let slot = Self::slot_members_of(role);
-        slot.read().unwrap_or_else(|| UnorderedSet::new(slot.key))
+    fn with_members_of<T>(
+        role: &Self::Role,
+        f: impl FnOnce(&mut UnorderedSet<AccountId>) -> T,
+    ) -> T {
+        let mut slot = Self::slot_members_of(role);
+        let mut set = slot
+            .read()
+            .unwrap_or_else(|| UnorderedSet::new(slot.key.clone()));
+        let value = f(&mut set);
+        slot.write(&set);
+        value
     }
 
     fn iter_members_of(role: &Self::Role) -> Iter {
-        Iter::new(Self::members_of(role))
+        let slot = Self::slot_members_of(role);
+        let set = slot.read().unwrap_or_else(|| UnorderedSet::new(slot.key));
+        // Cannot use with_members_of because Iter must be owned
+        Iter::new(set)
     }
 
     /// Returns whether a given account has been given a certain role.
     fn has_role(account_id: &AccountId, role: &Self::Role) -> bool {
-        Self::members_of(role).contains(account_id)
+        Self::with_members_of(role, |set| set.contains(account_id))
     }
 
     /// Assigns a role to an account.
     fn add_role(&mut self, account_id: AccountId, role: &Self::Role) {
-        Self::members_of(role).insert(account_id);
+        Self::with_members_of(role, |set| set.insert(account_id));
     }
 
     /// Removes a role from an account.
     fn remove_role(&mut self, account_id: &AccountId, role: &Self::Role) {
-        Self::members_of(role).remove(account_id);
+        Self::with_members_of(role, |set| set.remove(account_id));
     }
 
     /// Requires transaction predecessor to have a given role.
