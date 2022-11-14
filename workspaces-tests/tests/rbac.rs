@@ -3,8 +3,7 @@
 use std::collections::HashSet;
 
 use near_sdk::{
-    borsh::{self, BorshSerialize},
-    serde::{Deserialize, Serialize},
+    serde::Deserialize,
     serde_json::{self, json},
 };
 use tokio::join;
@@ -45,7 +44,7 @@ async fn setup(num_accounts: usize, wasm: &[u8]) -> Setup {
 }
 
 #[tokio::test]
-async fn test() {
+async fn happy() {
     let Setup { contract, accounts } = setup(4, WASM).await;
 
     let alice = &accounts[0];
@@ -180,19 +179,28 @@ async fn test() {
         },
     );
 
-    let (members_a, members_b, members_g, members_d) = join!(
+    let (members_a, members_b, members_g, members_d, count_a, count_b, count_g, count_d) = join!(
         members(contract.clone(), "a"),
         members(contract.clone(), "b"),
         members(contract.clone(), "g"),
         members(contract.clone(), "d"),
+        count_members(contract.clone(), "a"),
+        count_members(contract.clone(), "b"),
+        count_members(contract.clone(), "g"),
+        count_members(contract.clone(), "d"),
     );
 
-    let (alice_str, bob_str, charlie_str, daisy_str) = (
+    let (alice_str, bob_str, charlie_str, _daisy_str) = (
         alice.id().to_string(),
         bob.id().to_string(),
         charlie.id().to_string(),
         daisy.id().to_string(),
     );
+
+    assert_eq!(count_a, 3);
+    assert_eq!(count_b, 3);
+    assert_eq!(count_g, 2);
+    assert_eq!(count_d, 2);
 
     assert_eq!(
         members_a,
@@ -204,4 +212,19 @@ async fn test() {
     );
     assert_eq!(members_g, [alice_str.clone(), bob_str.clone()].into());
     assert_eq!(members_d, [alice_str.clone(), bob_str.clone()].into());
+}
+
+#[tokio::test]
+#[should_panic = "Unauthorized role"]
+async fn fail_missing_role() {
+    let Setup { contract, accounts } = setup(1, WASM).await;
+
+    let alice = &accounts[0];
+
+    alice
+        .call(contract.id(), "requires_alpha")
+        .transact()
+        .await
+        .unwrap()
+        .unwrap();
 }

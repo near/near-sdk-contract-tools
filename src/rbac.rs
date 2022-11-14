@@ -25,8 +25,6 @@
 //!     account has the specified role.
 //! * (ERR) [`Rbac::prohibit_role`] may only be called when the predecessor
 //!     account does not have the specified role.
-use std::marker::PhantomData;
-
 use near_sdk::{
     borsh::{self, BorshSerialize},
     env, require,
@@ -46,18 +44,23 @@ enum StorageKey<R> {
 
 /// Role-based access control
 pub trait Rbac {
-    /// Roles type (probably an enum)
+    /// Roles type (probably an enum).
     type Role: BorshSerialize + IntoStorageKey;
 
-    /// Storage slot namespace for items
+    /// Storage slot namespace for items.
     fn root() -> Slot<()> {
         Slot::new(DefaultStorageKey::Rbac)
     }
 
+    /// Storage slot for the backing `UnorderedSet` of all accounts assigned
+    /// to a role.
     fn slot_members_of(role: &Self::Role) -> Slot<UnorderedSet<AccountId>> {
         Self::root().field::<UnorderedSet<AccountId>>(StorageKey::Role(role))
     }
 
+    /// Deserializes the backing `UnorderedSet` structure, executes predicate
+    /// `f` on it, and reserializes the structure, returning the return value
+    /// of `f`.
     fn with_members_of<T>(
         role: &Self::Role,
         f: impl FnOnce(&mut UnorderedSet<AccountId>) -> T,
@@ -71,6 +74,7 @@ pub trait Rbac {
         value
     }
 
+    /// Iterates over all accounts that have been assigned a role.
     fn iter_members_of(role: &Self::Role) -> Iter {
         let slot = Self::slot_members_of(role);
         let set = slot.read().unwrap_or_else(|| UnorderedSet::new(slot.key));
@@ -98,7 +102,7 @@ pub trait Rbac {
         let predecessor = env::predecessor_account_id();
         require!(
             Self::has_role(&predecessor, role),
-            REQUIRE_ROLE_FAIL_MESSAGE
+            REQUIRE_ROLE_FAIL_MESSAGE,
         );
     }
 
@@ -107,17 +111,19 @@ pub trait Rbac {
         let predecessor = env::predecessor_account_id();
         require!(
             !Self::has_role(&predecessor, role),
-            PROHIBIT_ROLE_FAIL_MESSAGE
+            PROHIBIT_ROLE_FAIL_MESSAGE,
         );
     }
 }
 
+/// An iterator for `AccountId`s.
 pub struct Iter {
     inner_collection: UnorderedSet<AccountId>,
     index: usize,
 }
 
 impl Iter {
+    /// Creates a new iterator from an `UnorderedSet`.
     pub fn new(s: UnorderedSet<AccountId>) -> Self {
         Self {
             inner_collection: s,
@@ -248,7 +254,6 @@ mod tests {
     #[test]
     #[should_panic = "Unauthorized role"]
     pub fn require_role_fail_no_role() {
-        let r = Contract {};
         let a: AccountId = "account".parse().unwrap();
 
         testing_env!(VMContextBuilder::new().predecessor_account_id(a).build());
@@ -283,7 +288,6 @@ mod tests {
 
     #[test]
     pub fn prohibit_role_success_no_role() {
-        let r = Contract {};
         let a: AccountId = "account".parse().unwrap();
 
         testing_env!(VMContextBuilder::new().predecessor_account_id(a).build());
