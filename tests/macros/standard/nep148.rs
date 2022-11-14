@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use near_contract_tools::Nep148;
 use near_sdk::{json_types::Base64VecU8, near_bindgen};
 
@@ -30,6 +28,6 @@ fn test() {
     );
     assert_eq!(
         meta.reference_hash,
-        Some(Cow::Owned(Base64VecU8::from([97, 115, 100, 102].to_vec())))
+        Some(Base64VecU8::from([97, 115, 100, 102].to_vec()))
     );
 }
