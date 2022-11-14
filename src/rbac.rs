@@ -25,64 +25,120 @@
 //!     account has the specified role.
 //! * (ERR) [`Rbac::prohibit_role`] may only be called when the predecessor
 //!     account does not have the specified role.
-use near_sdk::{borsh::BorshSerialize, env, require, AccountId, IntoStorageKey};
+use near_sdk::{
+    borsh::{self, BorshSerialize},
+    env, require,
+    store::UnorderedSet,
+    AccountId, BorshStorageKey, IntoStorageKey,
+};
 
 use crate::{slot::Slot, DefaultStorageKey};
 
 const REQUIRE_ROLE_FAIL_MESSAGE: &str = "Unauthorized role";
 const PROHIBIT_ROLE_FAIL_MESSAGE: &str = "Prohibited role";
 
+#[derive(BorshSerialize, BorshStorageKey)]
+enum StorageKey<R> {
+    Role(R),
+}
+
 /// Role-based access control
 pub trait Rbac {
-    /// Roles type (probably an enum)
+    /// Roles type (probably an enum).
     type Role: BorshSerialize + IntoStorageKey;
 
-    /// Storage slot namespace for items
+    /// Storage slot namespace for items.
     fn root() -> Slot<()> {
         Slot::new(DefaultStorageKey::Rbac)
     }
 
+    /// Storage slot for the backing `UnorderedSet` of all accounts assigned
+    /// to a role.
+    fn slot_members_of(role: &Self::Role) -> Slot<UnorderedSet<AccountId>> {
+        Self::root().field::<UnorderedSet<AccountId>>(StorageKey::Role(role))
+    }
+
+    /// Deserializes the backing `UnorderedSet` structure, executes predicate
+    /// `f` on it, and reserializes the structure, returning the return value
+    /// of `f`.
+    fn with_members_of<T>(
+        role: &Self::Role,
+        f: impl FnOnce(&mut UnorderedSet<AccountId>) -> T,
+    ) -> T {
+        let mut slot = Self::slot_members_of(role);
+        let mut set = slot
+            .read()
+            .unwrap_or_else(|| UnorderedSet::new(slot.key.clone()));
+        let value = f(&mut set);
+        slot.write(&set);
+        value
+    }
+
+    /// Iterates over all accounts that have been assigned a role.
+    fn iter_members_of(role: &Self::Role) -> Iter {
+        let slot = Self::slot_members_of(role);
+        let set = slot.read().unwrap_or_else(|| UnorderedSet::new(slot.key));
+        // Cannot use with_members_of because Iter must be owned
+        Iter::new(set)
+    }
+
     /// Returns whether a given account has been given a certain role.
     fn has_role(account_id: &AccountId, role: &Self::Role) -> bool {
-        Self::root()
-            .ns(role.try_to_vec().unwrap())
-            .field(account_id.try_to_vec().unwrap())
-            .read()
-            .unwrap_or(false)
+        Self::with_members_of(role, |set| set.contains(account_id))
     }
 
     /// Assigns a role to an account.
-    fn add_role(&mut self, account_id: &AccountId, role: &Self::Role) {
-        Self::root()
-            .ns(role.try_to_vec().unwrap())
-            .field(account_id.try_to_vec().unwrap())
-            .write(&true);
+    fn add_role(&mut self, account_id: AccountId, role: &Self::Role) {
+        Self::with_members_of(role, |set| set.insert(account_id));
     }
 
     /// Removes a role from an account.
     fn remove_role(&mut self, account_id: &AccountId, role: &Self::Role) {
-        Self::root()
-            .ns(role.try_to_vec().unwrap())
-            .field::<_, bool>(account_id.try_to_vec().unwrap())
-            .remove();
+        Self::with_members_of(role, |set| set.remove(account_id));
     }
 
     /// Requires transaction predecessor to have a given role.
-    fn require_role(&self, role: &Self::Role) {
+    fn require_role(role: &Self::Role) {
         let predecessor = env::predecessor_account_id();
         require!(
             Self::has_role(&predecessor, role),
-            REQUIRE_ROLE_FAIL_MESSAGE
+            REQUIRE_ROLE_FAIL_MESSAGE,
         );
     }
 
     /// Requires transaction predecessor to not have a given role.
-    fn prohibit_role(&self, role: &Self::Role) {
+    fn prohibit_role(role: &Self::Role) {
         let predecessor = env::predecessor_account_id();
         require!(
             !Self::has_role(&predecessor, role),
-            PROHIBIT_ROLE_FAIL_MESSAGE
+            PROHIBIT_ROLE_FAIL_MESSAGE,
         );
+    }
+}
+
+/// An iterator for `AccountId`s.
+pub struct Iter {
+    inner_collection: UnorderedSet<AccountId>,
+    index: usize,
+}
+
+impl Iter {
+    /// Creates a new iterator from an `UnorderedSet`.
+    pub fn new(s: UnorderedSet<AccountId>) -> Self {
+        Self {
+            inner_collection: s,
+            index: 0,
+        }
+    }
+}
+
+impl Iterator for Iter {
+    type Item = AccountId;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let value = self.inner_collection.iter().nth(self.index);
+        self.index += 1;
+        value.map(ToOwned::to_owned)
     }
 }
 
@@ -97,10 +153,6 @@ mod tests {
     };
 
     use super::Rbac;
-
-    mod near_contract_tools {
-        pub use crate::*;
-    }
 
     #[derive(BorshSerialize, BorshStorageKey)]
     enum Role {
@@ -126,7 +178,7 @@ mod tests {
         let mut r = Contract {};
         let a: AccountId = "account".parse().unwrap();
 
-        r.add_role(&a, &Role::A);
+        r.add_role(a.clone(), &Role::A);
 
         assert!(Contract::has_role(&a, &Role::A));
         assert!(!Contract::has_role(&a, &Role::B));
@@ -137,8 +189,8 @@ mod tests {
         let mut r = Contract {};
         let a: AccountId = "account".parse().unwrap();
 
-        r.add_role(&a, &Role::B);
-        r.add_role(&a, &Role::A);
+        r.add_role(a.clone(), &Role::B);
+        r.add_role(a.clone(), &Role::A);
 
         assert!(Contract::has_role(&a, &Role::A));
         assert!(Contract::has_role(&a, &Role::B));
@@ -155,10 +207,10 @@ mod tests {
         let a: AccountId = "account_a".parse().unwrap();
         let b: AccountId = "account_b".parse().unwrap();
 
-        r.add_role(&a, &Role::B);
-        r.add_role(&a, &Role::A);
-        r.add_role(&b, &Role::B);
-        r.add_role(&b, &Role::A);
+        r.add_role(a.clone(), &Role::B);
+        r.add_role(a.clone(), &Role::A);
+        r.add_role(b.clone(), &Role::B);
+        r.add_role(b.clone(), &Role::A);
 
         assert!(Contract::has_role(&a, &Role::A));
         assert!(Contract::has_role(&a, &Role::B));
@@ -179,11 +231,11 @@ mod tests {
         let mut r = Contract {};
         let a: AccountId = "account".parse().unwrap();
 
-        r.add_role(&a, &Role::A);
+        r.add_role(a.clone(), &Role::A);
 
         testing_env!(VMContextBuilder::new().predecessor_account_id(a).build());
 
-        r.require_role(&Role::A);
+        Contract::require_role(&Role::A);
     }
 
     #[test]
@@ -192,22 +244,21 @@ mod tests {
         let mut r = Contract {};
         let a: AccountId = "account".parse().unwrap();
 
-        r.add_role(&a, &Role::A);
+        r.add_role(a.clone(), &Role::A);
 
         testing_env!(VMContextBuilder::new().predecessor_account_id(a).build());
 
-        r.require_role(&Role::B);
+        Contract::require_role(&Role::B);
     }
 
     #[test]
     #[should_panic = "Unauthorized role"]
     pub fn require_role_fail_no_role() {
-        let r = Contract {};
         let a: AccountId = "account".parse().unwrap();
 
         testing_env!(VMContextBuilder::new().predecessor_account_id(a).build());
 
-        r.require_role(&Role::B);
+        Contract::require_role(&Role::B);
     }
 
     #[test]
@@ -216,11 +267,11 @@ mod tests {
         let mut r = Contract {};
         let a: AccountId = "account".parse().unwrap();
 
-        r.add_role(&a, &Role::A);
+        r.add_role(a.clone(), &Role::A);
 
         testing_env!(VMContextBuilder::new().predecessor_account_id(a).build());
 
-        r.prohibit_role(&Role::A);
+        Contract::prohibit_role(&Role::A);
     }
 
     #[test]
@@ -228,20 +279,19 @@ mod tests {
         let mut r = Contract {};
         let a: AccountId = "account".parse().unwrap();
 
-        r.add_role(&a, &Role::A);
+        r.add_role(a.clone(), &Role::A);
 
         testing_env!(VMContextBuilder::new().predecessor_account_id(a).build());
 
-        r.prohibit_role(&Role::B);
+        Contract::prohibit_role(&Role::B);
     }
 
     #[test]
     pub fn prohibit_role_success_no_role() {
-        let r = Contract {};
         let a: AccountId = "account".parse().unwrap();
 
         testing_env!(VMContextBuilder::new().predecessor_account_id(a).build());
 
-        r.prohibit_role(&Role::B);
+        Contract::prohibit_role(&Role::B);
     }
 }

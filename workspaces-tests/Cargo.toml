@@ -6,24 +6,6 @@ publish = false
 version = "0.1.0"
 
 [[bin]]
-name = "upgrade_bad"
-
-[[bin]]
-name = "upgrade_old_borsh"
-
-[[bin]]
-name = "upgrade_old_jsonbase64"
-
-[[bin]]
-name = "upgrade_old_raw"
-
-[[bin]]
-name = "upgrade_new"
-
-[[bin]]
-name = "upgrade_old_multisig"
-
-[[bin]]
 name = "counter_multisig"
 
 [[bin]]
@@ -36,7 +18,28 @@ name = "fungible_token"
 name = "native_multisig"
 
 [[bin]]
+name = "rbac"
+
+[[bin]]
 name = "simple_multisig"
+
+[[bin]]
+name = "upgrade_bad"
+
+[[bin]]
+name = "upgrade_new"
+
+[[bin]]
+name = "upgrade_old_borsh"
+
+[[bin]]
+name = "upgrade_old_jsonbase64"
+
+[[bin]]
+name = "upgrade_old_multisig"
+
+[[bin]]
+name = "upgrade_old_raw"
 
 [dependencies]
 near-contract-tools = {path = "../", features = ["unstable"]}
