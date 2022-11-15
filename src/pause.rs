@@ -1,33 +1,48 @@
-//! Contract method pausing/unpausing
+//! Pause pattern implements methods to pause, unpause and get the status of the
+//! contract.
+//!
+//! [`Pause`] implements methods to pause and unpause the contract. When the
+//! methods are called the contracts status changes and the respective event
+//! is emitted. A contract starts off as "unpaused" by default. [`PauseExternal`]
+//! exposes an external function to check the status of the contract.
+//!
+//! This [derive macro](near_contract_tools_macros::Pause)
+//! derives a default implementation for both these traits.
+//!
+//! # Safety
+//! The default implementation assumes or enforces the following invariants.
+//! Violating assumed invariants may corrupt contract state and show unexpected
+//! behavior (UB). Enforced invariants throw an error (ERR) but contract
+//! state remains intact.
+//!
+//! * Initial state is unpaused.
+//! * (UB) The pause root storage slot is not used or modified. The default key is `~p`.
+//! * (ERR) Only an "unpaused" contract can call `pause`.
+//! * (ERR) Only a "paused" contract can call `unpause`.
+//! * (ERR) [`Pause::require_paused`] may only be called when the contract is paused.
+//! * (ERR) [`Pause::require_unpaused`] may only be called when the contract is unpaused.
 #![allow(missing_docs)] // #[ext_contract(...)] does not play nicely with clippy
 
-use crate::{slot::Slot, standard::nep297::Event};
+use crate::{slot::Slot, standard::nep297::Event, DefaultStorageKey};
+use near_contract_tools_macros::event;
 use near_sdk::{ext_contract, require};
 
 const UNPAUSED_FAIL_MESSAGE: &str = "Disallowed while contract is unpaused";
 const PAUSED_FAIL_MESSAGE: &str = "Disallowed while contract is paused";
 
 /// Events emitted when contract pause state is changed
-pub mod event {
-    use crate::event;
-
+#[event(
+    standard = "x-paus",
+    version = "1.0.0",
+    crate = "crate",
+    macros = "near_contract_tools_macros"
+)]
+#[derive(Debug, Clone)]
+pub enum PauseEvent {
     /// Emitted when the contract is paused
-    #[event(
-        standard = "x-paus",
-        version = "1.0.0",
-        crate = "crate",
-        macros = "near_contract_tools_macros"
-    )]
-    pub struct Pause;
-
+    Pause,
     /// Emitted when the contract is unpaused
-    #[event(
-        standard = "x-paus",
-        version = "1.0.0",
-        crate = "crate",
-        macros = "near_contract_tools_macros"
-    )]
-    pub struct Unpause;
+    Unpause,
 }
 
 /// Internal-only interactions for a pausable contract
@@ -65,7 +80,9 @@ pub mod event {
 /// ```
 pub trait Pause {
     /// Storage root
-    fn root() -> Slot<()>;
+    fn root() -> Slot<()> {
+        Slot::new(DefaultStorageKey::Pause)
+    }
 
     /// Storage slot for pause state
     fn slot_paused() -> Slot<bool> {
@@ -88,7 +105,7 @@ pub trait Pause {
     fn pause(&mut self) {
         Self::require_unpaused();
         self.set_is_paused(true);
-        event::Pause.emit();
+        PauseEvent::Pause.emit();
     }
 
     /// Unpauses the contract if it is currently paused, panics otherwise.
@@ -96,7 +113,7 @@ pub trait Pause {
     fn unpause(&mut self) {
         Self::require_paused();
         self.set_is_paused(false);
-        event::Unpause.emit();
+        PauseEvent::Unpause.emit();
     }
 
     /// Rejects if the contract is unpaused
@@ -110,7 +127,7 @@ pub trait Pause {
     }
 }
 
-/// External methods for `Pause`
+/// External methods for [Pause]
 #[ext_contract(ext_pause)]
 pub trait PauseExternal {
     /// Returns `true` if the contract is paused, `false` otherwise

@@ -15,12 +15,10 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
-      - name: Configure Rust
-        uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@master
         with:
-            toolchain: stable
-            override: true
-            components: rustfmt
+          toolchain: 1.65
+          components: rustfmt
       - name: Check formatting
         run: >
           echo "::echo::on";
@@ -30,21 +28,10 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
-      - name: Configure Rust
-        uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@master
         with:
-            toolchain: stable
-            override: true
-            components: clippy
-      - uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          toolchain: 1.65
+          components: clippy
       - name: Run linter
         run: cargo clippy -- -D warnings
   test:
@@ -52,20 +39,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
-      - name: Configure Rust
-        uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@master
         with:
-            toolchain: stable
-            override: true
-      - uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          toolchain: 1.65
       - name: Run unit and integration tests
         run: cargo test --verbose
   workspaces-test:
@@ -73,21 +49,10 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
-      - name: Configure Rust
-        uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@master
         with:
-            toolchain: stable
-            override: true
-            target: wasm32-unknown-unknown
-      - uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          toolchain: 1.65
+          targets: wasm32-unknown-unknown
       - name: Run workspaces tests
         run: >
           cd workspaces-tests;

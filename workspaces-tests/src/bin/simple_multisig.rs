@@ -104,7 +104,7 @@ impl Contract {
     }
 
     pub fn obtain_multisig_permission(&mut self) {
-        self.add_role(&env::predecessor_account_id(), &Role::Multisig);
+        self.add_role(env::predecessor_account_id(), &Role::Multisig);
     }
 
     pub fn request(&mut self, action: String) -> u32 {

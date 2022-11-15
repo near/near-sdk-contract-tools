@@ -18,11 +18,32 @@ name = "fungible_token"
 name = "native_multisig"
 
 [[bin]]
+name = "rbac"
+
+[[bin]]
 name = "simple_multisig"
 
+[[bin]]
+name = "upgrade_bad"
+
+[[bin]]
+name = "upgrade_new"
+
+[[bin]]
+name = "upgrade_old_borsh"
+
+[[bin]]
+name = "upgrade_old_jsonbase64"
+
+[[bin]]
+name = "upgrade_old_multisig"
+
+[[bin]]
+name = "upgrade_old_raw"
+
 [dependencies]
-near-contract-tools = {path = "../"}
-near-sdk = "4.0.0"
+near-contract-tools = {path = "../", features = ["unstable"]}
+near-sdk = { version = "4.1.1", default-features = false }
 strum = "0.24.1"
 strum_macros = "0.24.3"
 thiserror = "1.0.34"
@@ -31,4 +52,4 @@ thiserror = "1.0.34"
 tokio = "1.21.1"
 
 [target.'cfg(not(windows))'.dev-dependencies]
-workspaces = "0.4"
+workspaces = "0.6"

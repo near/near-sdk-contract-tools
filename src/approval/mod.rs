@@ -7,7 +7,7 @@ use near_sdk::{
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::slot::Slot;
+use crate::{slot::Slot, DefaultStorageKey};
 
 /// Error message emitted when the component is used before it is initialized
 pub const NOT_INITIALIZED: &str = "init must be called before use";
@@ -134,7 +134,9 @@ where
     C: ApprovalConfiguration<A, S> + BorshDeserialize + BorshSerialize,
 {
     /// Storage root
-    fn root() -> Slot<()>;
+    fn root() -> Slot<()> {
+        Slot::new(DefaultStorageKey::ApprovalManager)
+    }
 
     /// Because requests will be deleted from the requests collection,
     /// maintain a simple counter to guarantee unique IDs
@@ -439,9 +441,9 @@ mod tests {
 
         let mut contract = Contract::new(2);
 
-        contract.add_role(&alice, &Role::Multisig);
-        contract.add_role(&bob, &Role::Multisig);
-        contract.add_role(&charlie, &Role::Multisig);
+        contract.add_role(alice.clone(), &Role::Multisig);
+        contract.add_role(bob.clone(), &Role::Multisig);
+        contract.add_role(charlie.clone(), &Role::Multisig);
 
         predecessor(&alice);
         let request_id = contract
@@ -470,7 +472,7 @@ mod tests {
 
         let mut contract = Contract::new(2);
 
-        contract.add_role(&alice, &Role::Multisig);
+        contract.add_role(alice.clone(), &Role::Multisig);
 
         predecessor(&alice);
         let request_id = contract
@@ -489,7 +491,7 @@ mod tests {
 
         let mut contract = Contract::new(2);
 
-        contract.add_role(&alice, &Role::Multisig);
+        contract.add_role(alice.clone(), &Role::Multisig);
 
         predecessor(&alice);
 
@@ -509,8 +511,8 @@ mod tests {
 
         let mut contract = Contract::new(2);
 
-        contract.add_role(&alice, &Role::Multisig);
-        contract.add_role(&bob, &Role::Multisig);
+        contract.add_role(alice.clone(), &Role::Multisig);
+        contract.add_role(bob.clone(), &Role::Multisig);
 
         predecessor(&alice);
 
@@ -533,9 +535,9 @@ mod tests {
 
         let mut contract = Contract::new(2);
 
-        contract.add_role(&alice, &Role::Multisig);
-        contract.add_role(&bob, &Role::Multisig);
-        contract.add_role(&charlie, &Role::Multisig);
+        contract.add_role(alice.clone(), &Role::Multisig);
+        contract.add_role(bob.clone(), &Role::Multisig);
+        contract.add_role(charlie.clone(), &Role::Multisig);
 
         predecessor(&alice);
         let request_id = contract

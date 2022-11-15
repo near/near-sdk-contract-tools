@@ -12,8 +12,8 @@ use thiserror::Error;
 
 use super::{ActionRequest, ApprovalConfiguration};
 
-/// An AccountAuthorizer gatekeeps which accounts are eligible to submit approvals
-/// to an ApprovalManager
+/// Check which accounts are eligible to submit approvals to an
+/// [ApprovalManager](super::ApprovalManager)
 pub trait AccountAuthorizer {
     /// Why can this account not be authorized?
     type AuthorizationError;
@@ -281,7 +281,7 @@ mod tests {
         }
 
         pub fn obtain_multisig_permission(&mut self) {
-            self.add_role(&env::predecessor_account_id(), &Role::Multisig);
+            self.add_role(env::predecessor_account_id(), &Role::Multisig);
         }
 
         pub fn create(&mut self, say_hello: bool) -> u32 {

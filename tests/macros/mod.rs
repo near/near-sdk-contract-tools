@@ -67,8 +67,8 @@ impl Integration {
         let mut contract = Self { value: 0 };
 
         Owner::init(&mut contract, &owner_id);
-        contract.add_role(&owner_id, &Role::CanSetValue);
-        contract.add_role(&owner_id, &Role::CanPause);
+        contract.add_role(owner_id.clone(), &Role::CanSetValue);
+        contract.add_role(owner_id.clone(), &Role::CanPause);
 
         contract
     }
@@ -76,14 +76,14 @@ impl Integration {
     pub fn add_value_setter(&mut self, account_id: AccountId) {
         Self::require_owner();
 
-        self.add_role(&account_id, &Role::CanSetValue);
+        self.add_role(account_id.clone(), &Role::CanSetValue);
 
         my_event::PermissionGranted { to: account_id }.emit();
     }
 
     pub fn set_value(&mut self, value: u32) {
         Self::require_unpaused();
-        self.require_role(&Role::CanSetValue);
+        Self::require_role(&Role::CanSetValue);
 
         let old = self.value;
 
@@ -97,12 +97,12 @@ impl Integration {
     }
 
     pub fn pause(&mut self) {
-        self.require_role(&Role::CanPause);
+        Self::require_role(&Role::CanPause);
         Pause::pause(self);
     }
 
     pub fn unpause(&mut self) {
-        self.require_role(&Role::CanPause);
+        Self::require_role(&Role::CanPause);
         Pause::unpause(self);
     }
 
@@ -123,7 +123,7 @@ struct MigrateIntegration {
 }
 
 impl MigrateHook for MigrateIntegration {
-    fn on_migrate(old: Integration, _args: Option<String>) -> Self {
+    fn on_migrate(old: Integration) -> Self {
         Self::require_owner();
         Self::require_unpaused();
 
@@ -139,14 +139,14 @@ impl MigrateIntegration {
     pub fn add_value_setter(&mut self, account_id: AccountId) {
         Self::require_owner();
 
-        self.add_role(&account_id, &Role::CanSetValue);
+        self.add_role(account_id.clone(), &Role::CanSetValue);
 
         my_event::PermissionGranted { to: account_id }.emit();
     }
 
     pub fn set_value(&mut self, value: u32) {
         Self::require_unpaused();
-        self.require_role(&Role::CanSetValue);
+        Self::require_role(&Role::CanSetValue);
 
         let old = self.moved_value;
 
@@ -160,12 +160,12 @@ impl MigrateIntegration {
     }
 
     pub fn pause(&mut self) {
-        self.require_role(&Role::CanPause);
+        Self::require_role(&Role::CanPause);
         Pause::pause(self);
     }
 
     pub fn unpause(&mut self) {
-        self.require_role(&Role::CanPause);
+        Self::require_role(&Role::CanPause);
         Pause::unpause(self);
     }
 
@@ -217,7 +217,7 @@ fn integration() {
     // Perform migration
     env::state_write(&c);
 
-    let mut migrated = <MigrateIntegration as MigrateExternal>::migrate(None);
+    let mut migrated = <MigrateIntegration as MigrateExternal>::migrate();
 
     assert_eq!(migrated.moved_value, 25);
     assert_eq!(migrated.get_value(), 25);
@@ -330,7 +330,7 @@ fn integration_fail_migrate_allow() {
 
     testing_env!(context);
 
-    <MigrateIntegration as MigrateExternal>::migrate(None);
+    <MigrateIntegration as MigrateExternal>::migrate();
 }
 
 #[test]
@@ -348,7 +348,7 @@ fn integration_fail_migrate_paused() {
 
     env::state_write(&c);
 
-    <MigrateIntegration as MigrateExternal>::migrate(None);
+    <MigrateIntegration as MigrateExternal>::migrate();
 }
 
 #[cfg(test)]
