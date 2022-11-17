@@ -16,6 +16,8 @@ pub struct RbacMeta {
     // crates
     #[darling(rename = "crate", default = "crate::default_crate_name")]
     pub me: syn::Path,
+    #[darling(default = "crate::default_near_sdk")]
+    pub near_sdk: syn::Path,
 }
 
 pub fn expand(meta: RbacMeta) -> Result<TokenStream, darling::Error> {
@@ -27,6 +29,7 @@ pub fn expand(meta: RbacMeta) -> Result<TokenStream, darling::Error> {
         generics,
 
         me,
+        near_sdk,
     } = meta;
 
     let (imp, ty, wher) = generics.split_for_impl();
@@ -44,6 +47,12 @@ pub fn expand(meta: RbacMeta) -> Result<TokenStream, darling::Error> {
             type Role = #roles;
 
             #root
+        }
+
+        impl #me::rbac::guard::Guard for #roles {
+            fn apply(&self, account_id: &#near_sdk::AccountId) -> bool {
+                <#ident as #me::rbac::Rbac>::has_role(account_id, self)
+            }
         }
     })
 }

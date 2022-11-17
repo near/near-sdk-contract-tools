@@ -240,7 +240,7 @@ mod tests {
         }
     }
 
-    #[derive(BorshSerialize, BorshStorageKey)]
+    #[derive(Debug, BorshSerialize, BorshStorageKey)]
     enum Role {
         Multisig,
     }

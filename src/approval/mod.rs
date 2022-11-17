@@ -302,7 +302,7 @@ mod tests {
 
     use super::{Action, ActionRequest, ApprovalConfiguration, ApprovalManager};
 
-    #[derive(BorshSerialize, BorshStorageKey)]
+    #[derive(Debug, BorshSerialize, BorshStorageKey)]
     enum Role {
         Multisig,
     }

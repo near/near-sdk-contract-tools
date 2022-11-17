@@ -142,6 +142,103 @@ impl Iterator for Iter {
     }
 }
 
+pub mod guard {
+    use near_sdk::{
+        borsh::{self, BorshSerialize},
+        AccountId, BorshStorageKey,
+    };
+
+    #[macro_export]
+    macro_rules! rbac_guard {
+        (@inner all($($g:expr),* $(,)?)) => {
+            $crate::rbac::guard::All(&[
+                $(&rbac_guard!(@inner $g),)*
+            ])
+        };
+        (@inner any($($g:expr),* $(,)?)) => {
+            $crate::rbac::guard::Any(&[
+                $(&rbac_guard!(@inner $g),)*
+            ])
+        };
+        (@inner none($($g:expr),* $(,)?)) => {
+            $crate::rbac::guard::None(&[
+                $(&rbac_guard!(@inner $g),)*
+            ])
+        };
+        (@inner $g:expr $(,)?) => {
+            $g
+        };
+
+        ($account_id: expr, $($guard: tt)+) => {
+            near_sdk::require!(
+                $crate::rbac::guard::Guard::apply(&rbac_guard!(@inner $($guard)+), &$account_id),
+                "Unauthorized role",
+            )
+        };
+        ($($guard: tt)+) => {
+            rbac_guard!(near_sdk::env::predecessor_account_id(), $($guard)+)
+        };
+    }
+
+    #[derive(Debug, BorshSerialize, BorshStorageKey)]
+    pub enum Role {
+        A,
+        B,
+        C,
+        D,
+    }
+
+    impl Guard for Role {
+        fn apply(&self, account_id: &AccountId) -> bool {
+            true
+        }
+    }
+
+    #[test]
+    fn test() {
+        let g = rbac_guard!(all(Role::A, Role::B));
+        dbg!(&g);
+        let g = rbac_guard!(any(Role::B, Role::C));
+        dbg!(&g);
+        let g = rbac_guard!(none(Role::C, Role::D));
+        dbg!(&g);
+    }
+
+    pub trait Guard
+    where
+        Self: core::fmt::Debug,
+    {
+        fn apply(&self, account_id: &AccountId) -> bool;
+    }
+
+    #[derive(Debug)]
+    pub struct None<'a>(pub &'a [&'a dyn Guard]);
+
+    impl<'a> Guard for None<'a> {
+        fn apply(&self, account_id: &AccountId) -> bool {
+            self.0.iter().all(|g| !g.apply(account_id))
+        }
+    }
+
+    #[derive(Debug)]
+    pub struct Any<'a>(pub &'a [&'a dyn Guard]);
+
+    impl<'a> Guard for Any<'a> {
+        fn apply(&self, account_id: &AccountId) -> bool {
+            self.0.iter().any(|g| g.apply(account_id))
+        }
+    }
+
+    #[derive(Debug)]
+    pub struct All<'a>(pub &'a [&'a dyn Guard]);
+
+    impl<'a> Guard for All<'a> {
+        fn apply(&self, account_id: &AccountId) -> bool {
+            self.0.iter().all(|g| g.apply(account_id))
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use near_contract_tools_macros::Rbac;
@@ -152,12 +249,15 @@ mod tests {
         testing_env, AccountId, BorshStorageKey,
     };
 
+    use crate::rbac_guard;
+
     use super::Rbac;
 
-    #[derive(BorshSerialize, BorshStorageKey)]
+    #[derive(Debug, BorshSerialize, BorshStorageKey)]
     enum Role {
         A,
         B,
+        C,
     }
 
     #[derive(Rbac)]
@@ -236,6 +336,7 @@ mod tests {
         testing_env!(VMContextBuilder::new().predecessor_account_id(a).build());
 
         Contract::require_role(&Role::A);
+        rbac_guard!(Role::A);
     }
 
     #[test]
@@ -249,6 +350,35 @@ mod tests {
         testing_env!(VMContextBuilder::new().predecessor_account_id(a).build());
 
         Contract::require_role(&Role::B);
+    }
+
+    #[test]
+    pub fn require_role_macro() {
+        let mut r = Contract {};
+        let a: AccountId = "account".parse().unwrap();
+
+        r.add_role(a.clone(), &Role::A);
+
+        testing_env!(VMContextBuilder::new().predecessor_account_id(a).build());
+
+        rbac_guard!(any(Role::A, Role::B, Role::C));
+        rbac_guard!(none(Role::B, Role::C));
+        rbac_guard!(all(Role::A));
+        rbac_guard!(Role::A);
+        rbac_guard!(near_sdk::env::predecessor_account_id(), Role::A);
+    }
+
+    #[test]
+    #[should_panic = "Unauthorized role"]
+    pub fn require_role_fail_wrong_role_macro() {
+        let mut r = Contract {};
+        let a: AccountId = "account".parse().unwrap();
+
+        r.add_role(a.clone(), &Role::A);
+
+        testing_env!(VMContextBuilder::new().predecessor_account_id(a).build());
+
+        rbac_guard!(Role::B);
     }
 
     #[test]

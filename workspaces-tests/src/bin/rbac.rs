@@ -2,7 +2,7 @@
 
 use std::str::FromStr;
 
-use near_contract_tools::{rbac::Rbac, Rbac};
+use near_contract_tools::{rbac::Rbac, rbac_guard, Rbac};
 
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
@@ -13,7 +13,7 @@ use near_sdk::{
 
 pub fn main() {}
 
-#[derive(BorshSerialize, BorshStorageKey)]
+#[derive(Debug, BorshSerialize, BorshStorageKey)]
 pub enum Role {
     Alpha,
     Beta,
