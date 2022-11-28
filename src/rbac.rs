@@ -25,6 +25,8 @@
 //!     account has the specified role.
 //! * (ERR) [`Rbac::prohibit_role`] may only be called when the predecessor
 //!     account does not have the specified role.
+use std::iter::FusedIterator;
+
 use near_sdk::{
     borsh::{self, BorshSerialize},
     env, require,
@@ -139,11 +141,34 @@ impl Iterator for Iter {
     type Item = AccountId;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let value = self.inner_collection.iter().nth(self.index);
-        self.index += 1;
-        value.map(ToOwned::to_owned)
+        let value = self.inner_collection.iter().nth(self.index).cloned();
+        if value.is_some() {
+            self.index += 1;
+        }
+        value
+    }
+
+    fn nth(&mut self, n: usize) -> Option<Self::Item> {
+        self.index = usize::min(self.inner_collection.len() as usize, self.index + n);
+        self.next()
+    }
+
+    #[inline]
+    fn count(self) -> usize
+    where
+        Self: Sized,
+    {
+        self.inner_collection.len() as usize - self.index
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let s = (self.inner_collection.len() as usize).saturating_sub(self.index);
+        (s, Some(s))
     }
 }
+
+impl FusedIterator for Iter {}
 
 #[cfg(test)]
 mod tests {
