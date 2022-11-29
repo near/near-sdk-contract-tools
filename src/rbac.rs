@@ -61,9 +61,9 @@ pub trait Rbac {
     }
 
     /// Deserializes the backing `UnorderedSet` structure, executes predicate
-    /// `f` on it, and reserializes the structure, returning the return value
-    /// of `f`.
-    fn with_members_of<T>(
+    /// `f` on it, reserializes the structure, and writes it back into storage,
+    /// returning the return value of `f`.
+    fn with_members_of_mut<T>(
         role: &Self::Role,
         f: impl FnOnce(&mut UnorderedSet<AccountId>) -> T,
     ) -> T {
@@ -76,6 +76,16 @@ pub trait Rbac {
         value
     }
 
+    /// Deserializes the backing `UnorderedSet` structure and executes predicate
+    /// `f` on it. Returns the return value of `f`.
+    fn with_members_of<T>(role: &Self::Role, f: impl Fn(&UnorderedSet<AccountId>) -> T) -> T {
+        let slot = Self::slot_members_of(role);
+        let set = slot
+            .read()
+            .unwrap_or_else(|| UnorderedSet::new(slot.key.clone()));
+        f(&set)
+    }
+
     /// Iterates over all accounts that have been assigned a role.
     fn iter_members_of(role: &Self::Role) -> Iter {
         let slot = Self::slot_members_of(role);
@@ -86,20 +96,17 @@ pub trait Rbac {
 
     /// Returns whether a given account has been given a certain role.
     fn has_role(account_id: &AccountId, role: &Self::Role) -> bool {
-        Self::slot_members_of(role)
-            .read()
-            .map(|set| set.contains(account_id))
-            .unwrap_or(false)
+        Self::with_members_of(role, |set| set.contains(account_id))
     }
 
     /// Assigns a role to an account.
     fn add_role(&mut self, account_id: AccountId, role: &Self::Role) {
-        Self::with_members_of(role, |set| set.insert(account_id));
+        Self::with_members_of_mut(role, |set| set.insert(account_id));
     }
 
     /// Removes a role from an account.
     fn remove_role(&mut self, account_id: &AccountId, role: &Self::Role) {
-        Self::with_members_of(role, |set| set.remove(account_id));
+        Self::with_members_of_mut(role, |set| set.remove(account_id));
     }
 
     /// Requires transaction predecessor to have a given role.
@@ -169,6 +176,7 @@ impl Iterator for Iter {
 }
 
 impl FusedIterator for Iter {}
+impl ExactSizeIterator for Iter {}
 
 #[cfg(test)]
 mod tests {
