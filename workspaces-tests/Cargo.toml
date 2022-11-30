@@ -35,6 +35,7 @@ name = "payroll_example"
 [dependencies]
 near-contract-tools = {path = "../"}
 near-sdk = {version = "4.0.0", features = ["unstable"]}
+serde = "1.0.148"
 strum = "0.24.1"
 strum_macros = "0.24.3"
 thiserror = "1.0.34"
