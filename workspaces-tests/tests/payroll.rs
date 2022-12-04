@@ -25,8 +25,8 @@ async fn setup() -> Setup {
     let contract_id = contract.id();
     let owner = &accounts[0];
     let manager = &accounts[1];
-    let employee_1 = &accounts[2];
-    let employee_2 = &accounts[3];
+    let emp1 = &accounts[2];
+    let emp2 = &accounts[3];
 
     // Initialize contract
     contract
@@ -53,7 +53,7 @@ async fn setup() -> Setup {
     let result = manager
         .call(contract_id, "add_employee")
         .args_json(json!({
-            "account_id": employee_1.id(),
+            "account_id": emp1.id(),
         }))
         .transact()
         .await
@@ -63,7 +63,7 @@ async fn setup() -> Setup {
     let result = manager
         .call(contract_id, "add_employee")
         .args_json(json!({
-            "account_id": employee_2.id(),
+            "account_id": emp2.id(),
         }))
         .transact()
         .await
@@ -71,4 +71,33 @@ async fn setup() -> Setup {
         .unwrap();
 
     Setup { contract, accounts }
+}
+
+#[tokio::test]
+async fn successful_request() {
+    let Setup { contract, accounts } = setup().await;
+
+    let contract_id = contract.id();
+    let owner = &accounts[0];
+    let manager = &accounts[1];
+    let emp1 = &accounts[2];
+    let emp2 = &accounts[3];
+
+    let result = emp1
+        .call(contract_id, "is_employee")
+        .transact()
+        .await
+        .unwrap()
+        .unwrap();
+
+    dbg!(&result.borsh::<bool>(), true);
+
+    let result = emp1
+        .call(contract_id, "get_logged_time")
+        .transact()
+        .await
+        .unwrap()
+        .unwrap();
+
+    dbg!(&result.borsh::<u8>(), 0);
 }

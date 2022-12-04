@@ -56,7 +56,7 @@ impl ApprovalConfiguration<PayrollAction, PayrollApproval> for Payroll {
 
     fn is_removable(
         &self,
-        action_request: &approval::ActionRequest<PayrollAction, PayrollApproval>,
+        _action_request: &approval::ActionRequest<PayrollAction, PayrollApproval>,
     ) -> Result<(), Self::RemovalError> {
         Ok(())
     }
@@ -198,10 +198,29 @@ impl Payroll {
         self.logged_time
             .insert(&employee_id, &(current_hours + hours));
     }
+
+    /// Employee can check the time they've logged
+    pub fn get_logged_time(&self) -> u8 {
+        self.require_role(&Role::Employee);
+        let employee_id = env::predecessor_account_id();
+
+        self.logged_time.get(&employee_id).unwrap_or_else(|| {
+            env::panic_str(format!("No record exists for account: {}", employee_id).as_str())
+        })
+    }
+
+    pub fn is_employee(&self) -> bool {
+        self.require_role(&Role::Employee);
+        true
+    }
 }
 
 #[ext_contract(ext_payroll)]
 /// External methods for payroll
+///
+/// TODO: what does externally accessible functions mean
+/// if in tests different accounts can call the internal
+/// functions as in workspace_tests/tests/payroll.rs
 pub trait PayrollExternal {
     /// Manager can add new managers
     fn payroll_add_manager(&mut self, account_id: &AccountId);
@@ -245,6 +264,7 @@ impl PayrollExternal for Payroll {
 
 pub fn main() {}
 
+#[cfg(test)]
 mod tests {
     use near_contract_tools::rbac::Rbac;
     use near_sdk::{test_utils::VMContextBuilder, testing_env, AccountId};
@@ -317,11 +337,11 @@ mod tests {
         contract.add_employee(&emp2);
 
         assert!(Payroll::has_role(&emp1, &Role::Employee));
+        assert_eq!(contract.logged_time.get(&emp1), Some(0));
 
         testing_env!(VMContextBuilder::new()
             .predecessor_account_id(emp1.clone())
             .build());
-
         contract.log_time(10);
         assert_eq!(contract.logged_time.get(&emp1), Some(10));
 
@@ -337,6 +357,16 @@ mod tests {
         contract.log_time(9);
         assert_eq!(contract.logged_time.get(&emp1), Some(20));
         assert_eq!(contract.logged_time.get(&emp2), Some(9));
+
+        testing_env!(VMContextBuilder::new()
+            .predecessor_account_id(emp1.clone())
+            .build());
+        assert_eq!(contract.get_logged_time(), 20);
+
+        testing_env!(VMContextBuilder::new()
+            .predecessor_account_id(emp2.clone())
+            .build());
+        assert_eq!(contract.get_logged_time(), 9);
 
         // logged_time will panic if it is called by a user with manager role
         // this cannot be tested because panic unwind will need non-mutable
