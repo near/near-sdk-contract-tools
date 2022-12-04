@@ -126,24 +126,43 @@ struct Payroll {
     pub logged_time: UnorderedMap<AccountId, u8>,
 }
 
+/// Approval state for making payment
+#[derive(BorshSerialize, BorshDeserialize, Debug)]
+enum PayApprovalState {
+    EmployeeApproved,
+    ManagerApproved,
+    BothApproved,
+}
+
 /// Manager can add new employees and disburse payments
 /// Employees can log time
+///
+/// Note: After any &mut self function the contract state is automatically
+/// written back. An explicit env::state_write call is not needed.
+///
+/// https://docs.near.org/sdk/rust/contract-structure/near-bindgen
 #[near_bindgen]
 impl Payroll {
-    pub fn new() -> Self {
-        Payroll {
+    #[init]
+    pub fn new(owner: &AccountId) -> Self {
+        let mut contract = Payroll {
             hourly_fee: 1000,
             logged_time: UnorderedMap::new(PayrollKey::LOG),
-        }
+        };
+        contract.add_role(owner, &Role::Manager);
+        contract
+    }
+
+    /// Manager can add new managers
+    pub fn add_manager(&mut self, account_id: &AccountId) {
+        self.require_role(&Role::Manager);
+        self.add_role(account_id, &Role::Manager);
     }
 
     /// Manager can add new employees
     pub fn add_employee(&mut self, account_id: &AccountId) {
         self.require_role(&Role::Manager);
         self.logged_time.insert(account_id, &0);
-
-        // write updated time log to state
-        env::state_write(self);
     }
 
     pub fn approve_pay(&mut self, request_id: u32) {
@@ -159,7 +178,7 @@ impl Payroll {
         self.require_role(&Role::Employee);
         let employee_id = env::predecessor_account_id();
         let logged_time = self.logged_time.get(&employee_id).unwrap_or_else(|| {
-            env::panic_str(format!("No employee exists for account: {}", employee_id).as_str())
+            env::panic_str(format!("No record exists for account: {}", employee_id).as_str())
         });
 
         let request_id = self
@@ -179,21 +198,20 @@ impl Payroll {
         self.require_role(&Role::Employee);
         let employee_id = env::predecessor_account_id();
         let current_hours = self.logged_time.get(&employee_id).unwrap_or_else(|| {
-            env::panic_str(format!("No employee exists for account: {}", employee_id).as_str())
+            env::panic_str(format!("No record exists for account: {}", employee_id).as_str())
         });
 
         // Add entry for employee's account id
         self.logged_time
             .insert(&employee_id, &(current_hours + hours));
-
-        // write updated time log to state
-        env::state_write(self);
     }
 }
 
 #[ext_contract(ext_payroll)]
 /// External methods for payroll
 pub trait PayrollExternal {
+    /// Manager can add new managers
+    fn payroll_add_manager(&mut self, account_id: &AccountId);
     /// Manager can add new employees
     fn payroll_add_employee(&mut self, account_id: AccountId);
     /// Employee can log time
@@ -207,6 +225,10 @@ pub trait PayrollExternal {
 }
 
 impl PayrollExternal for Payroll {
+    fn payroll_add_manager(&mut self, account_id: &AccountId) {
+        self.add_manager(account_id);
+    }
+
     fn payroll_add_employee(&mut self, account_id: AccountId) {
         self.add_employee(&account_id);
     }
