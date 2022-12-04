@@ -126,14 +126,6 @@ struct Payroll {
     pub logged_time: UnorderedMap<AccountId, u8>,
 }
 
-/// Approval state for making payment
-#[derive(BorshSerialize, BorshDeserialize, Debug)]
-enum PayApprovalState {
-    EmployeeApproved,
-    ManagerApproved,
-    BothApproved,
-}
-
 /// Manager can add new employees and disburse payments
 /// Employees can log time
 ///
@@ -162,6 +154,7 @@ impl Payroll {
     /// Manager can add new employees
     pub fn add_employee(&mut self, account_id: &AccountId) {
         self.require_role(&Role::Manager);
+        self.add_role(account_id, &Role::Employee);
         self.logged_time.insert(account_id, &0);
     }
 
@@ -251,3 +244,102 @@ impl PayrollExternal for Payroll {
 }
 
 pub fn main() {}
+
+mod tests {
+    use near_contract_tools::rbac::Rbac;
+    use near_sdk::{test_utils::VMContextBuilder, testing_env, AccountId};
+
+    use crate::{Payroll, Role};
+
+    #[test]
+    fn test_owner() {
+        let owner: AccountId = "account_owner".parse().unwrap();
+        let _contract = Payroll::new(&owner);
+        assert!(Payroll::has_role(&owner, &Role::Manager));
+    }
+
+    #[test]
+    fn test_add_manager() {
+        let owner: AccountId = "account_owner".parse().unwrap();
+        let manager: AccountId = "account_manager".parse().unwrap();
+
+        let mut contract = Payroll::new(&owner);
+
+        testing_env!(VMContextBuilder::new()
+            .predecessor_account_id(owner.clone())
+            .build());
+
+        contract.add_manager(&manager);
+
+        assert!(Payroll::has_role(&owner, &Role::Manager));
+        assert!(Payroll::has_role(&manager, &Role::Manager));
+    }
+
+    #[test]
+    fn test_add_employees() {
+        let owner: AccountId = "account_owner".parse().unwrap();
+        let manager: AccountId = "account_manager".parse().unwrap();
+        let emp1: AccountId = "account_emp1".parse().unwrap();
+        let emp2: AccountId = "account_emp2".parse().unwrap();
+
+        let mut contract = Payroll::new(&owner);
+
+        testing_env!(VMContextBuilder::new()
+            .predecessor_account_id(owner.clone())
+            .build());
+
+        contract.add_manager(&manager);
+
+        testing_env!(VMContextBuilder::new()
+            .predecessor_account_id(manager.clone())
+            .build());
+
+        contract.add_employee(&emp1);
+        contract.add_employee(&emp2);
+
+        assert!(Payroll::has_role(&emp1, &Role::Employee));
+        assert!(Payroll::has_role(&emp2, &Role::Employee));
+    }
+
+    #[test]
+    fn test_employee_log_time() {
+        let owner: AccountId = "account_owner".parse().unwrap();
+        let emp1: AccountId = "account_emp1".parse().unwrap();
+        let emp2: AccountId = "account_emp2".parse().unwrap();
+
+        let mut contract = Payroll::new(&owner);
+
+        testing_env!(VMContextBuilder::new()
+            .predecessor_account_id(owner.clone())
+            .build());
+
+        contract.add_employee(&emp1);
+        contract.add_employee(&emp2);
+
+        assert!(Payroll::has_role(&emp1, &Role::Employee));
+
+        testing_env!(VMContextBuilder::new()
+            .predecessor_account_id(emp1.clone())
+            .build());
+
+        contract.log_time(10);
+        assert_eq!(contract.logged_time.get(&emp1), Some(10));
+
+        // time is incremented correctly
+        contract.log_time(10);
+        assert_eq!(contract.logged_time.get(&emp1), Some(20));
+
+        testing_env!(VMContextBuilder::new()
+            .predecessor_account_id(emp2.clone())
+            .build());
+
+        // time is incremented correctly for the user who made the call
+        contract.log_time(9);
+        assert_eq!(contract.logged_time.get(&emp1), Some(20));
+        assert_eq!(contract.logged_time.get(&emp2), Some(9));
+
+        // logged_time will panic if it is called by a user with manager role
+        // this cannot be tested because panic unwind will need non-mutable
+        // reference to contract
+    }
+}
