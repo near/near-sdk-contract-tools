@@ -59,11 +59,11 @@ mod tests {
         };
 
         let m2 = FungibleTokenMetadata {
-            spec: "spec".to_owned().into(),
-            name: "name".to_owned().into(),
-            symbol: "symbol".to_owned().into(),
-            icon: Some("icon".to_owned().into()),
-            reference: Some("reference".to_owned().into()),
+            spec: "spec".to_owned(),
+            name: "name".to_owned(),
+            symbol: "symbol".to_owned(),
+            icon: Some("icon".to_owned()),
+            reference: Some("reference".to_owned()),
             reference_hash: Some(b"reference_hash".to_vec().into()),
             decimals: 18,
         };
