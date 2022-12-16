@@ -15,7 +15,7 @@ Not to be confused with [`near-contract-standards`](https://crates.io/crates/nea
 
 **WARNING:** This is still early software, and there may be breaking changes between versions. I'll try my best to keep the docs & changelogs up-to-date. Don't hesitate to create an issue if find anything wrong.
 
-(Formerly known as `near-contract-tools`.)
+(Formerly known as [`near-contract-tools`](https://crates.io/crates/near-contract-tools).)
 
 ## Benefits
 

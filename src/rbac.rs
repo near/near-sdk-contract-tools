@@ -96,7 +96,10 @@ pub trait Rbac {
 
     /// Returns whether a given account has been given a certain role.
     fn has_role(account_id: &AccountId, role: &Self::Role) -> bool {
-        Self::with_members_of(role, |set| set.contains(account_id))
+        Self::slot_members_of(role)
+            .read()
+            .map(|set| set.contains(account_id))
+            .unwrap_or(false)
     }
 
     /// Assigns a role to an account.
