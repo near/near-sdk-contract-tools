@@ -10,7 +10,7 @@
 //!
 //! Note: [`MigrateHook`] must be implemented by the user and is not derived
 //! by default. It must convert data in the old schema to the new schema without
-//! failing. For a complete example checkout [upgrade_new.rs](https://github.com/NEARFoundation/near-contract-tools/blob/develop/workspaces-tests/src/bin/upgrade_new.rs)
+//! failing. For a complete example checkout [upgrade_new.rs](https://github.com/NEARFoundation/near-sdk-contract-tools/blob/develop/workspaces-tests/src/bin/upgrade_new.rs)
 //! in workspace-tests.
 //!
 //! # Safety
