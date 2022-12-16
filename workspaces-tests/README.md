@@ -1,6 +1,6 @@
 # `workspaces` tests
 
-This package contains tests for the `near-contract-tools` package using the `workspaces` crate.
+This package contains tests for the `near-sdk-contract-tools` package using the `workspaces` crate.
 
 ## Running the tests
 

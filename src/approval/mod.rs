@@ -289,13 +289,13 @@ where
 
 #[cfg(test)]
 mod tests {
-    use near_contract_tools_macros::Rbac;
     use near_sdk::{
         borsh::{self, BorshDeserialize, BorshSerialize},
         near_bindgen,
         test_utils::VMContextBuilder,
         testing_env, AccountId, BorshStorageKey,
     };
+    use near_sdk_contract_tools_macros::Rbac;
     use serde::Serialize;
 
     use crate::{rbac::Rbac, slot::Slot};

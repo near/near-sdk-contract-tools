@@ -1,4 +1,4 @@
-//! Macros for near-contract-tools
+//! Macros for near-sdk-contract-tools
 
 use darling::{FromDeriveInput, FromMeta};
 use proc_macro::TokenStream;
@@ -14,11 +14,11 @@ mod standard;
 mod upgrade;
 
 fn default_crate_name() -> syn::Path {
-    syn::parse_str("::near_contract_tools").unwrap()
+    syn::parse_str("::near_sdk_contract_tools").unwrap()
 }
 
 fn default_macros() -> syn::Path {
-    syn::parse_str("::near_contract_tools").unwrap()
+    syn::parse_str("::near_sdk_contract_tools").unwrap()
 }
 
 fn default_near_sdk() -> syn::Path {
@@ -98,7 +98,7 @@ pub fn derive_rbac(input: TokenStream) -> TokenStream {
 
 /// Adds NEP-141 fungible token core functionality to a contract. Exposes
 /// `ft_*` functions to the public blockchain, implements internal controller
-/// and receiver functionality (see: `near_contract_tools::standard::nep141`).
+/// and receiver functionality (see: `near_sdk_contract_tools::standard::nep141`).
 ///
 /// The storage key prefix for the fields can be optionally specified (default:
 /// `"~$141"`) using `#[nep141(storage_key = "<expression>")]`.

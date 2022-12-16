@@ -1,12 +1,12 @@
-use near_contract_tools::{
-    owner::{Owner, OwnerExternal},
-    Owner,
-};
 use near_sdk::{
     borsh::{self, BorshSerialize},
     env, near_bindgen,
     test_utils::VMContextBuilder,
     testing_env, AccountId, BorshStorageKey,
+};
+use near_sdk_contract_tools::{
+    owner::{Owner, OwnerExternal},
+    Owner,
 };
 
 #[derive(Owner)]

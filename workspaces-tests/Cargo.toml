@@ -42,7 +42,7 @@ name = "upgrade_old_multisig"
 name = "upgrade_old_raw"
 
 [dependencies]
-near-contract-tools = {path = "../", features = ["unstable"]}
+near-sdk-contract-tools = {path = "../", features = ["unstable"]}
 near-sdk = { version = "4.1.1", default-features = false }
 strum = "0.24.1"
 strum_macros = "0.24.3"

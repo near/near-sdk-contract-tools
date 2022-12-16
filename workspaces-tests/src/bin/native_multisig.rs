@@ -3,7 +3,11 @@
 // Ignore
 pub fn main() {}
 
-use near_contract_tools::{
+use near_sdk::{
+    borsh::{self, BorshDeserialize, BorshSerialize},
+    env, near_bindgen, AccountId, BorshStorageKey, PanicOnDefault, Promise,
+};
+use near_sdk_contract_tools::{
     approval::{
         native_transaction_action::{self, NativeTransactionAction},
         simple_multisig::{ApprovalState, Configuration},
@@ -11,10 +15,6 @@ use near_contract_tools::{
     },
     rbac::Rbac,
     Rbac, SimpleMultisig,
-};
-use near_sdk::{
-    borsh::{self, BorshDeserialize, BorshSerialize},
-    env, near_bindgen, AccountId, BorshStorageKey, PanicOnDefault, Promise,
 };
 
 #[derive(Clone, Debug, BorshSerialize, BorshStorageKey)]

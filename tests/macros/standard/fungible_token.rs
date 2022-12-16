@@ -1,9 +1,9 @@
-use near_contract_tools::{
-    standard::nep141::{Nep141, Nep141Controller},
-    FungibleToken,
-};
 use near_sdk::{
     json_types::Base64VecU8, near_bindgen, test_utils::VMContextBuilder, testing_env, AccountId,
+};
+use near_sdk_contract_tools::{
+    standard::nep141::{Nep141, Nep141Controller},
+    FungibleToken,
 };
 
 #[derive(FungibleToken)]

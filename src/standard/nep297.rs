@@ -1,4 +1,4 @@
-//! Helpers for `#[derive(near_contract_tools::Nep297)]`
+//! Helpers for `#[derive(near_sdk_contract_tools::Nep297)]`
 
 use near_sdk::serde::Serialize;
 
@@ -9,7 +9,7 @@ use near_sdk::serde::Serialize;
 /// ## Normal events
 ///
 /// ```
-/// use near_contract_tools::event;
+/// use near_sdk_contract_tools::event;
 ///
 /// #[event(standard = "nft", version = "1.0.0")]
 /// pub struct MintEvent {
@@ -22,7 +22,7 @@ use near_sdk::serde::Serialize;
 ///     token_id: "token_1".to_string(),
 /// };
 ///
-/// use near_contract_tools::standard::nep297::Event;
+/// use near_sdk_contract_tools::standard::nep297::Event;
 ///
 /// e.emit();
 /// ```

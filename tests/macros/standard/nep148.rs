@@ -1,5 +1,5 @@
-use near_contract_tools::Nep148;
 use near_sdk::{json_types::Base64VecU8, near_bindgen};
+use near_sdk_contract_tools::Nep148;
 
 #[derive(Nep148)]
 #[nep148(
