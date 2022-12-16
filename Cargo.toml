@@ -9,10 +9,10 @@ edition = "2021"
 license = "GPL-3.0"
 name = "near-contract-tools"
 repository = "https://github.com/NEARFoundation/near-contract-tools"
-version = "0.7.1"
+version = "0.7.2"
 
 [dependencies]
-near-contract-tools-macros = {version = "=0.7.1", path = "./macros"}
+near-contract-tools-macros = {version = "=0.7.2", path = "./macros"}
 near-sdk = {version = "4.1.0", default-features = false}
 serde = "1.0.144"
 serde_json = "1.0.85"
