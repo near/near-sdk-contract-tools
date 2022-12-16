@@ -291,9 +291,7 @@ mod tests {
                 Action::SayGoodbye
             };
 
-            let request_id = self.create_request(action, ApprovalState::new()).unwrap();
-
-            request_id
+            self.create_request(action, ApprovalState::new()).unwrap()
         }
 
         pub fn approve(&mut self, request_id: u32) {
@@ -373,7 +371,7 @@ mod tests {
 
         let mut context = VMContextBuilder::new();
         context
-            .predecessor_account_id(alice.clone())
+            .predecessor_account_id(alice)
             .block_timestamp(created_at + 10000);
         testing_env!(context.build());
 
@@ -401,7 +399,7 @@ mod tests {
 
         let mut context = VMContextBuilder::new();
         context
-            .predecessor_account_id(alice.clone())
+            .predecessor_account_id(alice)
             .block_timestamp(created_at + 9999);
         testing_env!(context.build());
 
@@ -430,7 +428,7 @@ mod tests {
 
         let mut context = VMContextBuilder::new();
         context
-            .predecessor_account_id(bob.clone())
+            .predecessor_account_id(bob)
             .block_timestamp(created_at + 10000);
         testing_env!(context.build());
 

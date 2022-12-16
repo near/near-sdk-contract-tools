@@ -29,6 +29,7 @@ mod test_events {
 
     #[derive(Nep297, Serialize)]
     #[nep297(standard = "enum-event", version = "1.0.0")]
+    #[allow(clippy::enum_variant_names)]
     pub enum EnumEvent {
         VariantOne,
         #[nep297(name = "genuine_variant_two")]
