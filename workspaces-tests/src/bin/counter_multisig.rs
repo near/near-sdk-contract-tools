@@ -1,15 +1,15 @@
 #![allow(missing_docs)]
 
-use near_contract_tools::{
-    approval::{simple_multisig::Configuration, *},
-    rbac::Rbac,
-    Rbac, SimpleMultisig,
-};
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
     env, near_bindgen,
     serde::Serialize,
     BorshStorageKey, PanicOnDefault,
+};
+use near_sdk_contract_tools::{
+    approval::{simple_multisig::Configuration, *},
+    rbac::Rbac,
+    Rbac, SimpleMultisig,
 };
 use std::string::ToString;
 use strum_macros::Display;

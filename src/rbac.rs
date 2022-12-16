@@ -8,9 +8,9 @@
 //! or prohibit a particular role. Typically, these are used to guard access to
 //! external functions exposed by the contract.
 //!
-//! This [derive macro](near_contract_tools_macros::Rbac) derives
+//! This [derive macro](near_sdk_contract_tools_macros::Rbac) derives
 //! a default implementation for RBAC. For a complete example check out
-//! [`counter_multisig.rs`](https://github.com/NEARFoundation/near-contract-tools/blob/develop/workspaces-tests/src/bin/counter_multisig.rs)
+//! [`counter_multisig.rs`](https://github.com/NEARFoundation/near-sdk-contract-tools/blob/develop/workspaces-tests/src/bin/counter_multisig.rs)
 //! in workspace-tests directory.
 //!
 //! # Safety
@@ -183,13 +183,13 @@ impl ExactSizeIterator for Iter {}
 
 #[cfg(test)]
 mod tests {
-    use near_contract_tools_macros::Rbac;
     use near_sdk::{
         borsh::{self, BorshSerialize},
         near_bindgen,
         test_utils::VMContextBuilder,
         testing_env, AccountId, BorshStorageKey,
     };
+    use near_sdk_contract_tools_macros::Rbac;
 
     use super::Rbac;
 

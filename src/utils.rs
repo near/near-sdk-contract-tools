@@ -7,7 +7,7 @@ use near_sdk::{env, require, Promise};
 /// # Examples
 ///
 /// ```
-/// use near_contract_tools::utils::prefix_key;
+/// use near_sdk_contract_tools::utils::prefix_key;
 ///
 /// assert_eq!(prefix_key(b"p", b"key"), b"pkey".to_vec());
 /// ```
@@ -22,7 +22,7 @@ pub fn prefix_key(prefix: &dyn AsRef<[u8]>, key: &dyn AsRef<[u8]>) -> Vec<u8> {
 /// # Examples
 ///
 /// ```
-/// use near_contract_tools::utils::apply_storage_fee_and_refund;
+/// use near_sdk_contract_tools::utils::apply_storage_fee_and_refund;
 ///
 /// let initial_storage_usage = near_sdk::env::storage_usage();
 /// let additional_fees = 0;

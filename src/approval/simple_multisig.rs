@@ -193,7 +193,7 @@ where
     }
 }
 
-/// Types used by near-contract-tools-macros
+/// Types used by near-sdk-contract-tools-macros
 pub mod macro_types {
     use thiserror::Error;
 

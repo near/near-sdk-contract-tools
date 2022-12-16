@@ -38,5 +38,5 @@ pub mod slot;
 pub mod upgrade;
 pub mod utils;
 
-pub use near_contract_tools_macros::*;
 use near_sdk::IntoStorageKey;
+pub use near_sdk_contract_tools_macros::*;

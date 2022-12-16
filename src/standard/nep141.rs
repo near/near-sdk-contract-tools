@@ -2,13 +2,13 @@
 //! <https://github.com/near/NEPs/blob/master/neps/nep-0141.md>
 #![allow(missing_docs)] // ext_contract doesn't play nice with #![warn(missing_docs)]
 
-use near_contract_tools_macros::event;
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
     env, ext_contract,
     json_types::U128,
     require, AccountId, BorshStorageKey, Gas, Promise, PromiseOrValue, PromiseResult,
 };
+use near_sdk_contract_tools_macros::event;
 use serde::{Deserialize, Serialize};
 
 use crate::{slot::Slot, standard::nep297::*, DefaultStorageKey};

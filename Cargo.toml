@@ -4,16 +4,16 @@ categories = ["wasm", "cryptography::cryptocurrencies"]
 description = """
 Helpful functions and macros for developing smart contracts on NEAR Protocol.
 """
-documentation = "https://docs.rs/near-contract-tools"
+documentation = "https://docs.rs/near-sdk-contract-tools"
 edition = "2021"
 license = "GPL-3.0"
-name = "near-contract-tools"
-repository = "https://github.com/NEARFoundation/near-contract-tools"
+name = "near-sdk-contract-tools"
+repository = "https://github.com/NEARFoundation/near-sdk-contract-tools"
 version = "0.7.2"
 
 [dependencies]
-near-contract-tools-macros = {version = "=0.7.2", path = "./macros"}
 near-sdk = {version = "4.1.0", default-features = false}
+near-sdk-contract-tools-macros = {version = "=0.7.2", path = "./macros"}
 serde = "1.0.144"
 serde_json = "1.0.85"
 thiserror = "1.0.35"

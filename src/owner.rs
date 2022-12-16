@@ -15,7 +15,7 @@
 //!
 //! The pattern consists of methods in [`Owner`] and [`OwnerExternal`]. The
 //! latter exposes methods externally and can be called by other contracts.
-//! This [derive macro](near_contract_tools_macros::Owner)
+//! This [derive macro](near_sdk_contract_tools_macros::Owner)
 //! derives default implementation both these traits.
 //!
 //! # Safety
@@ -32,11 +32,11 @@
 //!   respective [`Owner`] methods and expect the same invariants.
 #![allow(missing_docs)] // #[ext_contract(...)] does not play nicely with clippy
 
-use near_contract_tools_macros::event;
 use near_sdk::{
     borsh::{self, BorshSerialize},
     env, ext_contract, require, AccountId, BorshStorageKey,
 };
+use near_sdk_contract_tools_macros::event;
 
 use crate::{slot::Slot, standard::nep297::Event, DefaultStorageKey};
 
@@ -51,7 +51,7 @@ const NO_PROPOSED_OWNER_FAIL_MESSAGE: &str = "No proposed owner";
     standard = "x-own",
     version = "1.0.0",
     crate = "crate",
-    macros = "near_contract_tools_macros"
+    macros = "near_sdk_contract_tools_macros"
 )]
 #[derive(Debug, Clone)]
 pub enum OwnerEvent {
@@ -160,7 +160,7 @@ pub trait Owner {
     ///
     /// ```
     /// use near_sdk::{AccountId, near_bindgen};
-    /// use near_contract_tools::{Owner, owner::Owner};
+    /// use near_sdk_contract_tools::{Owner, owner::Owner};
     ///
     /// #[derive(Owner)]
     /// #[near_bindgen]
@@ -199,7 +199,7 @@ pub trait Owner {
     ///
     /// ```
     /// use near_sdk::{AccountId, near_bindgen};
-    /// use near_contract_tools::{Owner, owner::Owner};
+    /// use near_sdk_contract_tools::{Owner, owner::Owner};
     ///
     /// #[derive(Owner)]
     /// #[near_bindgen]

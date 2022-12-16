@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
 
-use near_contract_tools::{
+use near_sdk_contract_tools::{
     owner::{Owner, OwnerExternal},
     upgrade::PostUpgrade,
     Owner,
@@ -44,6 +44,6 @@ pub fn upgrade() {
     ContractOld::require_owner();
 
     unsafe {
-        near_contract_tools::upgrade::raw::upgrade(PostUpgrade::default());
+        near_sdk_contract_tools::upgrade::raw::upgrade(PostUpgrade::default());
     }
 }

@@ -2,11 +2,11 @@
 authors = ["Jacob Lindahl <jacob@near.foundation>"]
 categories = ["wasm"]
 description = """
-Macros for `near-contract-tools`
+Macros for `near-sdk-contract-tools`
 """
 edition = "2021"
 license = "GPL-3.0"
-name = "near-contract-tools-macros"
+name = "near-sdk-contract-tools-macros"
 version = "0.7.2"
 
 [dependencies]
