@@ -1,3 +1,5 @@
+# This package will be renamed to [`near-sdk-contract-tools`](https://crates.io/crates/near-sdk-contract-tools)
+
 # near-contract-tools
 
 > Helpful functions and macros for developing smart contracts on NEAR Protocol.

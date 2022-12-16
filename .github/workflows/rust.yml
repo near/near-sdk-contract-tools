@@ -43,7 +43,7 @@ jobs:
         with:
           toolchain: 1.65
       - name: Run unit and integration tests
-        run: cargo test --verbose
+        run: cargo test --workspace --exclude workspaces-tests
   workspaces-test:
     runs-on: ubuntu-latest
 
