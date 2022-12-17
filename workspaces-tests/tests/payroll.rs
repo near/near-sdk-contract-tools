@@ -1,7 +1,7 @@
 #![cfg(not(windows))]
 use near_sdk::serde_json::json;
 use std::str;
-use workspaces::{result::ExecutionFailure, Account, Contract};
+use workspaces::{Account, Contract};
 
 const WASM: &[u8] =
     include_bytes!("../../target/wasm32-unknown-unknown/release/payroll_example.wasm");
@@ -206,13 +206,15 @@ async fn test_disburse_payment() {
         .unwrap()
         .unwrap();
 
-    let promise = emp1
-        .call(contract_id, "log_time")
-        .args_json(json!({
-            "hours": 10,
-        }))
+    let balance_before = emp1.view_account().await.unwrap().balance;
+
+    emp1.call(contract_id, "get_pay")
         .transact()
         .await
         .unwrap()
         .unwrap();
+
+    let balance_after = emp1.view_account().await.unwrap().balance;
+
+    assert_eq!(balance_after - balance_before, 10000);
 }
