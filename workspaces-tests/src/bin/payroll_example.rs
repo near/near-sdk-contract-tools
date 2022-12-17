@@ -37,7 +37,10 @@ pub enum PayrollApproval {
     BothApproved,
 }
 
-impl ApprovalConfiguration<PayrollAction, PayrollApproval> for Payroll {
+#[derive(BorshSerialize, BorshDeserialize, Serialize)]
+struct PayApprovalConfiguration;
+
+impl ApprovalConfiguration<PayrollAction, PayrollApproval> for PayApprovalConfiguration {
     type ApprovalError = String;
     type RemovalError = ();
     type AuthorizationError = String;
@@ -110,7 +113,7 @@ impl ApprovalConfiguration<PayrollAction, PayrollApproval> for Payroll {
     }
 }
 
-impl ApprovalManager<PayrollAction, PayrollApproval, Payroll> for Payroll {}
+impl ApprovalManager<PayrollAction, PayrollApproval, PayApprovalConfiguration> for Payroll {}
 
 #[derive(BorshSerialize, BorshDeserialize, BorshStorageKey)]
 enum Role {
@@ -141,6 +144,7 @@ impl Payroll {
             hourly_fee: 1000,
             logged_time: UnorderedMap::new(PayrollKey::LOG),
         };
+        <Payroll as ApprovalManager<PayrollAction, PayrollApproval, PayApprovalConfiguration>>::init(PayApprovalConfiguration {});
         contract.add_role(owner, &Role::Manager);
         contract
     }
