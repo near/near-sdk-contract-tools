@@ -62,7 +62,7 @@ pub fn expand(meta: Nep148Meta) -> Result<TokenStream, darling::Error> {
             .parse::<quote::__private::TokenStream>()
             .unwrap();
 
-        quote! { ::std::borrow::Cow::Owned(#near_sdk::json_types::Base64VecU8::from(#v.to_vec())) }
+        quote! { #near_sdk::json_types::Base64VecU8::from(#v.to_vec()) }
     }));
 
     let (imp, ty, wher) = generics.split_for_impl();
@@ -71,7 +71,7 @@ pub fn expand(meta: Nep148Meta) -> Result<TokenStream, darling::Error> {
         use #me::standard::nep148::Nep148;
         #[#near_sdk::near_bindgen]
         impl #imp #me::standard::nep148::Nep148 for #ident #ty #wher {
-            fn ft_metadata(&self) -> #me::standard::nep148::FungibleTokenMetadata<'static> {
+            fn ft_metadata(&self) -> #me::standard::nep148::FungibleTokenMetadata {
                 #me::standard::nep148::FungibleTokenMetadata {
                     spec: #spec.into(),
                     name: #name.into(),

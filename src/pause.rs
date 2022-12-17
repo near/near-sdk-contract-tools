@@ -6,7 +6,7 @@
 //! is emitted. A contract starts off as "unpaused" by default. [`PauseExternal`]
 //! exposes an external function to check the status of the contract.
 //!
-//! This [derive macro](near_contract_tools_macros::Pause)
+//! This [derive macro](near_sdk_contract_tools_macros::Pause)
 //! derives a default implementation for both these traits.
 //!
 //! # Safety
@@ -24,8 +24,8 @@
 #![allow(missing_docs)] // #[ext_contract(...)] does not play nicely with clippy
 
 use crate::{slot::Slot, standard::nep297::Event, DefaultStorageKey};
-use near_contract_tools_macros::event;
 use near_sdk::{ext_contract, require};
+use near_sdk_contract_tools_macros::event;
 
 const UNPAUSED_FAIL_MESSAGE: &str = "Disallowed while contract is unpaused";
 const PAUSED_FAIL_MESSAGE: &str = "Disallowed while contract is paused";
@@ -35,7 +35,7 @@ const PAUSED_FAIL_MESSAGE: &str = "Disallowed while contract is paused";
     standard = "x-paus",
     version = "1.0.0",
     crate = "crate",
-    macros = "near_contract_tools_macros"
+    macros = "near_sdk_contract_tools_macros"
 )]
 #[derive(Debug, Clone)]
 pub enum PauseEvent {
@@ -51,7 +51,7 @@ pub enum PauseEvent {
 ///
 /// ```
 /// use near_sdk::near_bindgen;
-/// use near_contract_tools::{pause::Pause, Pause};
+/// use near_sdk_contract_tools::{pause::Pause, Pause};
 ///
 /// #[derive(Pause)]
 /// #[near_bindgen]
@@ -127,7 +127,7 @@ pub trait Pause {
     }
 }
 
-/// External methods for `Pause`
+/// External methods for [Pause]
 #[ext_contract(ext_pause)]
 pub trait PauseExternal {
     /// Returns `true` if the contract is paused, `false` otherwise

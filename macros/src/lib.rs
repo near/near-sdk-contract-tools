@@ -1,4 +1,4 @@
-//! Macros for near-contract-tools
+//! Macros for near-sdk-contract-tools
 
 use darling::{FromDeriveInput, FromMeta};
 use proc_macro::TokenStream;
@@ -11,13 +11,14 @@ mod pause;
 mod rbac;
 mod rename;
 mod standard;
+mod upgrade;
 
 fn default_crate_name() -> syn::Path {
-    syn::parse_str("::near_contract_tools").unwrap()
+    syn::parse_str("::near_sdk_contract_tools").unwrap()
 }
 
 fn default_macros() -> syn::Path {
-    syn::parse_str("::near_contract_tools").unwrap()
+    syn::parse_str("::near_sdk_contract_tools").unwrap()
 }
 
 fn default_near_sdk() -> syn::Path {
@@ -84,6 +85,10 @@ pub fn derive_pause(input: TokenStream) -> TokenStream {
 
 /// Adds role-based access control. No external methods are exposed.
 ///
+/// The roles prefix must be specify a type using #[rbac(roles = "MyRoles")].
+/// Typically "MyRoles" is an enum and it's variants are the different role
+/// names.
+///
 /// The storage key prefix for the fields can be optionally specified (default:
 /// `"~r"`) using `#[rbac(storage_key = "<expression>")]`.
 #[proc_macro_derive(Rbac, attributes(rbac))]
@@ -93,7 +98,7 @@ pub fn derive_rbac(input: TokenStream) -> TokenStream {
 
 /// Adds NEP-141 fungible token core functionality to a contract. Exposes
 /// `ft_*` functions to the public blockchain, implements internal controller
-/// and receiver functionality (see: `near_contract_tools::standard::nep141`).
+/// and receiver functionality (see: `near_sdk_contract_tools::standard::nep141`).
 ///
 /// The storage key prefix for the fields can be optionally specified (default:
 /// `"~$141"`) using `#[nep141(storage_key = "<expression>")]`.
@@ -175,4 +180,23 @@ pub fn event(attr: TokenStream, item: TokenStream) -> TokenStream {
         .and_then(|meta| standard::event::event_attribute(meta, item))
         .map(Into::into)
         .unwrap_or_else(|e| e.write_errors().into())
+}
+
+/// Create an upgrade component. Does not expose any functions to the
+/// blockchain.
+///
+/// Fields may be specified in the `#[upgrade(...)]` attribute.
+///
+/// Fields include:
+///  - `hook` - If included, provides an implementation of `UpgradeHook`. An implementation must be explicity provided otherwise. Options include:
+///     - `"none"` - Empty upgrade hook.
+///     - `"owner"` - The upgrade function may only be called by the owner of the contract as specified by an `Owner` implementation.
+///     - `"role(r)"` - The upgrade function may only be called by an account that has been assigned the role `r` as determined by an `Rbac` implementation.
+///  - `serializer` - `"borsh"` or `"jsonbase64"` (default). Indicates the serialization format of code the `upgrade` function will accept.
+///  - `migrate_method_name` - The name of the method to call after the upgrade. Default `"migrate"`.
+///  - `migrate_method_args` - The input to send to the migrate function. Default empty vector.
+///  - `migrate_minimum_gas` - How much gas to guarantee the migrate function, otherwise reject. Default 15T.
+#[proc_macro_derive(Upgrade, attributes(upgrade))]
+pub fn derive_upgrade(input: TokenStream) -> TokenStream {
+    make_derive(input, upgrade::expand)
 }

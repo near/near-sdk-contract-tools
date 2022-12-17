@@ -5,12 +5,12 @@
 //! method takes this state and replaces it with the new schema.
 //! [`MigrateExternal`] exposes this functionality publicly.
 //!
-//! The crate exports a [derive macro](near_contract_tools_macros::Migrate)
+//! The crate exports a [derive macro](near_sdk_contract_tools_macros::Migrate)
 //! that derives a default implementation for migration.
 //!
 //! Note: [`MigrateHook`] must be implemented by the user and is not derived
 //! by default. It must convert data in the old schema to the new schema without
-//! failing. For a complete example checkout [upgrade_new.rs](https://github.com/NEARFoundation/near-contract-tools/blob/develop/workspaces-tests/src/bin/upgrade_new.rs)
+//! failing. For a complete example checkout [upgrade_new.rs](https://github.com/NEARFoundation/near-sdk-contract-tools/blob/develop/workspaces-tests/src/bin/upgrade_new.rs)
 //! in workspace-tests.
 //!
 //! # Safety

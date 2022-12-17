@@ -3,13 +3,13 @@
 // Ignore
 pub fn main() {}
 
-use near_contract_tools::{standard::nep141::*, FungibleToken};
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
     env,
     json_types::U128,
     near_bindgen, PanicOnDefault,
 };
+use near_sdk_contract_tools::{standard::nep141::*, FungibleToken};
 
 #[derive(PanicOnDefault, BorshSerialize, BorshDeserialize, FungibleToken)]
 #[fungible_token(name = "My Fungible Token", symbol = "MYFT", decimals = 18, no_hooks)]

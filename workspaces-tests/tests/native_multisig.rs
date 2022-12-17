@@ -1,7 +1,7 @@
 #![cfg(not(windows))]
 
-use near_contract_tools::approval::native_transaction_action::PromiseAction;
 use near_sdk::{serde_json::json, Gas};
+use near_sdk_contract_tools::approval::native_transaction_action::PromiseAction;
 use workspaces::{network::Sandbox, Account, Contract, Worker};
 
 const WASM: &[u8] =

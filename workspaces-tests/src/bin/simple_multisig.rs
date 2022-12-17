@@ -5,7 +5,11 @@ pub fn main() {}
 
 use std::fmt::Display;
 
-use near_contract_tools::{
+use near_sdk::{
+    borsh::{self, BorshDeserialize, BorshSerialize},
+    env, near_bindgen, AccountId, BorshStorageKey, PanicOnDefault,
+};
+use near_sdk_contract_tools::{
     approval::{
         self,
         simple_multisig::{AccountAuthorizer, ApprovalState, Configuration},
@@ -14,10 +18,6 @@ use near_contract_tools::{
     rbac::Rbac,
     slot::Slot,
     Rbac,
-};
-use near_sdk::{
-    borsh::{self, BorshDeserialize, BorshSerialize},
-    env, near_bindgen, AccountId, BorshStorageKey, PanicOnDefault,
 };
 use thiserror::Error;
 
@@ -104,7 +104,7 @@ impl Contract {
     }
 
     pub fn obtain_multisig_permission(&mut self) {
-        self.add_role(&env::predecessor_account_id(), &Role::Multisig);
+        self.add_role(env::predecessor_account_id(), &Role::Multisig);
     }
 
     pub fn request(&mut self, action: String) -> u32 {

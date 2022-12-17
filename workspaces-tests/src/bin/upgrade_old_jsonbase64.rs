@@ -1,8 +1,9 @@
 #![allow(missing_docs)]
 
-use near_contract_tools::upgrade::{upgrade, Upgrade, UpgradeHook};
-
-use near_contract_tools::{owner::Owner, owner::OwnerExternal, Owner};
+use near_sdk_contract_tools::{
+    owner::{Owner, OwnerExternal},
+    Owner, Upgrade,
+};
 
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
@@ -10,7 +11,8 @@ use near_sdk::{
 };
 pub fn main() {}
 
-#[derive(BorshSerialize, BorshDeserialize, PanicOnDefault, Owner)]
+#[derive(BorshSerialize, BorshDeserialize, PanicOnDefault, Owner, Upgrade)]
+#[upgrade(serializer = "jsonbase64", hook = "owner")]
 #[near_bindgen]
 pub struct ContractOld {
     pub foo: u32,
@@ -32,19 +34,5 @@ impl ContractOld {
 
     pub fn get_foo(&self) -> u32 {
         self.foo
-    }
-}
-
-impl UpgradeHook for ContractOld {
-    fn on_upgrade() {
-        Self::require_owner();
-    }
-}
-
-impl Upgrade for ContractOld {
-    #[no_mangle]
-    fn upgrade_contract() {
-        Self::on_upgrade();
-        upgrade::<ContractOld>();
     }
 }

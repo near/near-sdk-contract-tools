@@ -328,13 +328,13 @@ where
 
 #[cfg(test)]
 mod tests {
-    use near_contract_tools_macros::Rbac;
     use near_sdk::{
         borsh::{self, BorshDeserialize, BorshSerialize},
         near_bindgen,
         test_utils::VMContextBuilder,
         testing_env, AccountId, BorshStorageKey,
     };
+    use near_sdk_contract_tools_macros::Rbac;
     use serde::Serialize;
 
     use crate::{rbac::Rbac, slot::Slot};
@@ -480,9 +480,9 @@ mod tests {
 
         let mut contract = Contract::new(2);
 
-        contract.add_role(&alice, &Role::Multisig);
-        contract.add_role(&bob, &Role::Multisig);
-        contract.add_role(&charlie, &Role::Multisig);
+        contract.add_role(alice.clone(), &Role::Multisig);
+        contract.add_role(bob, &Role::Multisig);
+        contract.add_role(charlie.clone(), &Role::Multisig);
 
         predecessor(&alice);
         let request_id = contract
@@ -511,7 +511,7 @@ mod tests {
 
         let mut contract = Contract::new(2);
 
-        contract.add_role(&alice, &Role::Multisig);
+        contract.add_role(alice.clone(), &Role::Multisig);
 
         predecessor(&alice);
         let request_id = contract
@@ -530,7 +530,7 @@ mod tests {
 
         let mut contract = Contract::new(2);
 
-        contract.add_role(&alice, &Role::Multisig);
+        contract.add_role(alice.clone(), &Role::Multisig);
 
         predecessor(&alice);
 
@@ -550,8 +550,8 @@ mod tests {
 
         let mut contract = Contract::new(2);
 
-        contract.add_role(&alice, &Role::Multisig);
-        contract.add_role(&bob, &Role::Multisig);
+        contract.add_role(alice.clone(), &Role::Multisig);
+        contract.add_role(bob.clone(), &Role::Multisig);
 
         predecessor(&alice);
 
@@ -574,9 +574,9 @@ mod tests {
 
         let mut contract = Contract::new(2);
 
-        contract.add_role(&alice, &Role::Multisig);
-        contract.add_role(&bob, &Role::Multisig);
-        contract.add_role(&charlie, &Role::Multisig);
+        contract.add_role(alice.clone(), &Role::Multisig);
+        contract.add_role(bob.clone(), &Role::Multisig);
+        contract.add_role(charlie.clone(), &Role::Multisig);
 
         predecessor(&alice);
         let request_id = contract

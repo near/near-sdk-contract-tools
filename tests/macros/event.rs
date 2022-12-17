@@ -1,9 +1,9 @@
-use near_contract_tools::standard::nep297::{Event, ToEventLog};
+use near_sdk_contract_tools::standard::nep297::{Event, ToEventLog};
 
 use crate::macros::event::test_events::Nep171NftMintData;
 
 mod test_events {
-    use near_contract_tools::Nep297;
+    use near_sdk_contract_tools::Nep297;
     use serde::Serialize;
 
     #[derive(Serialize)]
@@ -29,6 +29,7 @@ mod test_events {
 
     #[derive(Nep297, Serialize)]
     #[nep297(standard = "enum-event", version = "1.0.0")]
+    #[allow(clippy::enum_variant_names)]
     pub enum EnumEvent {
         VariantOne,
         #[nep297(name = "genuine_variant_two")]
@@ -109,10 +110,10 @@ fn derive_event() {
 }
 
 mod event_attribute_macro {
-    use near_contract_tools::{event, standard::nep297::Event};
+    use near_sdk_contract_tools::{event, standard::nep297::Event};
 
     mod my_event {
-        use near_contract_tools::event;
+        use near_sdk_contract_tools::event;
 
         #[event(standard = "my_event_standard", version = "1")]
         pub struct One;

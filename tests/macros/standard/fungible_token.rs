@@ -1,11 +1,10 @@
-use near_contract_tools::{
-    standard::nep141::{Nep141, Nep141Controller},
-    FungibleToken,
-};
 use near_sdk::{
     json_types::Base64VecU8, near_bindgen, test_utils::VMContextBuilder, testing_env, AccountId,
 };
-use std::borrow::Cow;
+use near_sdk_contract_tools::{
+    standard::nep141::{Nep141, Nep141Controller},
+    FungibleToken,
+};
 
 #[derive(FungibleToken)]
 #[fungible_token(
@@ -67,6 +66,6 @@ fn metadata() {
     );
     assert_eq!(
         meta.reference_hash,
-        Some(Cow::Owned(Base64VecU8::from([97, 115, 100, 102].to_vec())))
+        Some(Base64VecU8::from([97, 115, 100, 102].to_vec()))
     );
 }
