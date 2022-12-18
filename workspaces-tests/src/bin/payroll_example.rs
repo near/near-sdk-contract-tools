@@ -1,15 +1,19 @@
 //! Payroll system manages employee and their pay
-use near_contract_tools::{
-    approval::{self, ApprovalConfiguration, ApprovalManager},
-    rbac::Rbac,
-    Rbac,
-};
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
     collections::UnorderedMap,
-    env, ext_contract, near_bindgen,
+    env, near_bindgen,
     serde::Serialize,
     AccountId, BorshStorageKey, PanicOnDefault, Promise,
+};
+use near_sdk_contract_tools::{
+    approval::{self, ApprovalConfiguration, ApprovalManager},
+    // TODO: It is a bit confusing the for a beginner to import both the trait
+    // and the macro of the same name and similar path. It can be clarified
+    // either through documentation, slightly differently named module paths,
+    // by slightly different proc macro names.
+    rbac::Rbac,
+    Rbac,
 };
 
 #[derive(BorshStorageKey, BorshSerialize)]
@@ -31,6 +35,7 @@ impl approval::Action<Payroll> for PayrollAction {
 
 /// Both manager and employee need to approve payment request
 #[derive(BorshSerialize, BorshDeserialize, Serialize)]
+#[serde(crate = "near_sdk::serde")]
 pub enum PayrollApproval {
     EmployeeApproved,
     ManagerApproved,
@@ -38,6 +43,7 @@ pub enum PayrollApproval {
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Serialize)]
+#[serde(crate = "near_sdk::serde")]
 struct PayApprovalConfiguration;
 
 impl ApprovalConfiguration<PayrollAction, PayrollApproval> for PayApprovalConfiguration {
@@ -139,7 +145,7 @@ struct Payroll {
 #[near_bindgen]
 impl Payroll {
     #[init]
-    pub fn new(owner: &AccountId) -> Self {
+    pub fn new(owner: AccountId) -> Self {
         let mut contract = Payroll {
             hourly_fee: 1000,
             logged_time: UnorderedMap::new(PayrollKey::LOG),
@@ -150,16 +156,16 @@ impl Payroll {
     }
 
     /// Manager can add new managers
-    pub fn add_manager(&mut self, account_id: &AccountId) {
-        self.require_role(&Role::Manager);
+    pub fn add_manager(&mut self, account_id: AccountId) {
+        Payroll::require_role(&Role::Manager);
         self.add_role(account_id, &Role::Manager);
     }
 
     /// Manager can add new employees
-    pub fn add_employee(&mut self, account_id: &AccountId) {
-        self.require_role(&Role::Manager);
-        self.add_role(account_id, &Role::Employee);
-        self.logged_time.insert(account_id, &0);
+    pub fn add_employee(&mut self, account_id: AccountId) {
+        Payroll::require_role(&Role::Manager);
+        self.add_role(account_id.clone(), &Role::Employee);
+        self.logged_time.insert(&account_id, &0);
     }
 
     pub fn approve_pay(&mut self, request_id: u32) {
@@ -172,7 +178,7 @@ impl Payroll {
 
     /// Employee can request pay
     pub fn request_pay(&mut self) -> u32 {
-        self.require_role(&Role::Employee);
+        Payroll::require_role(&Role::Employee);
         let employee_id = env::predecessor_account_id();
         let logged_time = self.logged_time.get(&employee_id).unwrap_or_else(|| {
             env::panic_str(format!("No record exists for account: {}", employee_id).as_str())
@@ -192,7 +198,7 @@ impl Payroll {
 
     /// Employee can log time
     pub fn log_time(&mut self, hours: u8) {
-        self.require_role(&Role::Employee);
+        Payroll::require_role(&Role::Employee);
         let employee_id = env::predecessor_account_id();
         let current_hours = self.logged_time.get(&employee_id).unwrap_or_else(|| {
             env::panic_str(format!("No record exists for account: {}", employee_id).as_str())
@@ -205,7 +211,7 @@ impl Payroll {
 
     /// Employee can check the time they've logged
     pub fn get_logged_time(&self) -> u8 {
-        self.require_role(&Role::Employee);
+        Payroll::require_role(&Role::Employee);
         let employee_id = env::predecessor_account_id();
 
         self.logged_time.get(&employee_id).unwrap_or_else(|| {
@@ -214,55 +220,8 @@ impl Payroll {
     }
 
     pub fn is_employee(&self) -> bool {
-        self.require_role(&Role::Employee);
+        Payroll::require_role(&Role::Employee);
         true
-    }
-}
-
-#[ext_contract(ext_payroll)]
-/// External methods for payroll
-///
-/// TODO: what does externally accessible functions mean
-/// if in tests different accounts can call the internal
-/// functions as in workspace_tests/tests/payroll.rs
-pub trait PayrollExternal {
-    /// Manager can add new managers
-    fn payroll_add_manager(&mut self, account_id: &AccountId);
-    /// Manager can add new employees
-    fn payroll_add_employee(&mut self, account_id: AccountId);
-    /// Employee can log time
-    fn payroll_log_time(&mut self, hours: u8);
-    /// Employee can request for pay
-    fn payroll_request_pay(&mut self) -> u32;
-    /// Pay can be approved by manager and the employee who made the request
-    fn payroll_approve_pay(&mut self, request_id: u32);
-    /// If request is approved get_pay will return a promise to transfer funds
-    fn payroll_get_pay(&mut self, request_id: u32) -> Promise;
-}
-
-impl PayrollExternal for Payroll {
-    fn payroll_add_manager(&mut self, account_id: &AccountId) {
-        self.add_manager(account_id);
-    }
-
-    fn payroll_add_employee(&mut self, account_id: AccountId) {
-        self.add_employee(&account_id);
-    }
-
-    fn payroll_log_time(&mut self, hours: u8) {
-        self.log_time(hours);
-    }
-
-    fn payroll_request_pay(&mut self) -> u32 {
-        self.request_pay()
-    }
-
-    fn payroll_approve_pay(&mut self, request_id: u32) {
-        self.approve_pay(request_id);
-    }
-
-    fn payroll_get_pay(&mut self, request_id: u32) -> Promise {
-        self.get_pay(request_id)
     }
 }
 
@@ -270,15 +229,15 @@ pub fn main() {}
 
 #[cfg(test)]
 mod tests {
-    use near_contract_tools::rbac::Rbac;
     use near_sdk::{test_utils::VMContextBuilder, testing_env, AccountId};
+    use near_sdk_contract_tools::rbac::Rbac;
 
     use crate::{Payroll, Role};
 
     #[test]
     fn test_owner() {
         let owner: AccountId = "account_owner".parse().unwrap();
-        let _contract = Payroll::new(&owner);
+        let _contract = Payroll::new(owner.clone());
         assert!(Payroll::has_role(&owner, &Role::Manager));
     }
 
@@ -287,13 +246,13 @@ mod tests {
         let owner: AccountId = "account_owner".parse().unwrap();
         let manager: AccountId = "account_manager".parse().unwrap();
 
-        let mut contract = Payroll::new(&owner);
+        let mut contract = Payroll::new(owner.clone());
 
         testing_env!(VMContextBuilder::new()
             .predecessor_account_id(owner.clone())
             .build());
 
-        contract.add_manager(&manager);
+        contract.add_manager(manager.clone());
 
         assert!(Payroll::has_role(&owner, &Role::Manager));
         assert!(Payroll::has_role(&manager, &Role::Manager));
@@ -306,20 +265,20 @@ mod tests {
         let emp1: AccountId = "account_emp1".parse().unwrap();
         let emp2: AccountId = "account_emp2".parse().unwrap();
 
-        let mut contract = Payroll::new(&owner);
+        let mut contract = Payroll::new(owner.clone());
 
         testing_env!(VMContextBuilder::new()
             .predecessor_account_id(owner.clone())
             .build());
 
-        contract.add_manager(&manager);
+        contract.add_manager(manager.clone());
 
         testing_env!(VMContextBuilder::new()
             .predecessor_account_id(manager.clone())
             .build());
 
-        contract.add_employee(&emp1);
-        contract.add_employee(&emp2);
+        contract.add_employee(emp1.clone());
+        contract.add_employee(emp2.clone());
 
         assert!(Payroll::has_role(&emp1, &Role::Employee));
         assert!(Payroll::has_role(&emp2, &Role::Employee));
@@ -331,14 +290,14 @@ mod tests {
         let emp1: AccountId = "account_emp1".parse().unwrap();
         let emp2: AccountId = "account_emp2".parse().unwrap();
 
-        let mut contract = Payroll::new(&owner);
+        let mut contract = Payroll::new(owner.clone());
 
         testing_env!(VMContextBuilder::new()
             .predecessor_account_id(owner.clone())
             .build());
 
-        contract.add_employee(&emp1);
-        contract.add_employee(&emp2);
+        contract.add_employee(emp1.clone());
+        contract.add_employee(emp2.clone());
 
         assert!(Payroll::has_role(&emp1, &Role::Employee));
         assert_eq!(contract.logged_time.get(&emp1), Some(0));
