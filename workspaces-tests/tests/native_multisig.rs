@@ -3,10 +3,11 @@
 use std::time::Duration;
 
 use near_crypto::{KeyType, SecretKey};
-use near_sdk::{serde_json::json, Gas};
+use near_sdk::{serde_json::json, Gas, ONE_NEAR};
 use near_sdk_contract_tools::approval::native_transaction_action::PromiseAction;
 use tokio::time::sleep;
 use workspaces::{
+    result::{ExecutionResult, Value},
     sandbox,
     types::{AccessKeyPermission, Finality},
     Account, Contract, DevNetwork, Worker,
@@ -57,6 +58,76 @@ async fn setup_roles<T: DevNetwork>(worker: Worker<T>, num_accounts: usize) -> S
     s
 }
 
+async fn double_approve_and_execute(
+    contract: &Contract,
+    signer_1: &Account,
+    signer_2: &Account,
+    executor: &Account,
+    request_id: u32,
+) -> ExecutionResult<Value> {
+    signer_1
+        .call(contract.id(), "approve")
+        .args_json(json!({ "request_id": request_id }))
+        .transact()
+        .await
+        .unwrap()
+        .unwrap();
+
+    signer_2
+        .call(contract.id(), "approve")
+        .args_json(json!({ "request_id": request_id }))
+        .transact()
+        .await
+        .unwrap()
+        .unwrap();
+
+    executor
+        .call(contract.id(), "execute")
+        .args_json(json!({ "request_id": request_id }))
+        .transact()
+        .await
+        .unwrap()
+        .unwrap()
+}
+
+#[tokio::test]
+async fn create_account() {
+    let Setup {
+        contract,
+        accounts,
+        worker,
+    } = setup_roles(sandbox().await.unwrap(), 2).await;
+
+    let alice = &accounts[0];
+    let bob = &accounts[1];
+
+    let new_account_id_str = format!("new.{}", contract.id());
+    let new_account_id: workspaces::AccountId = new_account_id_str.parse().unwrap();
+
+    // Account does not exist yet
+    assert!(worker.view_account(&new_account_id).await.is_err());
+
+    let request_id = alice
+        .call(contract.id(), "request")
+        .args_json(json!({
+            "receiver_id": new_account_id_str.clone(),
+            "actions": [
+                PromiseAction::CreateAccount,
+                PromiseAction::Transfer { amount: ONE_NEAR.into() }
+            ],
+        }))
+        .transact()
+        .await
+        .unwrap()
+        .json::<u32>()
+        .unwrap();
+
+    double_approve_and_execute(&contract, alice, bob, alice, request_id).await;
+
+    let state = worker.view_account(&new_account_id).await.unwrap();
+    assert_eq!(state.balance, ONE_NEAR);
+}
+
 #[tokio::test]
 async fn add_remove_key() {
     let Setup {
@@ -83,28 +154,7 @@ async fn add_remove_key() {
                 .json::<u32>()
                 .unwrap();
 
-            alice
-                .call(contract.id(), "approve")
-                .args_json(json!({ "request_id": request_id }))
-                .transact()
-                .await
-                .unwrap()
-                .unwrap();
-
-            bob.call(contract.id(), "approve")
-                .args_json(json!({ "request_id": request_id }))
-                .transact()
-                .await
-                .unwrap()
-                .unwrap();
-
-            alice
-                .call(contract.id(), "execute")
-                .args_json(json!({ "request_id": request_id }))
-                .transact()
-                .await
-                .unwrap()
-                .unwrap();
+            double_approve_and_execute(contract, alice, bob, alice, request_id).await;
 
             // Finality is apparently insufficient here, as I was still getting some
             // errors on both Testnet and Sandbox if I didn't add the delay.
