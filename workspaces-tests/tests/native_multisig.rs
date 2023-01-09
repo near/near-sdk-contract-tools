@@ -1,8 +1,16 @@
 #![cfg(not(windows))]
 
+use std::time::Duration;
+
+use near_crypto::{KeyType, SecretKey};
 use near_sdk::{serde_json::json, Gas};
 use near_sdk_contract_tools::approval::native_transaction_action::PromiseAction;
-use workspaces::{network::Sandbox, Account, Contract, Worker};
+use tokio::time::sleep;
+use workspaces::{
+    network::{AllowDevAccountCreation, Sandbox},
+    types::{AccessKeyPermission, Finality},
+    Account, Contract, Network, Worker,
+};
 
 const WASM: &[u8] =
     include_bytes!("../../target/wasm32-unknown-unknown/release/native_multisig.wasm");
@@ -10,19 +18,18 @@ const WASM: &[u8] =
 const SECOND_WASM: &[u8] =
     include_bytes!("../../target/wasm32-unknown-unknown/release/cross_target.wasm");
 
-struct Setup {
-    pub worker: Worker<Sandbox>,
+struct Setup<T: ?Sized + Network + AllowDevAccountCreation> {
+    pub worker: Worker<T>,
     pub contract: Contract,
     pub accounts: Vec<Account>,
 }
 
 /// Setup for individual tests
-async fn setup(num_accounts: usize) -> Setup {
+async fn setup(num_accounts: usize) -> Setup<Sandbox> {
     let worker = workspaces::sandbox().await.unwrap();
 
     // Initialize contract
     let contract = worker.dev_deploy(&WASM.to_vec()).await.unwrap();
-    // contract.as_account()
     contract.call("new").transact().await.unwrap().unwrap();
 
     // Initialize user accounts
@@ -38,7 +45,7 @@ async fn setup(num_accounts: usize) -> Setup {
     }
 }
 
-async fn setup_roles(num_accounts: usize) -> Setup {
+async fn setup_roles(num_accounts: usize) -> Setup<Sandbox> {
     let s = setup(num_accounts).await;
 
     for account in s.accounts[..s.accounts.len() - 1].iter() {
@@ -51,6 +58,227 @@ async fn setup_roles(num_accounts: usize) -> Setup {
     }
 
     s
+}
+
+#[tokio::test]
+async fn add_remove_key() {
+    let Setup {
+        contract, accounts, ..
+    } = setup_roles(2).await;
+
+    let alice = &accounts[0];
+    let bob = &accounts[1];
+
+    // Add a new access key to the contract account
+    let execute_actions = |actions: Vec<PromiseAction>| {
+        let contract = &contract;
+
+        async move {
+            let request_id = alice
+                .call(contract.id(), "request")
+                .args_json(json!({
+                    "receiver_id": contract.id(),
+                    "actions": actions,
+                }))
+                .transact()
+                .await
+                .unwrap()
+                .json::<u32>()
+                .unwrap();
+
+            alice
+                .call(contract.id(), "approve")
+                .args_json(json!({ "request_id": request_id }))
+                .transact()
+                .await
+                .unwrap()
+                .unwrap();
+
+            bob.call(contract.id(), "approve")
+                .args_json(json!({ "request_id": request_id }))
+                .transact()
+                .await
+                .unwrap()
+                .unwrap();
+
+            alice
+                .call(contract.id(), "execute")
+                .args_json(json!({ "request_id": request_id }))
+                .transact()
+                .await
+                .unwrap()
+                .unwrap();
+
+            // Finality is apparently insufficient here, as I was still getting some
+            // errors on both Testnet and Sandbox if I didn't add the delay.
+            sleep(Duration::from_secs(1)).await;
+        }
+    };
+
+    // Add full-access key
+    let full_access_key = {
+        let secret_key = SecretKey::from_random(KeyType::ED25519);
+        let new_public_key = secret_key.public_key();
+        let new_public_key_string = new_public_key.to_string();
+
+        let keys_before = contract
+            .view_access_keys()
+            .finality(Finality::Final)
+            .await
+            .unwrap();
+
+        // workspaces::types::PublicKey wrapper type's contents are package-private
+        // and there is no Display/.to_string() implementation.
+        let new_key_json_string = near_sdk::serde_json::to_string(&new_public_key_string).unwrap();
+
+        assert!(
+            keys_before
+                .iter()
+                .find(|a| near_sdk::serde_json::to_string(&a.public_key).unwrap()
+                    == new_key_json_string)
+                .is_none(),
+            "New key does not exist in access keys before being added"
+        );
+
+        execute_actions(vec![PromiseAction::AddFullAccessKey {
+            public_key: new_public_key_string.clone(),
+            nonce: None,
+        }])
+        .await;
+
+        let keys_after = contract
+            .view_access_keys()
+            .finality(Finality::Final)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            keys_before.len() + 1,
+            keys_after.len(),
+            "There should be exactly one additional access key"
+        );
+
+        let key = keys_after
+            .iter()
+            .find(|a| {
+                near_sdk::serde_json::to_string(&a.public_key).unwrap() == new_key_json_string
+            })
+            .unwrap();
+
+        match &key.access_key.permission {
+            AccessKeyPermission::FullAccess => {}
+            _ => panic!("Expected full access key"),
+        }
+
+        new_public_key_string
+    };
+
+    // Add function-call access key
+    let function_call_key = {
+        let secret_key = SecretKey::from_random(KeyType::ED25519);
+        let new_public_key = secret_key.public_key();
+        let new_public_key_string = new_public_key.to_string();
+
+        let keys_before = contract
+            .view_access_keys()
+            .finality(Finality::Final)
+            .await
+            .unwrap();
+
+        // workspaces::types::PublicKey wrapper type's contents are package-private
+        // and there is no Display/.to_string() implementation.
+        let new_key_json_string = near_sdk::serde_json::to_string(&new_public_key_string).unwrap();
+
+        assert!(
+            keys_before
+                .iter()
+                .find(|a| near_sdk::serde_json::to_string(&a.public_key).unwrap()
+                    == new_key_json_string)
+                .is_none(),
+            "New key does not exist in access keys before being added"
+        );
+
+        execute_actions(vec![PromiseAction::AddAccessKey {
+            public_key: new_public_key_string.clone(),
+            allowance: (1234567890).into(),
+            receiver_id: alice.id().parse().unwrap(),
+            function_names: vec!["one".into(), "two".into(), "three".into()],
+            nonce: None,
+        }])
+        .await;
+
+        let keys_after = contract
+            .view_access_keys()
+            .finality(Finality::Final)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            keys_before.len() + 1,
+            keys_after.len(),
+            "There should be exactly one additional access key"
+        );
+
+        let key = keys_after
+            .iter()
+            .find(|a| {
+                near_sdk::serde_json::to_string(&a.public_key).unwrap() == new_key_json_string
+            })
+            .unwrap();
+
+        let perm = match &key.access_key.permission {
+            AccessKeyPermission::FunctionCall(fc) => fc,
+            _ => panic!("Expected function call permission"),
+        };
+
+        assert_eq!(perm.allowance, Some(1234567890));
+        assert_eq!(perm.method_names, &["one", "two", "three"]);
+        assert_eq!(perm.receiver_id, alice.id().to_string());
+
+        new_public_key_string
+    };
+
+    // Delete the access keys
+    {
+        let keys_before = contract
+            .view_access_keys()
+            .finality(Finality::Final)
+            .await
+            .unwrap();
+
+        execute_actions(vec![
+            PromiseAction::DeleteKey {
+                public_key: full_access_key.clone(),
+            },
+            PromiseAction::DeleteKey {
+                public_key: function_call_key.clone(),
+            },
+        ])
+        .await;
+
+        let keys_after = contract
+            .view_access_keys()
+            .finality(Finality::Final)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            keys_before.len() - 2,
+            keys_after.len(),
+            "There should be exactly two fewer access keys"
+        );
+
+        let full_json = near_sdk::serde_json::to_string(&full_access_key).unwrap();
+        let func_json = near_sdk::serde_json::to_string(&function_call_key).unwrap();
+
+        assert!(keys_after
+            .iter()
+            .find(|a| {
+                let k = near_sdk::serde_json::to_string(&a.public_key).unwrap();
+                k == full_json || k == func_json
+            })
+            .is_none());
+    }
 }
 
 #[tokio::test]
@@ -82,13 +310,8 @@ async fn transfer() {
 
     let is_approved = || async {
         contract
-            .view(
-                "is_approved",
-                json!({ "request_id": request_id })
-                    .to_string()
-                    .as_bytes()
-                    .to_vec(),
-            )
+            .view("is_approved")
+            .args_json(json!({ "request_id": request_id }))
             .await
             .unwrap()
             .json::<bool>()
@@ -258,7 +481,7 @@ async fn external_xcc() {
         .unwrap();
 
     let value_before = second_contract
-        .view("get_value", vec![])
+        .view("get_value")
         .await
         .unwrap()
         .json::<String>()
@@ -267,7 +490,7 @@ async fn external_xcc() {
     assert_eq!(value_before, "");
 
     let calls_before = second_contract
-        .view("get_calls", vec![])
+        .view("get_calls")
         .await
         .unwrap()
         .json::<u32>()
@@ -285,7 +508,7 @@ async fn external_xcc() {
         .unwrap();
 
     let value_after = second_contract
-        .view("get_value", vec![])
+        .view("get_value")
         .await
         .unwrap()
         .json::<String>()
@@ -294,7 +517,7 @@ async fn external_xcc() {
     assert_eq!(value_after, "Hello, world!");
 
     let calls_after = second_contract
-        .view("get_calls", vec![])
+        .view("get_calls")
         .await
         .unwrap()
         .json::<u32>()

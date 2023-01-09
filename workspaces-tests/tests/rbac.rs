@@ -74,10 +74,8 @@ async fn happy() {
         let role = role.to_string();
         async move {
             contract
-                .view(
-                    "count_members",
-                    serde_json::to_vec(&json!({ "role": role })).unwrap(),
-                )
+                .view("count_members")
+                .args_json(json!({ "role": role }))
                 .await
                 .unwrap()
                 .json::<u32>()
@@ -89,10 +87,8 @@ async fn happy() {
         let role = role.to_string();
         async move {
             contract
-                .view(
-                    "members",
-                    serde_json::to_vec(&json!({ "role": role })).unwrap(),
-                )
+                .view("members")
+                .args_json(json!({ "role": role }))
                 .await
                 .unwrap()
                 .json::<HashSet<String>>()
@@ -163,7 +159,7 @@ async fn happy() {
     .await;
 
     let schema = contract
-        .view("get", vec![])
+        .view("get")
         .await
         .unwrap()
         .json::<ContractSchema>()

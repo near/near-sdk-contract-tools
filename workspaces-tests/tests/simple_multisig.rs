@@ -62,13 +62,8 @@ async fn successful_request() {
 
     let is_approved = || async {
         contract
-            .view(
-                "is_approved",
-                json!({ "request_id": request_id })
-                    .to_string()
-                    .as_bytes()
-                    .to_vec(),
-            )
+            .view("is_approved")
+            .args_json(json!({ "request_id": request_id }))
             .await
             .unwrap()
             .json::<bool>()
