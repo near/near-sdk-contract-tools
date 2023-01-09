@@ -6,6 +6,9 @@ publish = false
 version = "0.1.0"
 
 [[bin]]
+name = "basic_adder"
+
+[[bin]]
 name = "counter_multisig"
 
 [[bin]]

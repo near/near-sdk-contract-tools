@@ -19,6 +19,9 @@ const WASM: &[u8] =
 const SECOND_WASM: &[u8] =
     include_bytes!("../../target/wasm32-unknown-unknown/release/cross_target.wasm");
 
+const BASIC_ADDER_WASM: &[u8] =
+    include_bytes!("../../target/wasm32-unknown-unknown/release/basic_adder.wasm");
+
 struct Setup<T: DevNetwork> {
     pub worker: Worker<T>,
     pub contract: Contract,
@@ -68,6 +71,7 @@ async fn double_approve_and_execute(
     signer_1
         .call(contract.id(), "approve")
         .args_json(json!({ "request_id": request_id }))
+        .max_gas()
         .transact()
         .await
         .unwrap()
@@ -76,6 +80,7 @@ async fn double_approve_and_execute(
     signer_2
         .call(contract.id(), "approve")
         .args_json(json!({ "request_id": request_id }))
+        .max_gas()
         .transact()
         .await
         .unwrap()
@@ -84,6 +89,7 @@ async fn double_approve_and_execute(
     executor
         .call(contract.id(), "execute")
         .args_json(json!({ "request_id": request_id }))
+        .max_gas()
         .transact()
         .await
         .unwrap()
@@ -113,9 +119,12 @@ async fn create_account() {
             "receiver_id": new_account_id_str.clone(),
             "actions": [
                 PromiseAction::CreateAccount,
-                PromiseAction::Transfer { amount: ONE_NEAR.into() }
+                PromiseAction::Transfer { amount: (ONE_NEAR * 30).into() },
+                PromiseAction::DeployContract { code: BASIC_ADDER_WASM.to_vec().into() },
+                PromiseAction::FunctionCall { function_name: "new".into(), arguments: vec![].into(), amount: 0.into(), gas: 1_000_000_000_000.into() }
             ],
         }))
+        .max_gas()
         .transact()
         .await
         .unwrap()
@@ -125,7 +134,20 @@ async fn create_account() {
     double_approve_and_execute(&contract, alice, bob, alice, request_id).await;
 
     let state = worker.view_account(&new_account_id).await.unwrap();
-    assert_eq!(state.balance, ONE_NEAR);
+    assert!(state.balance >= ONE_NEAR * 30);
+
+    let result = worker
+        .view(&new_account_id, "add_five")
+        .args_json(json!({ "value": 5 }))
+        .await
+        .unwrap()
+        .json::<u32>()
+        .unwrap();
+
+    assert_eq!(
+        result, 10,
+        "Contract is deployed to child account and is working"
+    );
 }
 
 #[tokio::test]
@@ -424,7 +446,11 @@ async fn reflexive_xcc() {
 
     let actions = vec![PromiseAction::FunctionCall {
         function_name: "private_add_one".into(),
-        arguments: json!({ "value": 25 }).to_string().as_bytes().to_vec(),
+        arguments: json!({ "value": 25 })
+            .to_string()
+            .as_bytes()
+            .to_vec()
+            .into(),
         amount: 0.into(),
         gas: (Gas::ONE_TERA.0 * 50).into(),
     }];
@@ -495,7 +521,8 @@ async fn external_xcc() {
         arguments: json!({ "value": "Hello, world!" })
             .to_string()
             .as_bytes()
-            .to_vec(),
+            .to_vec()
+            .into(),
         amount: 0.into(),
         gas: (Gas::ONE_TERA.0 * 50).into(),
     }];
