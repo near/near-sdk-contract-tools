@@ -7,9 +7,9 @@ use near_sdk::{serde_json::json, Gas};
 use near_sdk_contract_tools::approval::native_transaction_action::PromiseAction;
 use tokio::time::sleep;
 use workspaces::{
-    network::{AllowDevAccountCreation, Sandbox},
+    sandbox,
     types::{AccessKeyPermission, Finality},
-    Account, Contract, Network, Worker,
+    Account, Contract, DevNetwork, Worker,
 };
 
 const WASM: &[u8] =
@@ -18,16 +18,13 @@ const WASM: &[u8] =
 const SECOND_WASM: &[u8] =
     include_bytes!("../../target/wasm32-unknown-unknown/release/cross_target.wasm");
 
-struct Setup<T: ?Sized + Network + AllowDevAccountCreation> {
+struct Setup<T: DevNetwork> {
     pub worker: Worker<T>,
     pub contract: Contract,
     pub accounts: Vec<Account>,
 }
 
-/// Setup for individual tests
-async fn setup(num_accounts: usize) -> Setup<Sandbox> {
-    let worker = workspaces::sandbox().await.unwrap();
-
+async fn setup<T: DevNetwork>(worker: Worker<T>, num_accounts: usize) -> Setup<T> {
     // Initialize contract
     let contract = worker.dev_deploy(&WASM.to_vec()).await.unwrap();
     contract.call("new").transact().await.unwrap().unwrap();
@@ -45,8 +42,8 @@ async fn setup(num_accounts: usize) -> Setup<Sandbox> {
     }
 }
 
-async fn setup_roles(num_accounts: usize) -> Setup<Sandbox> {
-    let s = setup(num_accounts).await;
+async fn setup_roles<T: DevNetwork>(worker: Worker<T>, num_accounts: usize) -> Setup<T> {
+    let s = setup(worker, num_accounts).await;
 
     for account in s.accounts[..s.accounts.len() - 1].iter() {
         account
@@ -64,7 +61,7 @@ async fn setup_roles(num_accounts: usize) -> Setup<Sandbox> {
 async fn add_remove_key() {
     let Setup {
         contract, accounts, ..
-    } = setup_roles(2).await;
+    } = setup_roles(sandbox().await.unwrap(), 2).await;
 
     let alice = &accounts[0];
     let bob = &accounts[1];
@@ -285,7 +282,7 @@ async fn add_remove_key() {
 async fn transfer() {
     let Setup {
         contract, accounts, ..
-    } = setup_roles(3).await;
+    } = setup_roles(sandbox().await.unwrap(), 3).await;
 
     let alice = &accounts[0];
     let bob = &accounts[1];
@@ -369,7 +366,7 @@ async fn transfer() {
 async fn reflexive_xcc() {
     let Setup {
         contract, accounts, ..
-    } = setup_roles(3).await;
+    } = setup_roles(sandbox().await.unwrap(), 3).await;
 
     let alice = &accounts[0];
     let bob = &accounts[1];
@@ -428,7 +425,7 @@ async fn external_xcc() {
         worker,
         contract,
         accounts,
-    } = setup_roles(3).await;
+    } = setup_roles(sandbox().await.unwrap(), 3).await;
 
     let alice = &accounts[0];
     let bob = &accounts[1];
