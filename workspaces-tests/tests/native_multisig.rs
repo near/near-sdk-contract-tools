@@ -5,7 +5,7 @@ use std::{future::IntoFuture, time::Duration};
 use near_crypto::{KeyType, SecretKey};
 use near_sdk::{serde_json::json, Gas, ONE_NEAR};
 use near_sdk_contract_tools::approval::native_transaction_action::PromiseAction;
-use tokio::{join, time::sleep};
+use tokio::{join, task::JoinSet, time::sleep};
 use workspaces::{
     result::{ExecutionResult, Value},
     sandbox,
@@ -94,6 +94,76 @@ async fn double_approve_and_execute(
         .await
         .unwrap()
         .unwrap()
+}
+
+#[tokio::test]
+async fn stake() {
+    let Setup {
+        contract,
+        accounts,
+        worker,
+    } = setup_roles(sandbox().await.unwrap(), 2).await;
+
+    const MINIMUM_STAKE: u128 = 800_000_000_000_000_000_000_000_000;
+
+    let mut set = JoinSet::new();
+
+    // Fund contract account to meet minumum stake requirement.
+    // At the time of writing, it looks like workspaces network configuration is not yet released:
+    // https://github.com/near/workspaces-rs/commit/8df17e5d6ebbfe9ced52beb133f3e5b07a86dffb
+    // Otherwise we could just decrease the staking requirement.
+    for _ in 0..10 {
+        let w = worker.clone();
+        let contract_id = contract.id().clone();
+        set.spawn(async move {
+            let a = w.dev_create_account().await.unwrap();
+            a.delete_account(&contract_id).await.unwrap().unwrap();
+        });
+    }
+
+    // Await all
+    while set.join_next().await.is_some() {}
+
+    let alice = &accounts[0];
+    let bob = &accounts[1];
+
+    let secret_key = SecretKey::from_random(KeyType::ED25519);
+    let public_key = secret_key.public_key();
+
+    let contract_before = contract.view_account().await.unwrap();
+    assert_eq!(
+        contract_before.locked, 0,
+        "Account should start with no staked tokens"
+    );
+
+    let stake_amount = MINIMUM_STAKE;
+
+    let request_id = alice
+        .call(contract.id(), "request")
+        .args_json(json!({
+            "receiver_id": contract.id(),
+            "actions": [
+                PromiseAction::Stake {
+                    amount: stake_amount.into(),
+                    public_key: public_key.to_string(),
+                },
+            ],
+        }))
+        .max_gas()
+        .transact()
+        .await
+        .unwrap()
+        .json::<u32>()
+        .unwrap();
+
+    double_approve_and_execute(&contract, alice, bob, alice, request_id).await;
+
+    let contract_after = contract.view_account().await.unwrap();
+
+    assert_eq!(
+        contract_after.locked, stake_amount,
+        "Locked amount should be equal to the amount staked"
+    );
 }
 
 #[tokio::test]
