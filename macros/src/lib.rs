@@ -1,4 +1,4 @@
-//! Macros for near-sdk-contract-tools
+//! Macros for near-sdk-contract-tools.
 
 use darling::{FromDeriveInput, FromMeta};
 use proc_macro::TokenStream;
@@ -59,6 +59,18 @@ where
 /// - `SHOUTY_SNAKE_CASE`
 /// - `SHOUTY-KEBAB-CASE`
 /// - `Title Case`
+///
+/// # Warning
+///
+/// Rename strategies are provided for convenience, and the actual string
+/// transformation is delegated to the [`heck`](https://crates.io/crates/heck)
+/// crate. It _is_ possible that unexpected name transformations or collisions
+/// may occur, but it is _extremely unlikely_ if reasonable Rust naming
+/// conventions are followed.
+///
+/// For example, both `"HelloWorld"` and `"hello_world"`, when
+/// snake-case-ified, are `"hello_world"`, so if you happened to name distinct
+/// events thusly, the transformed names would collide.
 #[proc_macro_derive(Nep297, attributes(nep297))]
 pub fn derive_nep297(input: TokenStream) -> TokenStream {
     make_derive(input, standard::nep297::expand)
@@ -170,7 +182,9 @@ pub fn derive_simple_multisig(input: TokenStream) -> TokenStream {
     make_derive(input, approval::simple_multisig::expand)
 }
 
-/// Smart `#[event]` macro
+/// Smart `#[event]` macro.
+///
+/// See documentation on the [`derive@Nep297`] derive macro for more details.
 #[proc_macro_attribute]
 pub fn event(attr: TokenStream, item: TokenStream) -> TokenStream {
     let attr = parse_macro_input!(attr as AttributeArgs);
