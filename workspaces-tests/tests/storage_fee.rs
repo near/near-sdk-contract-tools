@@ -2,7 +2,6 @@
 
 use near_sdk::{json_types::U128, serde_json::json, ONE_NEAR};
 
-use tokio::join;
 use workspaces::{sandbox, Account, Contract, DevNetwork, Worker};
 
 const WASM: &[u8] = include_bytes!("../../target/wasm32-unknown-unknown/release/storage_fee.wasm");

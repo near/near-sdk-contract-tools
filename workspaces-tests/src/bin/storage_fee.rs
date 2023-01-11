@@ -6,7 +6,7 @@ use near_sdk::{
     json_types::U128,
     near_bindgen,
     store::Vector,
-    PanicOnDefault, Promise, PromiseOrValue,
+    PanicOnDefault, Promise,
 };
 use near_sdk_contract_tools::utils::apply_storage_fee_and_refund;
 
