@@ -27,6 +27,9 @@ name = "rbac"
 name = "simple_multisig"
 
 [[bin]]
+name = "storage_fee"
+
+[[bin]]
 name = "upgrade_bad"
 
 [[bin]]

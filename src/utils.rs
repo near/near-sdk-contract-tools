@@ -11,13 +11,21 @@ use near_sdk::{env, require, Promise};
 ///
 /// assert_eq!(prefix_key(b"p", b"key"), b"pkey".to_vec());
 /// ```
-pub fn prefix_key(prefix: &dyn AsRef<[u8]>, key: &dyn AsRef<[u8]>) -> Vec<u8> {
+pub fn prefix_key(prefix: impl AsRef<[u8]>, key: impl AsRef<[u8]>) -> Vec<u8> {
     [prefix.as_ref(), key.as_ref()].concat()
 }
 
 /// Calculates the storage fee of an action, given an initial storage amount,
 /// and refunds the predecessor a portion of the attached deposit if necessary.
 /// Returns refund Promise if refund was applied.
+///
+/// # Warning
+///
+/// New collections (those in `near_sdk::store`) cache writes, only applying
+/// state changes on drop. However, this function only accounts for actual
+/// changes to storage usage. You can force writes (allowing this function to
+/// detect storage changes) by calling `.flush()` on `near_sdk::store::*`
+/// collections.
 ///
 /// # Examples
 ///
@@ -65,5 +73,20 @@ pub fn apply_storage_fee_and_refund(
         Some(Promise::new(env::predecessor_account_id()).transfer(refund))
     } else {
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::prefix_key;
+
+    #[test]
+    fn test_prefix_key() {
+        assert_eq!(prefix_key(b"a", b"b"), b"ab");
+        assert_eq!(prefix_key("a", "b"), b"ab");
+        assert_eq!(prefix_key("a", b"b"), b"ab");
+        assert_eq!(prefix_key(&[], "abc"), b"abc");
+        assert_eq!(prefix_key(&[], b""), [0u8; 0]);
+        assert_eq!(prefix_key("abc", b""), b"abc");
     }
 }
