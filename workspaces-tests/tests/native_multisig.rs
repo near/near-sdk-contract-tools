@@ -1,11 +1,11 @@
 #![cfg(not(windows))]
 
-use std::time::Duration;
+use std::{future::IntoFuture, time::Duration};
 
 use near_crypto::{KeyType, SecretKey};
 use near_sdk::{serde_json::json, Gas, ONE_NEAR};
 use near_sdk_contract_tools::approval::native_transaction_action::PromiseAction;
-use tokio::time::sleep;
+use tokio::{join, time::sleep};
 use workspaces::{
     result::{ExecutionResult, Value},
     sandbox,
@@ -94,6 +94,63 @@ async fn double_approve_and_execute(
         .await
         .unwrap()
         .unwrap()
+}
+
+#[tokio::test]
+async fn delete_account() {
+    let Setup {
+        contract,
+        accounts,
+        worker,
+    } = setup_roles(sandbox().await.unwrap(), 2).await;
+
+    let alice = &accounts[0];
+    let bob = &accounts[1];
+
+    let (alice_before, contract_before) = join!(
+        alice.view_account().into_future(),
+        contract.view_account().into_future(),
+    );
+
+    let alice_balance_before = alice_before.unwrap().balance;
+    let contract_balance_before = contract_before.unwrap().balance;
+
+    let request_id = alice
+        .call(contract.id(), "request")
+        .args_json(json!({
+            "receiver_id": contract.id(),
+            "actions": [
+                PromiseAction::DeleteAccount {
+                    beneficiary_id: alice.id().parse().unwrap()
+                },
+            ],
+        }))
+        .max_gas()
+        .transact()
+        .await
+        .unwrap()
+        .json::<u32>()
+        .unwrap();
+
+    double_approve_and_execute(&contract, alice, bob, alice, request_id).await;
+
+    let (contract_view, alice_view, gas_price) = join!(
+        contract.view_account().into_future(),
+        alice.view_account().into_future(),
+        worker.gas_price().into_future(),
+    );
+
+    contract_view.expect_err("Contract account should be deleted");
+
+    let alice_balance_after = alice_view.unwrap().balance;
+    let gas_price = gas_price.unwrap();
+    const MAX_GAS: u128 = 300_000_000_000_000;
+
+    assert!(
+        alice_balance_after.abs_diff(alice_balance_before + contract_balance_before)
+            <= MAX_GAS * gas_price,
+        "All contract account funds (sans gas) transfer to the beneficiary account",
+    );
 }
 
 #[tokio::test]
