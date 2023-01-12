@@ -9,10 +9,10 @@ use near_sdk::{env, require, Promise};
 /// ```
 /// use near_sdk_contract_tools::utils::prefix_key;
 ///
-/// assert_eq!(prefix_key(b"p", b"key"), b"pkey".to_vec());
+/// assert_eq!(prefix_key(b"p", b"key"), b"pkey");
 /// ```
-pub fn prefix_key(prefix: impl AsRef<[u8]>, key: impl AsRef<[u8]>) -> Vec<u8> {
-    [prefix.as_ref(), key.as_ref()].concat()
+pub fn prefix_key(prefix: &[u8], key: &[u8]) -> Vec<u8> {
+    [prefix, key].concat()
 }
 
 /// Calculates the storage fee of an action, given an initial storage amount,
@@ -85,10 +85,10 @@ mod tests {
     #[test]
     fn test_prefix_key() {
         assert_eq!(prefix_key(b"a", b"b"), b"ab");
-        assert_eq!(prefix_key("a", "b"), b"ab");
-        assert_eq!(prefix_key("a", b"b"), b"ab");
-        assert_eq!(prefix_key(&[], "abc"), b"abc");
+        assert_eq!(prefix_key("a".as_ref(), "b".as_ref()), b"ab");
+        assert_eq!(prefix_key("a".as_ref(), b"b"), b"ab");
+        assert_eq!(prefix_key(&[], "abc".as_ref()), b"abc");
         assert_eq!(prefix_key(&[], b""), [0u8; 0]);
-        assert_eq!(prefix_key("abc", b""), b"abc");
+        assert_eq!(prefix_key("abc".as_ref(), b""), b"abc");
     }
 }
