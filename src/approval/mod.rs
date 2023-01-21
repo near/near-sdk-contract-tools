@@ -27,6 +27,19 @@ pub trait Action<Cont: ?Sized> {
 
 /// Defines the operating parameters for an ApprovalManager and performs
 /// approvals
+///
+/// TODO: unclear if the approval configuration should be defined on the contract
+/// a special configuration struct (as in the case multi-sig) or for a simple
+/// approval the state S itself.
+///
+/// TODO: Explain that the approval configuration parameters A and S are
+/// the Action and Action state (based on which the action is approved)
+///
+/// TODO: Good to have sane defaults for error types but blocked on issue
+/// https://github.com/rust-lang/rust/issues/29661. Mention sane defaults
+/// and choice behind them in documentation.
+///
+/// TODO: in many cases the state is the configuration
 pub trait ApprovalConfiguration<A, S> {
     /// Errors when approving a request
     type ApprovalError;
@@ -53,6 +66,8 @@ pub trait ApprovalConfiguration<A, S> {
         action_request: &ActionRequest<A, S>,
     ) -> Result<(), Self::AuthorizationError>;
 
+    /// TODO: can pass &AccountId here as well to be consistent with
+    /// is_account_authorized function
     /// Modify action_request.approval_state in-place to increase approval
     fn try_approve_with_authorized_account(
         &self,
@@ -127,6 +142,20 @@ pub enum RemovalError<AuthErr, RemErr> {
 
 /// Collection of action requests that manages their approval state and
 /// execution
+///
+/// TODO: Explain what the module does that A, S, C refer to the types
+/// for the action, the approvals state for the action and the
+/// type that approves an action based on it's state
+///
+/// TODO: Mention that this trait is only for creating, managing, removing
+/// approvals. The defaults are sane and it can just be implemented as
+/// is for any contract without any changes to the methods unless needed.
+///
+/// TODO: I would expect the approval manager to automatically execute
+/// the request once the required condition is met. This can be considered
+/// for a default setting in the approval manager. If this is not the
+/// case then it can be documented that the approvals and executions are
+/// entirely decided by the contract.
 pub trait ApprovalManager<A, S, C>
 where
     A: Action<Self> + BorshSerialize + BorshDeserialize,
@@ -228,6 +257,16 @@ where
         Ok(result)
     }
 
+    /// TODO: a name like `request_is_approved` or `is_request_approved` will
+    /// be more consistent with the rest of the function names and hence
+    /// easier to find
+    ///
+    /// TODO: Moreover this clashes with the function of the same name in
+    /// ApprovalConfiguration so a struct that implements both Configuration
+    /// and Manager traits cannot choose which one to call. This again can
+    /// be fixed by renaming this one and adding some documentation about
+    /// which one to use and when.
+    ///
     /// Is the given request ID able to be executed if such a request were to
     /// be initiated by an authorized account?
     fn is_approved_for_execution(request_id: u32) -> Result<(), C::ExecutionEligibilityError> {

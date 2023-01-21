@@ -47,6 +47,9 @@ name = "upgrade_old_multisig"
 [[bin]]
 name = "upgrade_old_raw"
 
+[[bin]]
+name = "payroll_example"
+
 [dependencies]
 near-sdk = {version = "4.1.1", default-features = false}
 near-sdk-contract-tools = {path = "../", features = ["unstable"]}
