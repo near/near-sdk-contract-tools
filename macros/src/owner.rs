@@ -39,36 +39,36 @@ pub fn expand(meta: OwnerMeta) -> Result<TokenStream, darling::Error> {
     });
 
     Ok(quote! {
-        impl #imp #me::owner::Owner for #ident #ty #wher {
+        impl #imp #me::owner::OwnerInternal for #ident #ty #wher {
             #root
         }
 
         #[#near_sdk::near_bindgen]
         impl #imp #me::owner::OwnerExternal for #ident #ty #wher {
             fn own_get_owner(&self) -> Option<#near_sdk::AccountId> {
-                <Self as #me::owner::Owner>::slot_owner().read()
+                <Self as #me::owner::OwnerInternal>::slot_owner().read()
             }
 
             fn own_get_proposed_owner(&self) -> Option<#near_sdk::AccountId> {
-                <Self as #me::owner::Owner>::slot_proposed_owner().read()
+                <Self as #me::owner::OwnerInternal>::slot_proposed_owner().read()
             }
 
             #[payable]
             fn own_renounce_owner(&mut self) {
                 #near_sdk::assert_one_yocto();
-                self.renounce_owner()
+                #me::owner::Owner::renounce_owner(self);
             }
 
             #[payable]
             fn own_propose_owner(&mut self, account_id: Option<#near_sdk::AccountId>) {
                 #near_sdk::assert_one_yocto();
-                self.propose_owner(account_id);
+                #me::owner::Owner::propose_owner(self, account_id);
             }
 
             #[payable]
             fn own_accept_owner(&mut self) {
                 #near_sdk::assert_one_yocto();
-                self.accept_owner();
+                #me::owner::Owner::accept_owner(self);
             }
         }
     })
