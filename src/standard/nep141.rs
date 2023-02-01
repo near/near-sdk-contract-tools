@@ -191,8 +191,8 @@ impl Nep141Transfer {
     }
 }
 
-/// Non-public implementations of functions for managing a fungible token.
-pub trait Nep141Controller {
+/// Internal functions for [`Nep141Controller`]. Using these methods may result in unexpected behavior.
+pub trait Nep141ControllerInternal {
     /// Root storage slot
     fn root() -> Slot<()> {
         Slot::new(DefaultStorageKey::Nep141)
@@ -207,16 +207,15 @@ pub trait Nep141Controller {
     fn slot_total_supply() -> Slot<u128> {
         Self::root().field(StorageKey::TotalSupply)
     }
+}
 
+/// Non-public implementations of functions for managing a fungible token.
+pub trait Nep141Controller {
     /// Get the balance of an account. Returns 0 if the account does not exist.
-    fn balance_of(account_id: &AccountId) -> u128 {
-        Self::slot_account(account_id).read().unwrap_or(0)
-    }
+    fn balance_of(account_id: &AccountId) -> u128;
 
     /// Get the total circulating supply of the token.
-    fn total_supply() -> u128 {
-        Self::slot_total_supply().read().unwrap_or(0)
-    }
+    fn total_supply() -> u128;
 
     /// Removes tokens from an account and decreases total supply. No event
     /// emission.
@@ -225,6 +224,94 @@ pub trait Nep141Controller {
     ///
     /// Panics if the current balance of `account_id` is less than `amount` or
     /// if `total_supply` is less than `amount`.
+    fn withdraw_unchecked(&mut self, account_id: &AccountId, amount: u128);
+
+    /// Increases the token balance of an account. Updates total supply. No
+    /// event emission,
+    ///
+    /// # Panics
+    ///
+    /// Panics if the balance of `account_id` plus `amount` >= `u128::MAX`, or
+    /// if the total supply plus `amount` >= `u128::MAX`.
+    fn deposit_unchecked(&mut self, account_id: &AccountId, amount: u128);
+
+    /// Decreases the balance of `sender_account_id` by `amount` and increases
+    /// the balance of `receiver_account_id` by the same. No change to total
+    /// supply. No event emission.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the balance of `sender_account_id` < `amount` or if the
+    /// balance of `receiver_account_id` plus `amount` >= `u128::MAX`.
+    fn transfer_unchecked(
+        &mut self,
+        sender_account_id: &AccountId,
+        receiver_account_id: &AccountId,
+        amount: u128,
+    );
+
+    /// Performs an NEP-141 token transfer, with event emission.
+    ///
+    /// # Panics
+    ///
+    /// See: `Nep141Controller::transfer_unchecked`
+    fn transfer(
+        &mut self,
+        sender_account_id: AccountId,
+        receiver_account_id: AccountId,
+        amount: u128,
+        memo: Option<String>,
+    );
+
+    /// Performs an NEP-141 token mint, with event emission.
+    ///
+    /// # Panics
+    ///
+    /// See: `Nep141Controller::deposit_unchecked`
+    fn mint(&mut self, account_id: AccountId, amount: u128, memo: Option<String>);
+
+    /// Performs an NEP-141 token burn, with event emission.
+    ///
+    /// # Panics
+    ///
+    /// See: `Nep141Controller::withdraw_unchecked`
+    fn burn(&mut self, account_id: AccountId, amount: u128, memo: Option<String>);
+
+    /// Performs an NEP-141 token transfer call, with event emission.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `gas_allowance` < `GAS_FOR_FT_TRANSFER_CALL`.
+    ///
+    /// See also: `Nep141Controller::transfer`
+    fn transfer_call(
+        &mut self,
+        sender_account_id: AccountId,
+        receiver_account_id: AccountId,
+        amount: u128,
+        memo: Option<String>,
+        msg: String,
+        gas_allowance: Gas,
+    ) -> Promise;
+
+    /// Resolves an NEP-141 `ft_transfer_call` promise chain.
+    fn resolve_transfer(
+        &mut self,
+        sender_id: AccountId,
+        receiver_id: AccountId,
+        amount: u128,
+    ) -> u128;
+}
+
+impl<T: Nep141ControllerInternal> Nep141Controller for T {
+    fn balance_of(account_id: &AccountId) -> u128 {
+        Self::slot_account(account_id).read().unwrap_or(0)
+    }
+
+    fn total_supply() -> u128 {
+        Self::slot_total_supply().read().unwrap_or(0)
+    }
+
     fn withdraw_unchecked(&mut self, account_id: &AccountId, amount: u128) {
         if amount != 0 {
             let balance = Self::balance_of(account_id);
@@ -243,13 +330,6 @@ pub trait Nep141Controller {
         }
     }
 
-    /// Increases the token balance of an account. Updates total supply. No
-    /// event emission,
-    ///
-    /// # Panics
-    ///
-    /// Panics if the balance of `account_id` plus `amount` >= `u128::MAX`, or
-    /// if the total supply plus `amount` >= `u128::MAX`.
     fn deposit_unchecked(&mut self, account_id: &AccountId, amount: u128) {
         if amount != 0 {
             let balance = Self::balance_of(account_id);
@@ -268,14 +348,6 @@ pub trait Nep141Controller {
         }
     }
 
-    /// Decreases the balance of `sender_account_id` by `amount` and increases
-    /// the balance of `receiver_account_id` by the same. No change to total
-    /// supply. No event emission.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the balance of `sender_account_id` < `amount` or if the
-    /// balance of `receiver_account_id` plus `amount` >= `u128::MAX`.
     fn transfer_unchecked(
         &mut self,
         sender_account_id: &AccountId,
@@ -297,11 +369,6 @@ pub trait Nep141Controller {
         }
     }
 
-    /// Performs an NEP-141 token transfer, with event emission.
-    ///
-    /// # Panics
-    ///
-    /// See: `Nep141Controller::transfer_unchecked`
     fn transfer(
         &mut self,
         sender_account_id: AccountId,
@@ -320,11 +387,6 @@ pub trait Nep141Controller {
         .emit();
     }
 
-    /// Performs an NEP-141 token mint, with event emission.
-    ///
-    /// # Panics
-    ///
-    /// See: `Nep141Controller::deposit_unchecked`
     fn mint(&mut self, account_id: AccountId, amount: u128, memo: Option<String>) {
         self.deposit_unchecked(&account_id, amount);
 
@@ -336,11 +398,6 @@ pub trait Nep141Controller {
         .emit();
     }
 
-    /// Performs an NEP-141 token burn, with event emission.
-    ///
-    /// # Panics
-    ///
-    /// See: `Nep141Controller::withdraw_unchecked`
     fn burn(&mut self, account_id: AccountId, amount: u128, memo: Option<String>) {
         self.withdraw_unchecked(&account_id, amount);
 
@@ -352,13 +409,6 @@ pub trait Nep141Controller {
         .emit();
     }
 
-    /// Performs an NEP-141 token transfer call, with event emission.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `gas_allowance` < `GAS_FOR_FT_TRANSFER_CALL`.
-    ///
-    /// See also: `Nep141Controller::transfer`
     fn transfer_call(
         &mut self,
         sender_account_id: AccountId,
@@ -396,7 +446,6 @@ pub trait Nep141Controller {
             )
     }
 
-    /// Resolves an NEP-141 `ft_transfer_call` promise chain.
     fn resolve_transfer(
         &mut self,
         sender_id: AccountId,
