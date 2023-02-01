@@ -13,7 +13,7 @@ use near_sdk_contract_tools::{
     approval::{
         self,
         simple_multisig::{AccountAuthorizer, ApprovalState, Configuration},
-        ApprovalManager,
+        ApprovalManager, ApprovalManagerInternal,
     },
     rbac::Rbac,
     slot::Slot,
@@ -55,7 +55,7 @@ pub struct Contract {}
 
 // This single function implementation completely implements simple multisig on
 // the contract
-impl ApprovalManager<MyAction, ApprovalState, Configuration<Self>> for Contract {
+impl ApprovalManagerInternal<MyAction, ApprovalState, Configuration<Self>> for Contract {
     fn root() -> Slot<()> {
         Slot::new(StorageKey::SimpleMultisig)
     }

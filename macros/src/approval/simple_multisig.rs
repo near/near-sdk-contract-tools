@@ -42,7 +42,7 @@ pub fn expand(meta: SimpleMultisigMeta) -> Result<TokenStream, darling::Error> {
     });
 
     Ok(quote! {
-        impl #imp #me::approval::ApprovalManager<
+        impl #imp #me::approval::ApprovalManagerInternal<
                 #action,
                 #me::approval::simple_multisig::ApprovalState,
                 #me::approval::simple_multisig::Configuration<Self>,
