@@ -40,10 +40,12 @@ pub fn expand(meta: RbacMeta) -> Result<TokenStream, darling::Error> {
     });
 
     Ok(quote! {
+        impl #imp #me::rbac::RbacInternal<#roles> for #ident #ty #wher {
+            #root
+        }
+
         impl #imp #me::rbac::Rbac for #ident #ty #wher {
             type Role = #roles;
-
-            #root
         }
     })
 }

@@ -44,11 +44,7 @@ enum StorageKey<R> {
     Role(R),
 }
 
-/// Role-based access control
-pub trait Rbac {
-    /// Roles type (probably an enum).
-    type Role: BorshSerialize + IntoStorageKey;
-
+pub trait RbacInternal<R: IntoStorageKey + BorshSerialize> {
     /// Storage slot namespace for items.
     fn root() -> Slot<()> {
         Slot::new(DefaultStorageKey::Rbac)
@@ -56,9 +52,15 @@ pub trait Rbac {
 
     /// Storage slot for the backing `UnorderedSet` of all accounts assigned
     /// to a role.
-    fn slot_members_of(role: &Self::Role) -> Slot<UnorderedSet<AccountId>> {
+    fn slot_members_of(role: &R) -> Slot<UnorderedSet<AccountId>> {
         Self::root().field::<UnorderedSet<AccountId>>(StorageKey::Role(role))
     }
+}
+
+/// Role-based access control
+pub trait Rbac: RbacInternal<Self::Role> {
+    /// Roles type (probably an enum).
+    type Role: BorshSerialize + IntoStorageKey;
 
     /// Deserializes the backing `UnorderedSet` structure, executes predicate
     /// `f` on it, reserializes the structure, and writes it back into storage,
@@ -78,7 +80,7 @@ pub trait Rbac {
 
     /// Deserializes the backing `UnorderedSet` structure and executes predicate
     /// `f` on it. Returns the return value of `f`.
-    fn with_members_of<T>(role: &Self::Role, f: impl Fn(&UnorderedSet<AccountId>) -> T) -> T {
+    fn with_members_of<T>(role: &Self::Role, f: impl FnOnce(&UnorderedSet<AccountId>) -> T) -> T {
         let slot = Self::slot_members_of(role);
         let set = slot
             .read()
