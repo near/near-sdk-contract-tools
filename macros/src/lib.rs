@@ -97,8 +97,8 @@ pub fn derive_pause(input: TokenStream) -> TokenStream {
 
 /// Adds role-based access control. No external methods are exposed.
 ///
-/// The roles prefix must be specify a type using #[rbac(roles = "MyRoles")].
-/// Typically "MyRoles" is an enum and it's variants are the different role
+/// The roles prefix can be specified using `#[rbac(roles = "MyRoles")]`.
+/// Typically `"MyRoles"` is an enum and its variants are the different role
 /// names.
 ///
 /// The storage key prefix for the fields can be optionally specified (default:
@@ -110,7 +110,7 @@ pub fn derive_rbac(input: TokenStream) -> TokenStream {
 
 /// Adds NEP-141 fungible token core functionality to a contract. Exposes
 /// `ft_*` functions to the public blockchain, implements internal controller
-/// and receiver functionality (see: `near_sdk_contract_tools::standard::nep141`).
+/// and receiver functionality (see: [`near_sdk_contract_tools::standard::nep141`]).
 ///
 /// The storage key prefix for the fields can be optionally specified (default:
 /// `"~$141"`) using `#[nep141(storage_key = "<expression>")]`.
