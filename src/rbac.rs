@@ -44,8 +44,8 @@ enum StorageKey<R> {
     Role(R),
 }
 
-/// Role-based access control
-pub trait Rbac {
+/// Internal functions for [`Rbac`]. Using these methods may result in unexpected behavior.
+pub trait RbacInternal {
     /// Roles type (probably an enum).
     type Role: BorshSerialize + IntoStorageKey;
 
@@ -59,10 +59,47 @@ pub trait Rbac {
     fn slot_members_of(role: &Self::Role) -> Slot<UnorderedSet<AccountId>> {
         Self::root().field::<UnorderedSet<AccountId>>(StorageKey::Role(role))
     }
+}
+
+/// Role-based access control
+pub trait Rbac {
+    /// Roles type (probably an enum).
+    type Role: BorshSerialize + IntoStorageKey;
 
     /// Deserializes the backing `UnorderedSet` structure, executes predicate
     /// `f` on it, reserializes the structure, and writes it back into storage,
     /// returning the return value of `f`.
+    fn with_members_of_mut<T>(
+        role: &Self::Role,
+        f: impl FnOnce(&mut UnorderedSet<AccountId>) -> T,
+    ) -> T;
+
+    /// Deserializes the backing `UnorderedSet` structure and executes predicate
+    /// `f` on it. Returns the return value of `f`.
+    fn with_members_of<T>(role: &Self::Role, f: impl FnOnce(&UnorderedSet<AccountId>) -> T) -> T;
+
+    /// Iterates over all accounts that have been assigned a role.
+    fn iter_members_of(role: &Self::Role) -> Iter;
+
+    /// Returns whether a given account has been given a certain role.
+    fn has_role(account_id: &AccountId, role: &Self::Role) -> bool;
+
+    /// Assigns a role to an account.
+    fn add_role(&mut self, account_id: AccountId, role: &Self::Role);
+
+    /// Removes a role from an account.
+    fn remove_role(&mut self, account_id: &AccountId, role: &Self::Role);
+
+    /// Requires transaction predecessor to have a given role.
+    fn require_role(role: &Self::Role);
+
+    /// Requires transaction predecessor to not have a given role.
+    fn prohibit_role(role: &Self::Role);
+}
+
+impl<I: RbacInternal> Rbac for I {
+    type Role = <Self as RbacInternal>::Role;
+
     fn with_members_of_mut<T>(
         role: &Self::Role,
         f: impl FnOnce(&mut UnorderedSet<AccountId>) -> T,
@@ -76,9 +113,7 @@ pub trait Rbac {
         value
     }
 
-    /// Deserializes the backing `UnorderedSet` structure and executes predicate
-    /// `f` on it. Returns the return value of `f`.
-    fn with_members_of<T>(role: &Self::Role, f: impl Fn(&UnorderedSet<AccountId>) -> T) -> T {
+    fn with_members_of<T>(role: &Self::Role, f: impl FnOnce(&UnorderedSet<AccountId>) -> T) -> T {
         let slot = Self::slot_members_of(role);
         let set = slot
             .read()
@@ -86,7 +121,6 @@ pub trait Rbac {
         f(&set)
     }
 
-    /// Iterates over all accounts that have been assigned a role.
     fn iter_members_of(role: &Self::Role) -> Iter {
         let slot = Self::slot_members_of(role);
         let set = slot.read().unwrap_or_else(|| UnorderedSet::new(slot.key));
@@ -94,7 +128,6 @@ pub trait Rbac {
         Iter::new(set)
     }
 
-    /// Returns whether a given account has been given a certain role.
     fn has_role(account_id: &AccountId, role: &Self::Role) -> bool {
         Self::slot_members_of(role)
             .read()
@@ -102,17 +135,14 @@ pub trait Rbac {
             .unwrap_or(false)
     }
 
-    /// Assigns a role to an account.
     fn add_role(&mut self, account_id: AccountId, role: &Self::Role) {
         Self::with_members_of_mut(role, |set| set.insert(account_id));
     }
 
-    /// Removes a role from an account.
     fn remove_role(&mut self, account_id: &AccountId, role: &Self::Role) {
         Self::with_members_of_mut(role, |set| set.remove(account_id));
     }
 
-    /// Requires transaction predecessor to have a given role.
     fn require_role(role: &Self::Role) {
         let predecessor = env::predecessor_account_id();
         require!(
@@ -121,7 +151,6 @@ pub trait Rbac {
         );
     }
 
-    /// Requires transaction predecessor to not have a given role.
     fn prohibit_role(role: &Self::Role) {
         let predecessor = env::predecessor_account_id();
         require!(

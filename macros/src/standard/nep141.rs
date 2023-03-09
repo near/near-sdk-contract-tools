@@ -54,7 +54,7 @@ pub fn expand(meta: Nep141Meta) -> Result<TokenStream, darling::Error> {
     });
 
     Ok(quote! {
-        impl #imp #me::standard::nep141::Nep141Controller for #ident #ty #wher {
+        impl #imp #me::standard::nep141::Nep141ControllerInternal for #ident #ty #wher {
             #root
         }
 

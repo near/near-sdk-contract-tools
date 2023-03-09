@@ -45,7 +45,20 @@ pub enum PauseEvent {
     Unpause,
 }
 
-/// Internal-only interactions for a pausable contract
+/// Internal functions for [`Pause`]. Using these methods may result in unexpected behavior.
+pub trait PauseInternal {
+    /// Storage root
+    fn root() -> Slot<()> {
+        Slot::new(DefaultStorageKey::Pause)
+    }
+
+    /// Storage slot for pause state
+    fn slot_paused() -> Slot<bool> {
+        Self::root().transmute()
+    }
+}
+
+/// Contract private-only interactions for a pausable contracts.
 ///
 /// # Examples
 ///
@@ -79,55 +92,59 @@ pub enum PauseEvent {
 /// }
 /// ```
 pub trait Pause {
-    /// Storage root
-    fn root() -> Slot<()> {
-        Slot::new(DefaultStorageKey::Pause)
-    }
-
-    /// Storage slot for pause state
-    fn slot_paused() -> Slot<bool> {
-        Self::root().transmute()
-    }
-
     /// Force the contract pause state in a particular direction.
     /// Does not emit events or check the current pause state.
+    fn set_is_paused(&mut self, is_paused: bool);
+
+    /// Returns `true` if the contract is paused, `false` otherwise
+    fn is_paused() -> bool;
+
+    /// Pauses the contract if it is currently unpaused, panics otherwise.
+    /// Emits a `PauseEvent::Pause` event.
+    fn pause(&mut self);
+
+    /// Unpauses the contract if it is currently paused, panics otherwise.
+    /// Emits a `PauseEvent::Unpause` event.
+    fn unpause(&mut self);
+
+    /// Rejects if the contract is unpaused.
+    fn require_paused();
+
+    /// Rejects if the contract is paused.
+    fn require_unpaused();
+}
+
+impl<T: PauseInternal> Pause for T {
     fn set_is_paused(&mut self, is_paused: bool) {
         Self::slot_paused().write(&is_paused);
     }
 
-    /// Returns `true` if the contract is paused, `false` otherwise
     fn is_paused() -> bool {
         Self::slot_paused().read().unwrap_or(false)
     }
 
-    /// Pauses the contract if it is currently unpaused, panics otherwise.
-    /// Emits a `PauseEvent::Pause` event.
     fn pause(&mut self) {
         Self::require_unpaused();
         self.set_is_paused(true);
         PauseEvent::Pause.emit();
     }
 
-    /// Unpauses the contract if it is currently paused, panics otherwise.
-    /// Emits a `PauseEvent::Unpause` event.
     fn unpause(&mut self) {
         Self::require_paused();
         self.set_is_paused(false);
         PauseEvent::Unpause.emit();
     }
 
-    /// Rejects if the contract is unpaused
     fn require_paused() {
         require!(Self::is_paused(), UNPAUSED_FAIL_MESSAGE);
     }
 
-    /// Rejects if the contract is paused
     fn require_unpaused() {
         require!(!Self::is_paused(), PAUSED_FAIL_MESSAGE);
     }
 }
 
-/// External methods for [Pause]
+/// External (public) methods for [`Pause`]
 #[ext_contract(ext_pause)]
 pub trait PauseExternal {
     /// Returns `true` if the contract is paused, `false` otherwise
