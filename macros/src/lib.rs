@@ -59,6 +59,8 @@ where
 /// - `SHOUTY_SNAKE_CASE`
 /// - `SHOUTY-KEBAB-CASE`
 /// - `Title Case`
+///
+/// Warning: The renaming process may remove duplicate underscores, etc.
 #[proc_macro_derive(Nep297, attributes(nep297))]
 pub fn derive_nep297(input: TokenStream) -> TokenStream {
     make_derive(input, standard::nep297::expand)

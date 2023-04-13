@@ -47,7 +47,7 @@ pub fn apply_storage_fee_and_refund(
     let storage_fee = u128::from(storage_usage_end.saturating_sub(initial_storage_usage))
         * env::storage_byte_cost();
 
-    let total_required_deposit = storage_fee + additional_fees;
+    let total_required_deposit = storage_fee.checked_add(additional_fees).unwrap_or_else(|| env::panic_str("Additional fees overflow"));
 
     let attached_deposit = env::attached_deposit();
 

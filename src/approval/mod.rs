@@ -196,7 +196,11 @@ where
             .is_account_authorized(&predecessor, &request)
             .map_err(|e| UnauthorizedAccountError(predecessor, e))?;
 
-        Self::slot_next_request_id().write(&(request_id + 1));
+        Self::slot_next_request_id().write(
+            &(request_id
+                .checked_add(1)
+                .unwrap_or_else(|| env::panic_str("Request ID overflow"))),
+        );
         Self::slot_request(request_id).write(&request);
 
         Ok(request_id)
