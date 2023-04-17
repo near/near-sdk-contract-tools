@@ -224,7 +224,7 @@ async fn delete_account() {
 }
 
 #[tokio::test]
-async fn create_account() {
+async fn create_account_transfer_deploy_contract_function_call() {
     let Setup {
         contract,
         accounts,
@@ -278,7 +278,7 @@ async fn create_account() {
 }
 
 #[tokio::test]
-async fn add_remove_key() {
+async fn add_both_access_key_kinds_and_delete() {
     let Setup {
         contract, accounts, ..
     } = setup_roles(sandbox().await.unwrap(), 2).await;
