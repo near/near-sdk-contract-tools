@@ -3,15 +3,17 @@
 /// Default storage keys used by various traits' `root()` functions.
 #[derive(Clone, Debug)]
 pub enum DefaultStorageKey {
-    /// Default storage key for [`approval::ApprovalManager::root`]
+    /// Default storage key for [`approval::ApprovalManagerInternal::root`]
     ApprovalManager,
-    /// Default storage key for [`standard::nep141::Nep141Controller::root`]
+    /// Default storage key for [`standard::nep141::Nep141ControllerInternal::root`]
     Nep141,
-    /// Default storage key for [`owner::Owner::root`]
+    /// Default storage key for [`standard::nep145::Nep145ControllerInternal::root`]
+    Nep145,
+    /// Default storage key for [`owner::OwnerInternal::root`]
     Owner,
-    /// Default storage key for [`pause::Pause::root`]
+    /// Default storage key for [`pause::PauseInternal::root`]
     Pause,
-    /// Default storage key for [`rbac::Rbac::root`]
+    /// Default storage key for [`rbac::RbacInternal::root`]
     Rbac,
 }
 
@@ -20,6 +22,7 @@ impl IntoStorageKey for DefaultStorageKey {
         match self {
             DefaultStorageKey::ApprovalManager => b"~am".to_vec(),
             DefaultStorageKey::Nep141 => b"~$141".to_vec(),
+            DefaultStorageKey::Nep145 => b"~$145".to_vec(),
             DefaultStorageKey::Owner => b"~o".to_vec(),
             DefaultStorageKey::Pause => b"~p".to_vec(),
             DefaultStorageKey::Rbac => b"~r".to_vec(),
