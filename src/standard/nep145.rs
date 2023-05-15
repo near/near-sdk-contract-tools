@@ -6,7 +6,7 @@ use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
     env, ext_contract,
     json_types::U128,
-    AccountId, BorshStorageKey,
+    AccountId, BorshStorageKey, Promise,
 };
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -95,6 +95,13 @@ pub struct MinimumBalanceUnderrunError {
 }
 
 #[derive(Debug, Error)]
+#[error("Account {account_id} must not exceed the maximum balance {}", maximum_balance.0)]
+pub struct MaximumBalanceOverrunError {
+    account_id: AccountId,
+    maximum_balance: U128,
+}
+
+#[derive(Debug, Error)]
 #[error("Account {account_id} cannot unregister with locked balance {} > 0", locked_balance.0)]
 pub struct UnregisterWithLockedBalanceError {
     account_id: AccountId,
@@ -121,6 +128,8 @@ pub enum StorageUnlockError {
 pub enum StorageDepositError {
     #[error(transparent)]
     MinimumBalanceUnderrun(#[from] MinimumBalanceUnderrunError),
+    #[error(transparent)]
+    MaximumBalanceOverrunError(#[from] MaximumBalanceOverrunError),
 }
 
 #[derive(Debug, Error)]
@@ -273,6 +282,16 @@ impl<T: Nep145ControllerInternal> Nep145Controller for T {
                 .into());
             }
 
+            if let Some(maximum_balance) = bounds.max {
+                if new_total > maximum_balance.0 {
+                    return Err(MaximumBalanceOverrunError {
+                        account_id: account_id.clone(),
+                        maximum_balance,
+                    }
+                    .into());
+                }
+            }
+
             new_total
         };
 
@@ -353,6 +372,91 @@ impl<T: Nep145ControllerInternal> Nep145Controller for T {
 
     fn storage_balance_bounds(&self) -> StorageBalanceBounds {
         Self::slot_balance_bounds().read().unwrap_or_default()
+    }
+}
+
+pub trait Nep145Hook {
+    fn on_force_unregister(&mut self, account_id: &AccountId, balance: &StorageBalance);
+}
+
+#[near_sdk::near_bindgen]
+struct Contract;
+
+impl Nep145ControllerInternal for Contract {}
+
+#[near_sdk::near_bindgen]
+impl Nep145 for Contract {
+    #[payable]
+    fn storage_deposit(
+        &mut self,
+        account_id: Option<AccountId>,
+        registration_only: Option<bool>,
+    ) -> StorageBalance {
+        let bounds = Nep145Controller::storage_balance_bounds(self);
+
+        let attached = env::attached_deposit();
+        let amount = if registration_only.unwrap_or(false) {
+            bounds.min.0
+        } else if let Some(U128(max)) = bounds.max {
+            u128::min(max, attached)
+        } else {
+            attached
+        };
+        let refund = attached.checked_sub(amount).unwrap_or_else(|| {
+            env::panic_str(&format!(
+                "Attached deposit {} is less than required {}",
+                attached, amount
+            ))
+        });
+        let predecessor = env::predecessor_account_id();
+
+        let storage_balance = Nep145Controller::storage_deposit(
+            self,
+            &account_id.unwrap_or_else(|| predecessor.clone()),
+            U128(amount),
+        )
+        .unwrap_or_else(|e| env::panic_str(&format!("Storage deposit error: {e}")));
+
+        if refund > 0 {
+            Promise::new(predecessor).transfer(amount);
+        }
+
+        storage_balance
+    }
+
+    #[payable]
+    fn storage_withdraw(&mut self, amount: Option<U128>) -> StorageBalance {
+        near_sdk::assert_one_yocto();
+
+        let predecessor = env::predecessor_account_id();
+
+        let balance = Nep145Controller::storage_balance(self, &predecessor)
+            .unwrap_or_else(|| env::panic_str("Account is not registered"));
+
+        let amount = amount.unwrap_or(balance.available);
+
+        if amount.0 == 0 {
+            return balance;
+        }
+
+        let new_balance = Nep145Controller::storage_withdraw(self, &predecessor, amount)
+            .unwrap_or_else(|e| env::panic_str(&format!("Storage withdraw error: {e}")));
+
+        Promise::new(predecessor).transfer(amount.0);
+
+        new_balance
+    }
+
+    fn storage_unregister(&mut self, force: Option<bool>) -> bool {
+        todo!()
+    }
+
+    fn storage_balance_of(&self, account_id: AccountId) -> Option<StorageBalance> {
+        todo!()
+    }
+
+    fn storage_balance_bounds(&self) -> StorageBalanceBounds {
+        todo!()
     }
 }
 
