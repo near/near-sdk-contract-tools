@@ -255,6 +255,10 @@ See [src/slot.rs](src/slot.rs) They are very thin wrappers over a storage key. I
 
 First, run `git config core.hooksPath hooks/` to install the hooks of this directory (without affecting how git hooks work for other projects).
 
+## Audit
+
+This library has been [audited](./documents/NEAR%20Contract%20Tools%20-%20Final%20-%2005.05.2023.pdf) by [Kudelski Security](https://www.kudelskisecurity.com/).
+
 ## Authors
 
 - Jacob Lindahl [@sudo_build](https://twitter.com/sudo_build)
