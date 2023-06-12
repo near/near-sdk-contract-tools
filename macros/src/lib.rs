@@ -68,7 +68,7 @@ where
 /// may occur, but it is _extremely unlikely_ if reasonable Rust naming
 /// conventions are followed.
 ///
-/// For example, both `"HelloWorld"` and `"hello_world"`, when
+/// For example, `"HelloWorld"`, `"hello_world"`, and `"hello__world"`, when
 /// snake-case-ified, are `"hello_world"`, so if you happened to name distinct
 /// events thusly, the transformed names would collide.
 #[proc_macro_derive(Nep297, attributes(nep297))]
