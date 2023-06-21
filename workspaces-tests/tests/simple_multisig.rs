@@ -1,24 +1,23 @@
 #![cfg(not(windows))]
 
 use near_sdk::serde_json::json;
-use workspaces::{prelude::*, Account, Contract, Network, Worker};
+use workspaces::{Account, Contract};
 
 const WASM: &[u8] =
     include_bytes!("../../target/wasm32-unknown-unknown/release/simple_multisig.wasm");
 
-struct Setup<N: Network> {
-    pub worker: Worker<N>,
+struct Setup {
     pub contract: Contract,
     pub accounts: Vec<Account>,
 }
 
 /// Setup for individual tests
-async fn setup(num_accounts: usize) -> Setup<impl Network> {
+async fn setup(num_accounts: usize) -> Setup {
     let worker = workspaces::sandbox().await.unwrap();
 
     // Initialize contract
     let contract = worker.dev_deploy(&WASM.to_vec()).await.unwrap();
-    contract.call(&worker, "new").transact().await.unwrap();
+    contract.call("new").transact().await.unwrap().unwrap();
 
     // Initialize user accounts
     let mut accounts = vec![];
@@ -26,21 +25,18 @@ async fn setup(num_accounts: usize) -> Setup<impl Network> {
         accounts.push(worker.dev_create_account().await.unwrap());
     }
 
-    Setup {
-        worker,
-        contract,
-        accounts,
-    }
+    Setup { contract, accounts }
 }
 
-async fn setup_roles(num_accounts: usize) -> Setup<impl Network> {
+async fn setup_roles(num_accounts: usize) -> Setup {
     let s = setup(num_accounts).await;
 
     for account in s.accounts[..s.accounts.len() - 1].iter() {
         account
-            .call(&s.worker, s.contract.id(), "obtain_multisig_permission")
+            .call(s.contract.id(), "obtain_multisig_permission")
             .transact()
             .await
+            .unwrap()
             .unwrap();
     }
 
@@ -49,20 +45,15 @@ async fn setup_roles(num_accounts: usize) -> Setup<impl Network> {
 
 #[tokio::test]
 async fn successful_request() {
-    let Setup {
-        worker,
-        contract,
-        accounts,
-    } = setup_roles(3).await;
+    let Setup { contract, accounts } = setup_roles(3).await;
 
     let alice = &accounts[0];
     let bob = &accounts[1];
     let charlie = &accounts[2];
 
     let request_id = alice
-        .call(&worker, contract.id(), "request")
+        .call(contract.id(), "request")
         .args_json(json!({"action": "hello"}))
-        .unwrap()
         .transact()
         .await
         .unwrap()
@@ -71,14 +62,8 @@ async fn successful_request() {
 
     let is_approved = || async {
         contract
-            .view(
-                &worker,
-                "is_approved",
-                json!({ "request_id": request_id })
-                    .to_string()
-                    .as_bytes()
-                    .to_vec(),
-            )
+            .view("is_approved")
+            .args_json(json!({ "request_id": request_id }))
             .await
             .unwrap()
             .json::<bool>()
@@ -88,38 +73,37 @@ async fn successful_request() {
     assert!(!is_approved().await);
 
     alice
-        .call(&worker, contract.id(), "approve")
+        .call(contract.id(), "approve")
         .args_json(json!({ "request_id": request_id }))
-        .unwrap()
         .transact()
         .await
+        .unwrap()
         .unwrap();
 
     assert!(!is_approved().await);
 
-    bob.call(&worker, contract.id(), "approve")
+    bob.call(contract.id(), "approve")
         .args_json(json!({ "request_id": request_id }))
-        .unwrap()
         .transact()
         .await
+        .unwrap()
         .unwrap();
 
     assert!(is_approved().await);
 
     charlie
-        .call(&worker, contract.id(), "approve")
+        .call(contract.id(), "approve")
         .args_json(json!({ "request_id": request_id }))
-        .unwrap()
         .transact()
         .await
+        .unwrap()
         .unwrap();
 
     assert!(is_approved().await);
 
     let exec_result = charlie
-        .call(&worker, contract.id(), "execute")
+        .call(contract.id(), "execute")
         .args_json(json!({ "request_id": request_id }))
-        .unwrap()
         .transact()
         .await
         .unwrap()
@@ -132,19 +116,14 @@ async fn successful_request() {
 #[tokio::test]
 #[should_panic = "UnauthorizedAccount"]
 async fn unauthorized_account() {
-    let Setup {
-        worker,
-        contract,
-        accounts,
-    } = setup_roles(3).await;
+    let Setup { contract, accounts } = setup_roles(3).await;
 
     let alice = &accounts[0];
     let unauthorized_account = &accounts[3];
 
     let request_id = alice
-        .call(&worker, contract.id(), "request")
+        .call(contract.id(), "request")
         .args_json(json!({"action": "hello"}))
-        .unwrap()
         .transact()
         .await
         .unwrap()
@@ -152,10 +131,10 @@ async fn unauthorized_account() {
         .unwrap();
 
     unauthorized_account
-        .call(&worker, contract.id(), "approve")
+        .call(contract.id(), "approve")
         .args_json(json!({ "request_id": request_id }))
-        .unwrap()
         .transact()
         .await
+        .unwrap()
         .unwrap();
 }

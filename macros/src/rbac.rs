@@ -3,8 +3,6 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::Expr;
 
-const DEFAULT_STORAGE_KEY: &str = r#"(b"~r" as &[u8])"#;
-
 #[derive(Debug, FromDeriveInput)]
 #[darling(attributes(rbac), supports(struct_named))]
 pub struct RbacMeta {
@@ -33,16 +31,19 @@ pub fn expand(meta: RbacMeta) -> Result<TokenStream, darling::Error> {
 
     let (imp, ty, wher) = generics.split_for_impl();
 
-    let storage_key =
-        storage_key.unwrap_or_else(|| syn::parse_str::<Expr>(DEFAULT_STORAGE_KEY).unwrap());
-
-    Ok(quote! {
-        impl #imp #me::rbac::Rbac for #ident #ty #wher {
-            type Role = #roles;
-
+    let root = storage_key.map(|storage_key| {
+        quote! {
             fn root() -> #me::slot::Slot<()> {
                 #me::slot::Slot::new(#storage_key)
             }
+        }
+    });
+
+    Ok(quote! {
+        impl #imp #me::rbac::RbacInternal for #ident #ty #wher {
+            type Role = #roles;
+
+            #root
         }
     })
 }

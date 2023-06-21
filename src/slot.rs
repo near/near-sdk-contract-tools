@@ -1,14 +1,15 @@
 //! Managed storage slots
 //!
-//! Makes it easier to avoid storing storage keys in storage itself, helping to
-//! reduce IO in a transaction and save on gas.
-
+//! Makes it easy to create and manage storage keys and avoid unnecessary
+//! writes to contract storage. This reduces transaction IO  and saves on gas.
 use std::marker::PhantomData;
 
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
     env, IntoStorageKey,
 };
+
+use crate::utils::prefix_key;
 
 /// A storage slot, composed of a storage location (key) and a data type
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug)]
@@ -31,7 +32,7 @@ impl Slot<()> {
 
 impl<T> Slot<T> {
     /// Creates a new [`Slot`] that controls the given storage key
-    pub fn new<K: IntoStorageKey>(key: K) -> Self {
+    pub fn new(key: impl IntoStorageKey) -> Self {
         Self {
             key: key.into_storage_key(),
             _marker: PhantomData,
@@ -40,18 +41,18 @@ impl<T> Slot<T> {
 
     /// Creates a new [`Slot`] that controls the given key namespaced (prefixed)
     /// by the parent key, to be used as a namespace for another subfield.
-    pub fn ns<K: IntoStorageKey>(&self, key: K) -> Slot<()> {
+    pub fn ns(&self, key: impl IntoStorageKey) -> Slot<()> {
         Slot {
-            key: [self.key.clone(), key.into_storage_key()].concat(),
+            key: prefix_key(&self.key, &key.into_storage_key()),
             _marker: PhantomData,
         }
     }
 
     /// Creates a new [`Slot`] that controls the given key namespaced (prefixed)
     /// by the parent key.
-    pub fn field<K: IntoStorageKey, U>(&self, key: K) -> Slot<U> {
+    pub fn field<U>(&self, key: impl IntoStorageKey) -> Slot<U> {
         Slot {
-            key: [self.key.clone(), key.into_storage_key()].concat(),
+            key: prefix_key(&self.key, &key.into_storage_key()),
             _marker: PhantomData,
         }
     }
@@ -62,8 +63,7 @@ impl<T> Slot<T> {
     /// # Warning
     ///
     /// If the data in the slot is not parsable into the new type, methods like
-    /// [`Slot::read`](struct.Slot.html#method.read) and
-    /// [`Slot::take`](struct.Slot.html#method.take) will panic.
+    /// [`Slot::read`] and [`Slot::take`] will panic.
     pub fn transmute<U>(&self) -> Slot<U> {
         Slot {
             key: self.key.clone(),

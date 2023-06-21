@@ -3,8 +3,6 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::Expr;
 
-const DEFAULT_STORAGE_KEY: &str = r#"(b"~o" as &[u8])"#;
-
 #[derive(Debug, FromDeriveInput)]
 #[darling(attributes(owner), supports(struct_named))]
 pub struct OwnerMeta {
@@ -32,42 +30,45 @@ pub fn expand(meta: OwnerMeta) -> Result<TokenStream, darling::Error> {
 
     let (imp, ty, wher) = generics.split_for_impl();
 
-    let storage_key =
-        storage_key.unwrap_or_else(|| syn::parse_str::<Expr>(DEFAULT_STORAGE_KEY).unwrap());
-
-    Ok(quote! {
-        impl #imp #me::owner::Owner for #ident #ty #wher {
+    let root = storage_key.map(|storage_key| {
+        quote! {
             fn root() -> #me::slot::Slot<()> {
                 #me::slot::Slot::root(#storage_key)
             }
+        }
+    });
+
+    Ok(quote! {
+        impl #imp #me::owner::OwnerInternal for #ident #ty #wher {
+            #root
         }
 
         #[#near_sdk::near_bindgen]
         impl #imp #me::owner::OwnerExternal for #ident #ty #wher {
             fn own_get_owner(&self) -> Option<#near_sdk::AccountId> {
-                <Self as #me::owner::Owner>::slot_owner().read()
+                <Self as #me::owner::OwnerInternal>::slot_owner().read()
             }
 
             fn own_get_proposed_owner(&self) -> Option<#near_sdk::AccountId> {
-                <Self as #me::owner::Owner>::slot_proposed_owner().read()
+                <Self as #me::owner::OwnerInternal>::slot_proposed_owner().read()
             }
 
             #[payable]
             fn own_renounce_owner(&mut self) {
                 #near_sdk::assert_one_yocto();
-                self.renounce_owner()
+                #me::owner::Owner::renounce_owner(self);
             }
 
             #[payable]
             fn own_propose_owner(&mut self, account_id: Option<#near_sdk::AccountId>) {
                 #near_sdk::assert_one_yocto();
-                self.propose_owner(account_id);
+                #me::owner::Owner::propose_owner(self, account_id);
             }
 
             #[payable]
             fn own_accept_owner(&mut self) {
                 #near_sdk::assert_one_yocto();
-                self.accept_owner();
+                #me::owner::Owner::accept_owner(self);
             }
         }
     })

@@ -5,8 +5,6 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::Expr;
 
-const DEFAULT_STORAGE_KEY: &str = r#"(b"~$141" as &[u8])"#;
-
 #[derive(Debug, FromDeriveInput)]
 #[darling(attributes(nep141), supports(struct_named))]
 pub struct Nep141Meta {
@@ -35,8 +33,13 @@ pub fn expand(meta: Nep141Meta) -> Result<TokenStream, darling::Error> {
 
     let (imp, ty, wher) = generics.split_for_impl();
 
-    let storage_key =
-        storage_key.unwrap_or_else(|| syn::parse_str::<Expr>(DEFAULT_STORAGE_KEY).unwrap());
+    let root = storage_key.map(|storage_key| {
+        quote! {
+            fn root() -> #me::slot::Slot<()> {
+                #me::slot::Slot::root(#storage_key)
+            }
+        }
+    });
 
     let before_transfer = no_hooks.is_present().not().then(|| {
         quote! {
@@ -51,10 +54,8 @@ pub fn expand(meta: Nep141Meta) -> Result<TokenStream, darling::Error> {
     });
 
     Ok(quote! {
-        impl #imp #me::standard::nep141::Nep141Controller for #ident #ty #wher {
-            fn root() -> #me::slot::Slot<()> {
-                #me::slot::Slot::root(#storage_key)
-            }
+        impl #imp #me::standard::nep141::Nep141ControllerInternal for #ident #ty #wher {
+            #root
         }
 
         #[#near_sdk::near_bindgen]
@@ -87,7 +88,13 @@ pub fn expand(meta: Nep141Meta) -> Result<TokenStream, darling::Error> {
 
                 #before_transfer
 
-                Nep141Controller::transfer(self, &sender_id, &receiver_id, amount, memo.as_deref());
+                Nep141Controller::transfer(
+                    self,
+                    sender_id.clone(),
+                    receiver_id.clone(),
+                    amount,
+                    memo,
+                );
 
                 #after_transfer
             }
@@ -119,7 +126,7 @@ pub fn expand(meta: Nep141Meta) -> Result<TokenStream, darling::Error> {
                     sender_id.clone(),
                     receiver_id.clone(),
                     amount,
-                    memo.as_deref(),
+                    memo,
                     msg.clone(),
                     #near_sdk::env::prepaid_gas(),
                 );
@@ -147,7 +154,12 @@ pub fn expand(meta: Nep141Meta) -> Result<TokenStream, darling::Error> {
                 receiver_id: #near_sdk::AccountId,
                 amount: #near_sdk::json_types::U128,
             ) -> #near_sdk::json_types::U128 {
-                #me::standard::nep141::Nep141Controller::resolve_transfer(self, sender_id, receiver_id, amount.into()).into()
+                #me::standard::nep141::Nep141Controller::resolve_transfer(
+                    self,
+                    sender_id,
+                    receiver_id,
+                    amount.into(),
+                ).into()
             }
         }
     })

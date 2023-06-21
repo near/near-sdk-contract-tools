@@ -3,8 +3,6 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::Expr;
 
-const DEFAULT_STORAGE_KEY: &str = r#"(b"~sm" as &[u8])"#;
-
 #[derive(Debug, FromDeriveInput)]
 #[darling(attributes(simple_multisig), supports(struct_named))]
 pub struct SimpleMultisigMeta {
@@ -35,18 +33,21 @@ pub fn expand(meta: SimpleMultisigMeta) -> Result<TokenStream, darling::Error> {
 
     let (imp, ty, wher) = generics.split_for_impl();
 
-    let storage_key =
-        storage_key.unwrap_or_else(|| syn::parse_str::<Expr>(DEFAULT_STORAGE_KEY).unwrap());
+    let root = storage_key.map(|storage_key| {
+        quote! {
+            fn root() -> #me::slot::Slot<()> {
+                #me::slot::Slot::root(#storage_key)
+            }
+        }
+    });
 
     Ok(quote! {
-        impl #imp #me::approval::ApprovalManager<
+        impl #imp #me::approval::ApprovalManagerInternal<
                 #action,
                 #me::approval::simple_multisig::ApprovalState,
                 #me::approval::simple_multisig::Configuration<Self>,
             > for #ident #ty #wher {
-            fn root() -> #me::slot::Slot<()> {
-                #me::slot::Slot::root(#storage_key)
-            }
+            #root
         }
 
         impl #imp #me::approval::simple_multisig::AccountAuthorizer for #ident #ty #wher {

@@ -1,14 +1,17 @@
 #![allow(missing_docs)]
 
-use near_contract_tools::{migrate::MigrateExternal, migrate::MigrateHook, Migrate};
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
     near_bindgen, PanicOnDefault,
 };
+use near_sdk_contract_tools::{
+    migrate::{MigrateExternal, MigrateHook},
+    Migrate,
+};
 
-pub fn main() {}
+pub fn main() {} // Ignore
 
-#[derive(BorshSerialize, BorshDeserialize, PanicOnDefault)]
+#[derive(BorshDeserialize)]
 pub struct ContractOld {
     pub foo: u32,
 }
@@ -33,10 +36,6 @@ impl ContractNew {
     #[init]
     pub fn new() -> Self {
         Self { bar: 0 }
-    }
-
-    pub fn decrement_bar(&mut self) {
-        self.bar -= 1;
     }
 
     pub fn get_bar(&self) -> u64 {

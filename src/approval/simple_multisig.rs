@@ -12,8 +12,8 @@ use thiserror::Error;
 
 use super::{ActionRequest, ApprovalConfiguration};
 
-/// An AccountAuthorizer gatekeeps which accounts are eligible to submit approvals
-/// to an ApprovalManager
+/// Check which accounts are eligible to submit approvals to an
+/// [ApprovalManager](super::ApprovalManager)
 pub trait AccountAuthorizer {
     /// Why can this account not be authorized?
     type AuthorizationError;
@@ -193,7 +193,7 @@ where
     }
 }
 
-/// Types used by near-contract-tools-macros
+/// Types used by near-sdk-contract-tools-macros
 pub mod macro_types {
     use thiserror::Error;
 
@@ -216,7 +216,7 @@ mod tests {
     use crate::{
         approval::{
             simple_multisig::{AccountAuthorizer, ApprovalState, Configuration},
-            ApprovalManager,
+            ApprovalManager, ApprovalManagerInternal,
         },
         rbac::Rbac,
         slot::Slot,
@@ -250,7 +250,7 @@ mod tests {
     #[near_bindgen]
     struct Contract {}
 
-    impl ApprovalManager<Action, ApprovalState, Configuration<Self>> for Contract {
+    impl ApprovalManagerInternal<Action, ApprovalState, Configuration<Self>> for Contract {
         fn root() -> Slot<()> {
             Slot::new(b"m")
         }
@@ -281,7 +281,7 @@ mod tests {
         }
 
         pub fn obtain_multisig_permission(&mut self) {
-            self.add_role(&env::predecessor_account_id(), &Role::Multisig);
+            self.add_role(env::predecessor_account_id(), &Role::Multisig);
         }
 
         pub fn create(&mut self, say_hello: bool) -> u32 {
@@ -291,9 +291,7 @@ mod tests {
                 Action::SayGoodbye
             };
 
-            let request_id = self.create_request(action, ApprovalState::new()).unwrap();
-
-            request_id
+            self.create_request(action, ApprovalState::new()).unwrap()
         }
 
         pub fn approve(&mut self, request_id: u32) {
@@ -373,7 +371,7 @@ mod tests {
 
         let mut context = VMContextBuilder::new();
         context
-            .predecessor_account_id(alice.clone())
+            .predecessor_account_id(alice)
             .block_timestamp(created_at + 10000);
         testing_env!(context.build());
 
@@ -401,7 +399,7 @@ mod tests {
 
         let mut context = VMContextBuilder::new();
         context
-            .predecessor_account_id(alice.clone())
+            .predecessor_account_id(alice)
             .block_timestamp(created_at + 9999);
         testing_env!(context.build());
 
@@ -430,7 +428,7 @@ mod tests {
 
         let mut context = VMContextBuilder::new();
         context
-            .predecessor_account_id(bob.clone())
+            .predecessor_account_id(bob)
             .block_timestamp(created_at + 10000);
         testing_env!(context.build());
 

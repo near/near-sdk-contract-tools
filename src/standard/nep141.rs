@@ -8,9 +8,10 @@ use near_sdk::{
     json_types::U128,
     require, AccountId, BorshStorageKey, Gas, Promise, PromiseOrValue, PromiseResult,
 };
+use near_sdk_contract_tools_macros::event;
 use serde::{Deserialize, Serialize};
 
-use crate::{slot::Slot, standard::nep297::*};
+use crate::{slot::Slot, standard::nep297::*, DefaultStorageKey};
 
 /// Gas value required for ft_resolve_transfer calls
 pub const GAS_FOR_RESOLVE_TRANSFER: Gas = Gas(5_000_000_000_000);
@@ -20,95 +21,81 @@ pub const GAS_FOR_FT_TRANSFER_CALL: Gas = Gas(25_000_000_000_000 + GAS_FOR_RESOL
 const MORE_GAS_FAIL_MESSAGE: &str = "More gas is required";
 
 /// NEP-141 standard events for minting, burning, and transferring tokens
+#[event(
+    crate = "crate",
+    macros = "crate",
+    serde = "serde",
+    standard = "nep141",
+    version = "1.0.0"
+)]
+#[derive(Debug, Clone)]
+pub enum Nep141Event {
+    /// Token mint event. Emitted when tokens are created and total_supply is
+    /// increased.
+    FtMint(Vec<event::FtMintData>),
+
+    /// Token transfer event. Emitted when tokens are transferred between two
+    /// accounts. No change to total_supply.
+    FtTransfer(Vec<event::FtTransferData>),
+
+    /// Token burn event. Emitted when tokens are burned (removed from supply).
+    /// Decrease in total_supply.
+    FtBurn(Vec<event::FtBurnData>),
+}
+
 pub mod event {
     use near_sdk::{json_types::U128, AccountId};
     use serde::Serialize;
 
-    use crate::event;
-
-    /// Token mint event. Emitted when tokens are created and total_supply is
-    /// increased.
-    #[event(
-        crate = "crate",
-        macros = "crate",
-        serde = "serde",
-        standard = "nep141",
-        version = "1.0.0"
-    )]
-    #[derive(Debug, Clone)]
-    pub struct FtMint<'a>(pub &'a [FtMintData<'a>]);
-
     /// Individual mint metadata
     #[derive(Serialize, Debug, Clone)]
-    pub struct FtMintData<'a> {
+    pub struct FtMintData {
         /// Address to which new tokens were minted
-        pub owner_id: &'a AccountId,
+        pub owner_id: AccountId,
         /// Amount of minted tokens
         pub amount: U128,
         /// Optional note
         #[serde(skip_serializing_if = "Option::is_none")]
-        pub memo: Option<&'a str>,
+        pub memo: Option<String>,
     }
-
-    /// Token transfer event. Emitted when tokens are transferred between two
-    /// accounts. No change to total_supply.
-    #[event(
-        crate = "crate",
-        macros = "crate",
-        serde = "serde",
-        standard = "nep141",
-        version = "1.0.0"
-    )]
-    #[derive(Debug, Clone)]
-    pub struct FtTransfer<'a>(pub &'a [FtTransferData<'a>]);
 
     /// Individual transfer metadata
     #[derive(Serialize, Debug, Clone)]
-    pub struct FtTransferData<'a> {
+    pub struct FtTransferData {
         /// Account ID of the sender
-        pub old_owner_id: &'a AccountId,
+        pub old_owner_id: AccountId,
         /// Account ID of the receiver
-        pub new_owner_id: &'a AccountId,
+        pub new_owner_id: AccountId,
         /// Amount of transferred tokens
         pub amount: U128,
         /// Optional note
         #[serde(skip_serializing_if = "Option::is_none")]
-        pub memo: Option<&'a str>,
+        pub memo: Option<String>,
     }
-
-    /// Token burn event. Emitted when tokens are burned (removed from supply).
-    /// Decrease in total_supply.
-    #[event(
-        crate = "crate",
-        macros = "crate",
-        serde = "serde",
-        standard = "nep141",
-        version = "1.0.0"
-    )]
-    #[derive(Debug, Clone)]
-    pub struct FtBurn<'a>(pub &'a [FtBurnData<'a>]);
 
     /// Individual burn metadata
     #[derive(Serialize, Debug, Clone)]
-    pub struct FtBurnData<'a> {
+    pub struct FtBurnData {
         /// Account ID from which tokens were burned
-        pub owner_id: &'a AccountId,
+        pub owner_id: AccountId,
         /// Amount of burned tokens
         pub amount: U128,
         /// Optional note
         #[serde(skip_serializing_if = "Option::is_none")]
-        pub memo: Option<&'a str>,
+        pub memo: Option<String>,
     }
 
     #[cfg(test)]
     mod tests {
-        use super::{super::Event, *};
+
+        use super::{super::Nep141Event, *};
+        use crate::standard::nep297::Event;
 
         #[test]
         fn mint() {
             assert_eq!(
-                FtMint(&[FtMintData {
-                    owner_id: &"foundation.near".parse().unwrap(),
+                Nep141Event::FtMint(vec![FtMintData {
+                    owner_id: "foundation.near".parse().unwrap(),
                     amount: 500u128.into(),
                     memo: None,
                 }])
@@ -120,16 +107,16 @@ pub mod event {
         #[test]
         fn transfer() {
             assert_eq!(
-                FtTransfer(&[
+                Nep141Event::FtTransfer(vec![
                     FtTransferData {
-                        old_owner_id: &"from.near".parse().unwrap(),
-                        new_owner_id: &"to.near".parse().unwrap(),
+                        old_owner_id: "from.near".parse().unwrap(),
+                        new_owner_id: "to.near".parse().unwrap(),
                         amount: 42u128.into(),
-                        memo: Some("hi hello bonjour"),
+                        memo: Some("hi hello bonjour".to_string()),
                     },
                     FtTransferData {
-                        old_owner_id: &"user1.near".parse().unwrap(),
-                        new_owner_id: &"user2.near".parse().unwrap(),
+                        old_owner_id: "user1.near".parse().unwrap(),
+                        new_owner_id: "user2.near".parse().unwrap(),
                         amount: 7500u128.into(),
                         memo: None
                     },
@@ -142,8 +129,8 @@ pub mod event {
         #[test]
         fn burn() {
             assert_eq!(
-                FtBurn(&[FtBurnData {
-                    owner_id: &"foundation.near".parse().unwrap(),
+                Nep141Event::FtBurn(vec![FtBurnData {
+                    owner_id: "foundation.near".parse().unwrap(),
                     amount: 100u128.into(),
                     memo: None,
                 }])
@@ -204,10 +191,12 @@ impl Nep141Transfer {
     }
 }
 
-/// Non-public implementations of functions for managing a fungible token.
-pub trait Nep141Controller {
+/// Internal functions for [`Nep141Controller`]. Using these methods may result in unexpected behavior.
+pub trait Nep141ControllerInternal {
     /// Root storage slot
-    fn root() -> Slot<()>;
+    fn root() -> Slot<()> {
+        Slot::new(DefaultStorageKey::Nep141)
+    }
 
     /// Slot for account data
     fn slot_account(account_id: &AccountId) -> Slot<u128> {
@@ -218,16 +207,15 @@ pub trait Nep141Controller {
     fn slot_total_supply() -> Slot<u128> {
         Self::root().field(StorageKey::TotalSupply)
     }
+}
 
+/// Non-public implementations of functions for managing a fungible token.
+pub trait Nep141Controller {
     /// Get the balance of an account. Returns 0 if the account does not exist.
-    fn balance_of(account_id: &AccountId) -> u128 {
-        Self::slot_account(account_id).read().unwrap_or(0)
-    }
+    fn balance_of(account_id: &AccountId) -> u128;
 
     /// Get the total circulating supply of the token.
-    fn total_supply() -> u128 {
-        Self::slot_total_supply().read().unwrap_or(0)
-    }
+    fn total_supply() -> u128;
 
     /// Removes tokens from an account and decreases total supply. No event
     /// emission.
@@ -236,6 +224,94 @@ pub trait Nep141Controller {
     ///
     /// Panics if the current balance of `account_id` is less than `amount` or
     /// if `total_supply` is less than `amount`.
+    fn withdraw_unchecked(&mut self, account_id: &AccountId, amount: u128);
+
+    /// Increases the token balance of an account. Updates total supply. No
+    /// event emission,
+    ///
+    /// # Panics
+    ///
+    /// Panics if the balance of `account_id` plus `amount` >= `u128::MAX`, or
+    /// if the total supply plus `amount` >= `u128::MAX`.
+    fn deposit_unchecked(&mut self, account_id: &AccountId, amount: u128);
+
+    /// Decreases the balance of `sender_account_id` by `amount` and increases
+    /// the balance of `receiver_account_id` by the same. No change to total
+    /// supply. No event emission.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the balance of `sender_account_id` < `amount` or if the
+    /// balance of `receiver_account_id` plus `amount` >= `u128::MAX`.
+    fn transfer_unchecked(
+        &mut self,
+        sender_account_id: &AccountId,
+        receiver_account_id: &AccountId,
+        amount: u128,
+    );
+
+    /// Performs an NEP-141 token transfer, with event emission.
+    ///
+    /// # Panics
+    ///
+    /// See: `Nep141Controller::transfer_unchecked`
+    fn transfer(
+        &mut self,
+        sender_account_id: AccountId,
+        receiver_account_id: AccountId,
+        amount: u128,
+        memo: Option<String>,
+    );
+
+    /// Performs an NEP-141 token mint, with event emission.
+    ///
+    /// # Panics
+    ///
+    /// See: `Nep141Controller::deposit_unchecked`
+    fn mint(&mut self, account_id: AccountId, amount: u128, memo: Option<String>);
+
+    /// Performs an NEP-141 token burn, with event emission.
+    ///
+    /// # Panics
+    ///
+    /// See: `Nep141Controller::withdraw_unchecked`
+    fn burn(&mut self, account_id: AccountId, amount: u128, memo: Option<String>);
+
+    /// Performs an NEP-141 token transfer call, with event emission.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `gas_allowance` < `GAS_FOR_FT_TRANSFER_CALL`.
+    ///
+    /// See also: `Nep141Controller::transfer`
+    fn transfer_call(
+        &mut self,
+        sender_account_id: AccountId,
+        receiver_account_id: AccountId,
+        amount: u128,
+        memo: Option<String>,
+        msg: String,
+        gas_allowance: Gas,
+    ) -> Promise;
+
+    /// Resolves an NEP-141 `ft_transfer_call` promise chain.
+    fn resolve_transfer(
+        &mut self,
+        sender_id: AccountId,
+        receiver_id: AccountId,
+        amount: u128,
+    ) -> u128;
+}
+
+impl<T: Nep141ControllerInternal> Nep141Controller for T {
+    fn balance_of(account_id: &AccountId) -> u128 {
+        Self::slot_account(account_id).read().unwrap_or(0)
+    }
+
+    fn total_supply() -> u128 {
+        Self::slot_total_supply().read().unwrap_or(0)
+    }
+
     fn withdraw_unchecked(&mut self, account_id: &AccountId, amount: u128) {
         if amount != 0 {
             let balance = Self::balance_of(account_id);
@@ -254,13 +330,6 @@ pub trait Nep141Controller {
         }
     }
 
-    /// Increases the token balance of an account. Updates total supply. No
-    /// event emission,
-    ///
-    /// # Panics
-    ///
-    /// Panics if the balance of `account_id` plus `amount` >= `u128::MAX`, or
-    /// if the total supply plus `amount` >= `u128::MAX`.
     fn deposit_unchecked(&mut self, account_id: &AccountId, amount: u128) {
         if amount != 0 {
             let balance = Self::balance_of(account_id);
@@ -279,14 +348,6 @@ pub trait Nep141Controller {
         }
     }
 
-    /// Decreases the balance of `sender_account_id` by `amount` and increases
-    /// the balance of `receiver_account_id` by the same. No change to total
-    /// supply. No event emission.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the balance of `sender_account_id` < `amount` or if the
-    /// balance of `receiver_account_id` plus `amount` >= `u128::MAX`.
     fn transfer_unchecked(
         &mut self,
         sender_account_id: &AccountId,
@@ -308,21 +369,16 @@ pub trait Nep141Controller {
         }
     }
 
-    /// Performs an NEP-141 token transfer, with event emission.
-    ///
-    /// # Panics
-    ///
-    /// See: `Nep141Controller::transfer_unchecked`
     fn transfer(
         &mut self,
-        sender_account_id: &AccountId,
-        receiver_account_id: &AccountId,
+        sender_account_id: AccountId,
+        receiver_account_id: AccountId,
         amount: u128,
-        memo: Option<&str>,
+        memo: Option<String>,
     ) {
-        self.transfer_unchecked(sender_account_id, receiver_account_id, amount);
+        self.transfer_unchecked(&sender_account_id, &receiver_account_id, amount);
 
-        event::FtTransfer(&[event::FtTransferData {
+        Nep141Event::FtTransfer(vec![event::FtTransferData {
             old_owner_id: sender_account_id,
             new_owner_id: receiver_account_id,
             amount: amount.into(),
@@ -331,15 +387,10 @@ pub trait Nep141Controller {
         .emit();
     }
 
-    /// Performs an NEP-141 token mint, with event emission.
-    ///
-    /// # Panics
-    ///
-    /// See: `Nep141Controller::deposit_unchecked`
-    fn mint(&mut self, account_id: &AccountId, amount: u128, memo: Option<&str>) {
-        self.deposit_unchecked(account_id, amount);
+    fn mint(&mut self, account_id: AccountId, amount: u128, memo: Option<String>) {
+        self.deposit_unchecked(&account_id, amount);
 
-        event::FtMint(&[event::FtMintData {
+        Nep141Event::FtMint(vec![event::FtMintData {
             owner_id: account_id,
             amount: amount.into(),
             memo,
@@ -347,15 +398,10 @@ pub trait Nep141Controller {
         .emit();
     }
 
-    /// Performs an NEP-141 token burn, with event emission.
-    ///
-    /// # Panics
-    ///
-    /// See: `Nep141Controller::withdraw_unchecked`
-    fn burn(&mut self, account_id: &AccountId, amount: u128, memo: Option<&str>) {
-        self.withdraw_unchecked(account_id, amount);
+    fn burn(&mut self, account_id: AccountId, amount: u128, memo: Option<String>) {
+        self.withdraw_unchecked(&account_id, amount);
 
-        event::FtBurn(&[event::FtBurnData {
+        Nep141Event::FtBurn(vec![event::FtBurnData {
             owner_id: account_id,
             amount: amount.into(),
             memo,
@@ -363,19 +409,12 @@ pub trait Nep141Controller {
         .emit();
     }
 
-    /// Performs an NEP-141 token transfer call, with event emission.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `gas_allowance` < `GAS_FOR_FT_TRANSFER_CALL`.
-    ///
-    /// See also: `Nep141Controller::transfer`
     fn transfer_call(
         &mut self,
         sender_account_id: AccountId,
         receiver_account_id: AccountId,
         amount: u128,
-        memo: Option<&str>,
+        memo: Option<String>,
         msg: String,
         gas_allowance: Gas,
     ) -> Promise {
@@ -384,7 +423,12 @@ pub trait Nep141Controller {
             MORE_GAS_FAIL_MESSAGE,
         );
 
-        self.transfer(&sender_account_id, &receiver_account_id, amount, memo);
+        self.transfer(
+            sender_account_id.clone(),
+            receiver_account_id.clone(),
+            amount,
+            memo,
+        );
 
         let receiver_gas = gas_allowance
             .0
@@ -402,7 +446,6 @@ pub trait Nep141Controller {
             )
     }
 
-    /// Resolves an NEP-141 `ft_transfer_call` promise chain.
     fn resolve_transfer(
         &mut self,
         sender_id: AccountId,
@@ -427,7 +470,7 @@ pub trait Nep141Controller {
             let receiver_balance = Self::balance_of(&receiver_id);
             if receiver_balance > 0 {
                 let refund_amount = std::cmp::min(receiver_balance, unused_amount);
-                self.transfer(&receiver_id, &sender_id, refund_amount, None);
+                self.transfer(receiver_id, sender_id, refund_amount, None);
                 refund_amount
             } else {
                 0

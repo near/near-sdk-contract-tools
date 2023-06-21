@@ -7,7 +7,7 @@ use near_sdk::{
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::slot::Slot;
+use crate::{slot::Slot, DefaultStorageKey};
 
 /// Error message emitted when the component is used before it is initialized
 pub const NOT_INITIALIZED: &str = "init must be called before use";
@@ -125,16 +125,17 @@ pub enum RemovalError<AuthErr, RemErr> {
     RemovalNotAllowed(RemErr),
 }
 
-/// Collection of action requests that manages their approval state and
-/// execution
-pub trait ApprovalManager<A, S, C>
+/// Internal functions for [`ApprovalManager`]. Using these methods may result in unexpected behavior.
+pub trait ApprovalManagerInternal<A, S, C>
 where
     A: Action<Self> + BorshSerialize + BorshDeserialize,
     S: BorshSerialize + BorshDeserialize + Serialize,
     C: ApprovalConfiguration<A, S> + BorshDeserialize + BorshSerialize,
 {
     /// Storage root
-    fn root() -> Slot<()>;
+    fn root() -> Slot<()> {
+        Slot::new(DefaultStorageKey::ApprovalManager)
+    }
 
     /// Because requests will be deleted from the requests collection,
     /// maintain a simple counter to guarantee unique IDs
@@ -147,26 +148,79 @@ where
         Self::root().field(ApprovalStorageKey::Config)
     }
 
+    /// Current list of pending action requests.
+    fn slot_request(request_id: u32) -> Slot<ActionRequest<A, S>> {
+        Self::root().field(ApprovalStorageKey::Request(request_id))
+    }
+}
+
+/// Collection of action requests that manages their approval state and
+/// execution
+pub trait ApprovalManager<A, S, C>
+where
+    A: Action<Self> + BorshSerialize + BorshDeserialize,
+    S: BorshSerialize + BorshDeserialize + Serialize,
+    C: ApprovalConfiguration<A, S> + BorshDeserialize + BorshSerialize,
+{
     /// Reads config from storage. Panics if the component has not been
     /// initialized.
+    fn get_config() -> C;
+
+    /// Get a request by ID
+    fn get_request(request_id: u32) -> Option<ActionRequest<A, S>>;
+
+    /// Must be called before using the Approval construct. Can only be called
+    /// once.
+    fn init(config: C);
+
+    /// Creates a new action request initialized with the given approval state
+    fn create_request(
+        &mut self,
+        action: A,
+        approval_state: S,
+    ) -> Result<u32, CreationError<C::AuthorizationError>>;
+
+    /// Executes an action request and removes it from the collection if the
+    /// approval state of the request is fulfilled.
+    fn execute_request(
+        &mut self,
+        request_id: u32,
+    ) -> Result<A::Output, ExecutionError<C::AuthorizationError, C::ExecutionEligibilityError>>;
+
+    /// Is the given request ID able to be executed if such a request were to
+    /// be initiated by an authorized account?
+    fn is_approved_for_execution(request_id: u32) -> Result<(), C::ExecutionEligibilityError>;
+
+    /// Tries to approve the action request designated by the given request ID
+    /// with the given arguments. Panics if the request ID does not exist.
+    fn approve_request(
+        &mut self,
+        request_id: u32,
+    ) -> Result<(), ApprovalError<C::AuthorizationError, C::ApprovalError>>;
+
+    /// Tries to remove the action request indicated by request_id.
+    fn remove_request(
+        &mut self,
+        request_id: u32,
+    ) -> Result<(), RemovalError<C::AuthorizationError, C::RemovalError>>;
+}
+
+impl<T: ApprovalManagerInternal<A, S, C>, A, S, C> ApprovalManager<A, S, C> for T
+where
+    A: Action<Self> + BorshSerialize + BorshDeserialize,
+    S: BorshSerialize + BorshDeserialize + Serialize,
+    C: ApprovalConfiguration<A, S> + BorshDeserialize + BorshSerialize,
+{
     fn get_config() -> C {
         Self::slot_config()
             .read()
             .unwrap_or_else(|| env::panic_str(NOT_INITIALIZED))
     }
 
-    /// Current list of pending action requests.
-    fn slot_request(request_id: u32) -> Slot<ActionRequest<A, S>> {
-        Self::root().field(ApprovalStorageKey::Request(request_id))
-    }
-
-    /// Get a request by ID
     fn get_request(request_id: u32) -> Option<ActionRequest<A, S>> {
         Self::slot_request(request_id).read()
     }
 
-    /// Must be called before using the Approval construct. Can only be called
-    /// once.
     fn init(config: C) {
         require!(
             Self::slot_config().swap(&config).is_none(),
@@ -174,7 +228,6 @@ where
         );
     }
 
-    /// Creates a new action request initialized with the given approval state
     fn create_request(
         &mut self,
         action: A,
@@ -200,8 +253,6 @@ where
         Ok(request_id)
     }
 
-    /// Executes an action request and removes it from the collection if the
-    /// approval state of the request is fulfilled.
     fn execute_request(
         &mut self,
         request_id: u32,
@@ -226,8 +277,6 @@ where
         Ok(result)
     }
 
-    /// Is the given request ID able to be executed if such a request were to
-    /// be initiated by an authorized account?
     fn is_approved_for_execution(request_id: u32) -> Result<(), C::ExecutionEligibilityError> {
         let request = Self::slot_request(request_id).read().unwrap();
 
@@ -235,8 +284,6 @@ where
         config.is_approved_for_execution(&request)
     }
 
-    /// Tries to approve the action request designated by the given request ID
-    /// with the given arguments. Panics if the request ID does not exist.
     fn approve_request(
         &mut self,
         request_id: u32,
@@ -260,7 +307,6 @@ where
         Ok(())
     }
 
-    /// Tries to remove the action request indicated by request_id.
     fn remove_request(
         &mut self,
         request_id: u32,
@@ -287,18 +333,20 @@ where
 
 #[cfg(test)]
 mod tests {
-    use near_contract_tools_macros::Rbac;
     use near_sdk::{
         borsh::{self, BorshDeserialize, BorshSerialize},
         near_bindgen,
         test_utils::VMContextBuilder,
         testing_env, AccountId, BorshStorageKey,
     };
+    use near_sdk_contract_tools_macros::Rbac;
     use serde::Serialize;
 
     use crate::{rbac::Rbac, slot::Slot};
 
-    use super::{Action, ActionRequest, ApprovalConfiguration, ApprovalManager};
+    use super::{
+        Action, ActionRequest, ApprovalConfiguration, ApprovalManager, ApprovalManagerInternal,
+    };
 
     #[derive(BorshSerialize, BorshStorageKey)]
     enum Role {
@@ -345,7 +393,7 @@ mod tests {
         }
     }
 
-    impl ApprovalManager<MyAction, MultisigApprovalState, MultisigConfig> for Contract {
+    impl ApprovalManagerInternal<MyAction, MultisigApprovalState, MultisigConfig> for Contract {
         fn root() -> Slot<()> {
             Slot::new(b"a")
         }
@@ -439,9 +487,9 @@ mod tests {
 
         let mut contract = Contract::new(2);
 
-        contract.add_role(&alice, &Role::Multisig);
-        contract.add_role(&bob, &Role::Multisig);
-        contract.add_role(&charlie, &Role::Multisig);
+        contract.add_role(alice.clone(), &Role::Multisig);
+        contract.add_role(bob, &Role::Multisig);
+        contract.add_role(charlie.clone(), &Role::Multisig);
 
         predecessor(&alice);
         let request_id = contract
@@ -470,7 +518,7 @@ mod tests {
 
         let mut contract = Contract::new(2);
 
-        contract.add_role(&alice, &Role::Multisig);
+        contract.add_role(alice.clone(), &Role::Multisig);
 
         predecessor(&alice);
         let request_id = contract
@@ -489,7 +537,7 @@ mod tests {
 
         let mut contract = Contract::new(2);
 
-        contract.add_role(&alice, &Role::Multisig);
+        contract.add_role(alice.clone(), &Role::Multisig);
 
         predecessor(&alice);
 
@@ -509,8 +557,8 @@ mod tests {
 
         let mut contract = Contract::new(2);
 
-        contract.add_role(&alice, &Role::Multisig);
-        contract.add_role(&bob, &Role::Multisig);
+        contract.add_role(alice.clone(), &Role::Multisig);
+        contract.add_role(bob.clone(), &Role::Multisig);
 
         predecessor(&alice);
 
@@ -533,9 +581,9 @@ mod tests {
 
         let mut contract = Contract::new(2);
 
-        contract.add_role(&alice, &Role::Multisig);
-        contract.add_role(&bob, &Role::Multisig);
-        contract.add_role(&charlie, &Role::Multisig);
+        contract.add_role(alice.clone(), &Role::Multisig);
+        contract.add_role(bob.clone(), &Role::Multisig);
+        contract.add_role(charlie.clone(), &Role::Multisig);
 
         predecessor(&alice);
         let request_id = contract
