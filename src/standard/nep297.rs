@@ -72,5 +72,3 @@ pub struct EventLog<T> {
     /// Data type of the event metadata
     pub data: T,
 }
-
-pub trait EventConsumer<I, E> {}

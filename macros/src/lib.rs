@@ -147,6 +147,11 @@ pub fn derive_fungible_token(input: TokenStream) -> TokenStream {
     make_derive(input, standard::fungible_token::expand)
 }
 
+#[proc_macro_derive(Nep171, attributes(nep171))]
+pub fn derive_nep171(input: TokenStream) -> TokenStream {
+    make_derive(input, standard::nep171::expand)
+}
+
 /// Migrate a contract's default struct from one schema to another.
 ///
 /// Fields may be specified in the `#[migrate(...)]` attribute.
