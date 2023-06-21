@@ -18,7 +18,7 @@ pub mod event {
         standard = "nep171",
         version = "1.0.0",
         crate = "crate",
-        macros = "near_contract_tools_macros"
+        macros = "near_sdk_contract_tools_macros"
     )]
     #[derive(Debug, Clone)]
     pub struct NftMint(pub Vec<NftMintData>);
@@ -35,7 +35,7 @@ pub mod event {
         standard = "nep171",
         version = "1.0.0",
         crate = "crate",
-        macros = "near_contract_tools_macros"
+        macros = "near_sdk_contract_tools_macros"
     )]
     #[derive(Debug, Clone)]
     pub struct NftTransfer(pub Vec<NftTransferData>);
@@ -55,7 +55,7 @@ pub mod event {
         standard = "nep171",
         version = "1.0.0",
         crate = "crate",
-        macros = "near_contract_tools_macros"
+        macros = "near_sdk_contract_tools_macros"
     )]
     #[derive(Debug, Clone)]
     pub struct NftBurn(pub Vec<NftBurnData>);
