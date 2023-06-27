@@ -22,28 +22,31 @@ impl near_sdk_contract_tools::standard::nep171::Nep171Resolver for NonFungibleTo
         token_id: near_sdk_contract_tools::standard::nep171::TokenId,
         _approved_account_ids: Option<std::collections::HashMap<near_sdk::AccountId, u64>>,
     ) -> bool {
-        // Get whether token should be returned
-        let must_revert =
+        near_sdk::require!(
+            near_sdk::env::promise_results_count() == 1,
+            "Requires exactly one promise result.",
+        );
+
+        let should_revert =
             if let near_sdk::PromiseResult::Successful(value) = near_sdk::env::promise_result(0) {
                 near_sdk::serde_json::from_slice::<bool>(&value).unwrap_or(true)
             } else {
                 true
             };
 
-        // if call succeeded, return early
-        if !must_revert {
-            return true;
+        if should_revert {
+            near_sdk_contract_tools::standard::nep171::Nep171Controller::transfer(
+                self,
+                token_id,
+                receiver_id.clone(),
+                receiver_id,
+                previous_owner_id,
+                None,
+            )
+            .is_err()
+        } else {
+            true
         }
-
-        near_sdk_contract_tools::standard::nep171::Nep171Controller::transfer(
-            self,
-            token_id,
-            receiver_id.clone(),
-            receiver_id,
-            previous_owner_id,
-            None,
-        )
-        .is_err()
     }
 }
 
