@@ -1,5 +1,3 @@
-// use ;
-
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk_contract_tools::slot::Slot;
 
@@ -14,6 +12,42 @@ impl near_sdk_contract_tools::standard::nep171::Nep171ControllerInternal for Non
     }
 }
 
+#[near_sdk::near_bindgen]
+impl near_sdk_contract_tools::standard::nep171::Nep171Resolver for NonFungibleToken {
+    #[private]
+    fn nft_resolve_transfer(
+        &mut self,
+        previous_owner_id: near_sdk::AccountId,
+        receiver_id: near_sdk::AccountId,
+        token_id: near_sdk_contract_tools::standard::nep171::TokenId,
+        _approved_account_ids: Option<std::collections::HashMap<near_sdk::AccountId, u64>>,
+    ) -> bool {
+        // Get whether token should be returned
+        let must_revert =
+            if let near_sdk::PromiseResult::Successful(value) = near_sdk::env::promise_result(0) {
+                near_sdk::serde_json::from_slice::<bool>(&value).unwrap_or(true)
+            } else {
+                true
+            };
+
+        // if call succeeded, return early
+        if !must_revert {
+            return true;
+        }
+
+        near_sdk_contract_tools::standard::nep171::Nep171Controller::transfer(
+            self,
+            token_id,
+            receiver_id.clone(),
+            receiver_id,
+            previous_owner_id,
+            None,
+        )
+        .is_err()
+    }
+}
+
+#[near_sdk::near_bindgen]
 impl near_sdk_contract_tools::standard::nep171::Nep171 for NonFungibleToken {
     fn nft_transfer(
         &mut self,
@@ -33,7 +67,15 @@ impl near_sdk_contract_tools::standard::nep171::Nep171 for NonFungibleToken {
 
         let sender_id = near_sdk::env::predecessor_account_id();
 
-        Nep171Controller::transfer(self, token_id, sender_id, receiver_id, memo).unwrap();
+        Nep171Controller::transfer(
+            self,
+            token_id,
+            sender_id.clone(),
+            sender_id,
+            receiver_id,
+            memo,
+        )
+        .unwrap();
     }
 
     fn nft_transfer_call(
@@ -48,7 +90,7 @@ impl near_sdk_contract_tools::standard::nep171::Nep171 for NonFungibleToken {
 
         near_sdk::require!(
             approval_id.is_none(),
-            APPROVAL_MANAGEMENT_NOT_SUPPORTED_MESSAGE
+            APPROVAL_MANAGEMENT_NOT_SUPPORTED_MESSAGE,
         );
 
         near_sdk::assert_one_yocto();
@@ -64,6 +106,7 @@ impl near_sdk_contract_tools::standard::nep171::Nep171 for NonFungibleToken {
             self,
             token_id.clone(),
             sender_id.clone(),
+            sender_id.clone(),
             receiver_id.clone(),
             memo,
         )
@@ -78,7 +121,7 @@ impl near_sdk_contract_tools::standard::nep171::Nep171 for NonFungibleToken {
                 msg,
             )
             .then(
-                ext_nep171::ext(near_sdk::env::current_account_id())
+                ext_nep171_resolver::ext(near_sdk::env::current_account_id())
                     .with_static_gas(GAS_FOR_RESOLVE_TRANSFER)
                     .nft_resolve_transfer(sender_id, receiver_id, token_id, None),
             )
@@ -91,18 +134,7 @@ impl near_sdk_contract_tools::standard::nep171::Nep171 for NonFungibleToken {
     ) -> Option<near_sdk_contract_tools::standard::nep171::Token> {
         use near_sdk_contract_tools::standard::nep171::*;
 
-        Nep171Controller::token_owner(self, token_id.clone()).map(|owner_id| Token {
-            token_id,
-            owner_id,
-        })
-    }
-
-    fn nft_resolve_transfer(
-        previous_owner_id: near_sdk::AccountId,
-        receiver_id: near_sdk::AccountId,
-        token_id: String,
-        approved_account_ids: Option<std::collections::HashMap<String, u64>>,
-    ) -> bool {
-        todo!()
+        Nep171Controller::token_owner(self, token_id.clone())
+            .map(|owner_id| Token { token_id, owner_id })
     }
 }
