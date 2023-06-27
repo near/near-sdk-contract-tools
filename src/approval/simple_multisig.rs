@@ -193,7 +193,7 @@ where
     }
 }
 
-/// Types used by near-contract-tools-macros
+/// Types used by near-sdk-contract-tools-macros
 pub mod macro_types {
     use thiserror::Error;
 
@@ -216,7 +216,7 @@ mod tests {
     use crate::{
         approval::{
             simple_multisig::{AccountAuthorizer, ApprovalState, Configuration},
-            ApprovalManager,
+            ApprovalManager, ApprovalManagerInternal,
         },
         rbac::Rbac,
         slot::Slot,
@@ -250,7 +250,7 @@ mod tests {
     #[near_bindgen]
     struct Contract {}
 
-    impl ApprovalManager<Action, ApprovalState, Configuration<Self>> for Contract {
+    impl ApprovalManagerInternal<Action, ApprovalState, Configuration<Self>> for Contract {
         fn root() -> Slot<()> {
             Slot::new(b"m")
         }

@@ -1,10 +1,10 @@
-use near_contract_tools::{
-    pause::{Pause, PauseExternal},
-    Pause,
-};
 use near_sdk::{
     borsh::{self, BorshSerialize},
     near_bindgen, BorshStorageKey,
+};
+use near_sdk_contract_tools::{
+    pause::{Pause, PauseExternal},
+    Pause,
 };
 
 #[derive(BorshSerialize, BorshStorageKey)]

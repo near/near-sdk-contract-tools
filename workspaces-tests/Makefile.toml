@@ -1,22 +1,20 @@
 [tasks.build]
 clear = true
 script = """
+rustup target add wasm32-unknown-unknown
 cargo build --target wasm32-unknown-unknown --release --all
 """
 
 [tasks.test]
 clear = true
+dependencies = ["build"]
 script = """
 #!/usr/bin/env bash
 set -e
 
 if [[ -n $1 ]]; then
-    # a test may depend on more than one contract and we don't have a nice way of declaring that yet
-    # cargo build --target wasm32-unknown-unknown --release --bin "$1"
-    cargo build --target wasm32-unknown-unknown --release --all
-    cargo test --package workspaces-tests --test "$1" -- --nocapture
+    cargo test --package workspaces-tests --test "$1" "$2" -- --nocapture
 else
-    cargo build --target wasm32-unknown-unknown --release --all
     cargo test
 fi
 """

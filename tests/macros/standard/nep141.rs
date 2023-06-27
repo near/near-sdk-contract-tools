@@ -1,4 +1,3 @@
-use near_contract_tools::{standard::nep141::*, Nep141};
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
     collections::Vector,
@@ -8,6 +7,7 @@ use near_sdk::{
     test_utils::VMContextBuilder,
     testing_env, AccountId, PromiseOrValue,
 };
+use near_sdk_contract_tools::{standard::nep141::*, Nep141};
 
 #[derive(Nep141, BorshDeserialize, BorshSerialize)]
 #[near_bindgen]
@@ -45,7 +45,7 @@ struct FungibleTokenReceiver {
     pub log: Vector<(String, u128)>,
 }
 
-impl near_contract_tools::standard::nep141::Nep141Receiver for FungibleTokenReceiver {
+impl near_sdk_contract_tools::standard::nep141::Nep141Receiver for FungibleTokenReceiver {
     fn ft_on_transfer(
         &mut self,
         sender_id: AccountId,

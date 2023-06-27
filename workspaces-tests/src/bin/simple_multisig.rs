@@ -5,19 +5,19 @@ pub fn main() {}
 
 use std::fmt::Display;
 
-use near_contract_tools::{
+use near_sdk::{
+    borsh::{self, BorshDeserialize, BorshSerialize},
+    env, near_bindgen, AccountId, BorshStorageKey, PanicOnDefault,
+};
+use near_sdk_contract_tools::{
     approval::{
         self,
         simple_multisig::{AccountAuthorizer, ApprovalState, Configuration},
-        ApprovalManager,
+        ApprovalManager, ApprovalManagerInternal,
     },
     rbac::Rbac,
     slot::Slot,
     Rbac,
-};
-use near_sdk::{
-    borsh::{self, BorshDeserialize, BorshSerialize},
-    env, near_bindgen, AccountId, BorshStorageKey, PanicOnDefault,
 };
 use thiserror::Error;
 
@@ -55,7 +55,7 @@ pub struct Contract {}
 
 // This single function implementation completely implements simple multisig on
 // the contract
-impl ApprovalManager<MyAction, ApprovalState, Configuration<Self>> for Contract {
+impl ApprovalManagerInternal<MyAction, ApprovalState, Configuration<Self>> for Contract {
     fn root() -> Slot<()> {
         Slot::new(StorageKey::SimpleMultisig)
     }

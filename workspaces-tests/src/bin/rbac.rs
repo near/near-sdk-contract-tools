@@ -2,7 +2,7 @@
 
 use std::str::FromStr;
 
-use near_contract_tools::{rbac::Rbac, Rbac};
+use near_sdk_contract_tools::{rbac::Rbac, Rbac};
 
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},

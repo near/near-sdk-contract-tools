@@ -1,10 +1,10 @@
-use near_contract_tools::{
-    migrate::{MigrateExternal, MigrateHook},
-    Migrate,
-};
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
     env, near_bindgen,
+};
+use near_sdk_contract_tools::{
+    migrate::{MigrateExternal, MigrateHook},
+    Migrate,
 };
 
 #[derive(BorshDeserialize, BorshSerialize, Debug)]

@@ -9,6 +9,8 @@ use near_sdk::{
     env, IntoStorageKey,
 };
 
+use crate::utils::prefix_key;
+
 /// A storage slot, composed of a storage location (key) and a data type
 #[derive(BorshSerialize, BorshDeserialize, Clone, Debug)]
 pub struct Slot<T> {
@@ -41,7 +43,7 @@ impl<T> Slot<T> {
     /// by the parent key, to be used as a namespace for another subfield.
     pub fn ns(&self, key: impl IntoStorageKey) -> Slot<()> {
         Slot {
-            key: [self.key.clone(), key.into_storage_key()].concat(),
+            key: prefix_key(&self.key, &key.into_storage_key()),
             _marker: PhantomData,
         }
     }
@@ -50,7 +52,7 @@ impl<T> Slot<T> {
     /// by the parent key.
     pub fn field<U>(&self, key: impl IntoStorageKey) -> Slot<U> {
         Slot {
-            key: [self.key.clone(), key.into_storage_key()].concat(),
+            key: prefix_key(&self.key, &key.into_storage_key()),
             _marker: PhantomData,
         }
     }

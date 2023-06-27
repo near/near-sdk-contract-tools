@@ -8,13 +8,8 @@ const WASM: &[u8] =
 
 async fn balance(contract: &Contract, account: &AccountId) -> u128 {
     contract
-        .view(
-            "ft_balance_of",
-            json!({ "account_id": account })
-                .to_string()
-                .as_bytes()
-                .to_vec(),
-        )
+        .view("ft_balance_of")
+        .args_json(json!({ "account_id": account }))
         .await
         .unwrap()
         .json::<U128>()

@@ -32,7 +32,7 @@ impl FromMeta for HookBody {
                 .and_then(|s| syn::parse_str::<Expr>(s.as_str()).ok())
                 .map(|e| HookBody::Role(Box::new(e)))
                 .ok_or_else(|| {
-                    darling::Error::custom(&format!(
+                    darling::Error::custom(format!(
                         r#"Invalid value "{value}", expected "empty", "owner", or "role(...)""#,
                     ))
                 })
@@ -51,7 +51,7 @@ impl FromMeta for Serializer {
         match value {
             "borsh" => Ok(Self::Borsh),
             "jsonbase64" => Ok(Self::JsonBase64),
-            _ => Err(darling::Error::custom(&format!(
+            _ => Err(darling::Error::custom(format!(
                 r#"Invalid value "{value}", expected "borsh" or "jsonbase64""#
             ))),
         }

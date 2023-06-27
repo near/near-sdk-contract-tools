@@ -4,7 +4,7 @@
 
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
-    json_types::{U128, U64},
+    json_types::{Base64VecU8, U128, U64},
     AccountId, Gas, Promise,
 };
 use serde::{Deserialize, Serialize};
@@ -19,14 +19,14 @@ pub enum PromiseAction {
     /// Native DEPLOY_CONTRACT action
     DeployContract {
         /// WASM binary blob
-        code: Vec<u8>,
+        code: Base64VecU8,
     },
     /// Native FUNCTION_CALL action
     FunctionCall {
         /// Name of function to call on receiver
         function_name: String,
         /// Function input (optional)
-        arguments: Vec<u8>,
+        arguments: Base64VecU8,
         /// Attached deposit
         amount: U128,
         /// Attached gas
@@ -114,15 +114,18 @@ impl<C> super::Action<C> for NativeTransactionAction {
                         nonce.map(Into::into).unwrap_or(0),
                     ),
                 PromiseAction::CreateAccount => promise.create_account(),
-                PromiseAction::DeployContract { code } => promise.deploy_contract(code),
+                PromiseAction::DeployContract { code } => promise.deploy_contract(code.0),
                 PromiseAction::FunctionCall {
                     function_name,
                     arguments,
                     amount,
                     gas,
-                } => {
-                    promise.function_call(function_name, arguments, amount.into(), Gas(gas.into()))
-                }
+                } => promise.function_call(
+                    function_name,
+                    arguments.0,
+                    amount.into(),
+                    Gas(gas.into()),
+                ),
                 PromiseAction::Transfer { amount } => promise.transfer(amount.into()),
                 PromiseAction::Stake { amount, public_key } => {
                     promise.stake(amount.into(), public_key.parse().unwrap())

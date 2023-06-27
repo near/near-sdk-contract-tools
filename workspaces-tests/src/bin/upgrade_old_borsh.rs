@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
 
-use near_contract_tools::{
+use near_sdk_contract_tools::{
     owner::{Owner, OwnerExternal},
     Owner, Upgrade,
 };

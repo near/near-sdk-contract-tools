@@ -6,6 +6,9 @@ publish = false
 version = "0.1.0"
 
 [[bin]]
+name = "basic_adder"
+
+[[bin]]
 name = "counter_multisig"
 
 [[bin]]
@@ -22,6 +25,9 @@ name = "rbac"
 
 [[bin]]
 name = "simple_multisig"
+
+[[bin]]
+name = "storage_fee"
 
 [[bin]]
 name = "upgrade_bad"
@@ -42,14 +48,15 @@ name = "upgrade_old_multisig"
 name = "upgrade_old_raw"
 
 [dependencies]
-near-contract-tools = {path = "../", features = ["unstable"]}
-near-sdk = { version = "4.1.1", default-features = false }
+near-sdk = {version = "4.1.1", default-features = false}
+near-sdk-contract-tools = {path = "../", features = ["unstable"]}
 strum = "0.24.1"
 strum_macros = "0.24.3"
 thiserror = "1.0.34"
 
 [dev-dependencies]
+near-crypto = "0.15.0"
 tokio = "1.21.1"
 
 [target.'cfg(not(windows))'.dev-dependencies]
-workspaces = "0.6"
+workspaces = "0.7"

@@ -39,7 +39,7 @@ pub fn expand(meta: PauseMeta) -> Result<TokenStream, darling::Error> {
     });
 
     Ok(quote! {
-        impl #imp #me::pause::Pause for #ident #ty #wher {
+        impl #imp #me::pause::PauseInternal for #ident #ty #wher {
             #root
         }
 

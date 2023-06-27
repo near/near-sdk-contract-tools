@@ -1,16 +1,16 @@
-use near_contract_tools::{
+use near_sdk::{
+    borsh::{self, BorshDeserialize, BorshSerialize},
+    env, near_bindgen,
+    test_utils::VMContextBuilder,
+    testing_env, AccountId, BorshStorageKey,
+};
+use near_sdk_contract_tools::{
     migrate::{MigrateExternal, MigrateHook},
     owner::Owner,
     pause::Pause,
     rbac::Rbac,
     standard::nep297::Event,
     Migrate, Owner, Pause, Rbac,
-};
-use near_sdk::{
-    borsh::{self, BorshDeserialize, BorshSerialize},
-    env, near_bindgen,
-    test_utils::VMContextBuilder,
-    testing_env, AccountId, BorshStorageKey,
 };
 
 mod event;
@@ -20,8 +20,8 @@ mod pause;
 mod standard;
 
 mod my_event {
-    use near_contract_tools::Nep297;
     use near_sdk::AccountId;
+    use near_sdk_contract_tools::Nep297;
     use serde::Serialize;
 
     #[derive(Serialize, Nep297)]
@@ -353,16 +353,16 @@ fn integration_fail_migrate_paused() {
 
 #[cfg(test)]
 mod pausable_fungible_token {
-    use near_contract_tools::{
-        pause::Pause,
-        standard::nep141::{Nep141, Nep141Controller, Nep141Hook, Nep141Transfer},
-        FungibleToken, Pause,
-    };
     use near_sdk::{
         borsh::{self, BorshDeserialize, BorshSerialize},
         env, near_bindgen,
         test_utils::VMContextBuilder,
         testing_env, AccountId,
+    };
+    use near_sdk_contract_tools::{
+        pause::Pause,
+        standard::nep141::{Nep141, Nep141Controller, Nep141Hook, Nep141Transfer},
+        FungibleToken, Pause,
     };
 
     #[derive(FungibleToken, Pause, BorshDeserialize, BorshSerialize)]

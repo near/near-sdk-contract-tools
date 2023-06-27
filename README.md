@@ -1,6 +1,4 @@
-# This package will be renamed to [`near-sdk-contract-tools`](https://crates.io/crates/near-sdk-contract-tools)
-
-# near-contract-tools
+# near-sdk-contract-tools
 
 > Helpful functions and macros for developing smart contracts on NEAR Protocol.
 
@@ -17,15 +15,17 @@ Not to be confused with [`near-contract-standards`](https://crates.io/crates/nea
 
 **WARNING:** This is still early software, and there may be breaking changes between versions. I'll try my best to keep the docs & changelogs up-to-date. Don't hesitate to create an issue if find anything wrong.
 
+(Formerly known as [`near-contract-tools`](https://crates.io/crates/near-contract-tools).)
+
 ## Benefits
 
 - requires fewer lines of code
-  - Without near-contract-tools, implementing fungible token events (mint, transfer, and burn) takes ~100 lines of code. Using near-contract-tools, you can [implement them in ~40 lines](https://youtu.be/kJzes_UP5j0?t=1058).
+  - Without near-sdk-contract-tools, implementing fungible token events (mint, transfer, and burn) takes ~100 lines of code. Using near-sdk-contract-tools, you can [implement them in ~40 lines](https://youtu.be/kJzes_UP5j0?t=1058).
 - is more readable
 - follows a consistent pattern
   - Every time you use the events macro, it will [implement events in the same way](https://youtu.be/kJzes_UP5j0?t=1150). Without it, you’d need to ensure that `emit`, `emit_many`, etc all work (and work the same).
 - is more thorough
-  - near-contract-standards is also not implementing traits, so that’s another improvement that near-contract-tools offers.
+  - near-contract-standards is also not implementing traits, so that’s another improvement that near-sdk-contract-tools offers.
 
 You can think of this collection of common tools and patterns (mostly in the form of [derive macros](https://doc.rust-lang.org/reference/procedural-macros.html#derive-macros)) as sort of an OpenZeppelin for NEAR.
 
@@ -34,7 +34,7 @@ You can think of this collection of common tools and patterns (mostly in the for
 ```text
 rustup target add wasm32-unknown-unknown
 cargo init
-cargo add near-contract-tools
+cargo add near-sdk-contract-tools
 cargo add near-sdk
 # https://raen.dev/guide/intro/getting-set-up.html
 cargo install raen
@@ -80,7 +80,7 @@ See also: [the full integration tests](tests/macros/mod.rs).
 
 ```rust
 use near_sdk::{near_bindgen, AccountId};
-use near_contract_tools::{owner::Owner, Owner};
+use near_sdk_contract_tools::{owner::Owner, Owner};
 
 #[derive(Owner)]
 #[near_bindgen]
@@ -124,7 +124,7 @@ fn own_accept_owner(&mut self);
 The `#[event]` macro can be applied to structs or enums.
 
 ```rust
-use near_contract_tools::{event, standard::nep297::Event};
+use near_sdk_contract_tools::{event, standard::nep297::Event};
 
 #[event(standard = "nft", version = "1.0.0")]
 pub struct MintEvent {
@@ -146,7 +146,7 @@ e.emit();
 To create a contract that is compatible with the NEP-141 and NEP-148 standards, that emits standard-compliant (NEP-141, NEP-297) events.
 
 ```rust
-use near_contract_tools::FungibleToken;
+use near_sdk_contract_tools::FungibleToken;
 use near_sdk::near_bindgen;
 
 #[derive(FungibleToken)]
@@ -169,7 +169,7 @@ Standalone macros for each individual standard also exist.
 One may wish to combine the features of multiple macros in one contract. All of the macros are written such that they will work in a standalone manner, so this should largely work without issue. However, sometimes it may be desirable for the macros to work in _combination_ with each other. For example, to make a fungible token pausable, use the fungible token hooks to require that a contract be unpaused before making a token transfer:
 
 ```rust
-use near_contract_tools::{
+use near_sdk_contract_tools::{
     pause::Pause,
     standard::nep141::{Nep141Hook, Nep141Transfer},
     FungibleToken, Pause,
@@ -192,13 +192,13 @@ Note: Hooks can be disabled using `#[nep141(no_hooks)]` or `#[fungible_token(no_
 
 ### Custom Crates
 
-If you are a library developer, have modified a crate that one of the `near-contract-tools` macros uses (like `serde` or `near-sdk`), or are otherwise using a crate under a different name, you can specify crate names in macros like so:
+If you are a library developer, have modified a crate that one of the `near-sdk-contract-tools` macros uses (like `serde` or `near-sdk`), or are otherwise using a crate under a different name, you can specify crate names in macros like so:
 
 ```rust, ignore
 #[event(
     // ...
-    crate = "near_contract_tools",
-    macros = "near_contract_tools_macros",
+    crate = "near_sdk_contract_tools",
+    macros = "near_sdk_contract_tools_macros",
     serde = "serde",
 )]
 // ...
@@ -254,6 +254,10 @@ See [src/slot.rs](src/slot.rs) They are very thin wrappers over a storage key. I
 ### Getting Started
 
 First, run `git config core.hooksPath hooks/` to install the hooks of this directory (without affecting how git hooks work for other projects).
+
+## Audit
+
+This library has been [audited](./documents/NEAR%20Contract%20Tools%20-%20Final%20-%2005.05.2023.pdf) by [Kudelski Security](https://www.kudelskisecurity.com/).
 
 ## Authors
 

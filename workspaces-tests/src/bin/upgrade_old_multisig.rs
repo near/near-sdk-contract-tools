@@ -1,11 +1,5 @@
 #![allow(missing_docs)]
 pub fn main() {}
-use near_contract_tools::{
-    approval::{self, ApprovalManager},
-    owner::{Owner, OwnerExternal},
-    rbac::Rbac,
-    Owner, Rbac, SimpleMultisig, Upgrade,
-};
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
     env,
@@ -13,6 +7,12 @@ use near_sdk::{
     near_bindgen,
     serde::{Deserialize, Serialize},
     BorshStorageKey, PanicOnDefault,
+};
+use near_sdk_contract_tools::{
+    approval::{self, ApprovalManager},
+    owner::{Owner, OwnerExternal},
+    rbac::Rbac,
+    Owner, Rbac, SimpleMultisig, Upgrade,
 };
 
 #[derive(BorshStorageKey, BorshSerialize, Debug, Clone)]

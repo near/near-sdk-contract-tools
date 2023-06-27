@@ -7,22 +7,30 @@ use near_sdk::{env, require, Promise};
 /// # Examples
 ///
 /// ```
-/// use near_contract_tools::utils::prefix_key;
+/// use near_sdk_contract_tools::utils::prefix_key;
 ///
-/// assert_eq!(prefix_key(b"p", b"key"), b"pkey".to_vec());
+/// assert_eq!(prefix_key(b"p", b"key"), b"pkey");
 /// ```
-pub fn prefix_key(prefix: &dyn AsRef<[u8]>, key: &dyn AsRef<[u8]>) -> Vec<u8> {
-    [prefix.as_ref(), key.as_ref()].concat()
+pub fn prefix_key(prefix: &[u8], key: &[u8]) -> Vec<u8> {
+    [prefix, key].concat()
 }
 
 /// Calculates the storage fee of an action, given an initial storage amount,
 /// and refunds the predecessor a portion of the attached deposit if necessary.
 /// Returns refund Promise if refund was applied.
 ///
+/// # Warning
+///
+/// New collections (those in `near_sdk::store`) cache writes, only applying
+/// state changes on drop. However, this function only accounts for actual
+/// changes to storage usage. You can force writes (allowing this function to
+/// detect storage changes) by calling `.flush()` on `near_sdk::store::*`
+/// collections.
+///
 /// # Examples
 ///
 /// ```
-/// use near_contract_tools::utils::apply_storage_fee_and_refund;
+/// use near_sdk_contract_tools::utils::apply_storage_fee_and_refund;
 ///
 /// let initial_storage_usage = near_sdk::env::storage_usage();
 /// let additional_fees = 0;
@@ -47,7 +55,9 @@ pub fn apply_storage_fee_and_refund(
     let storage_fee = u128::from(storage_usage_end.saturating_sub(initial_storage_usage))
         * env::storage_byte_cost();
 
-    let total_required_deposit = storage_fee + additional_fees;
+    let total_required_deposit = storage_fee
+        .checked_add(additional_fees)
+        .expect("Required deposit overflows u128");
 
     let attached_deposit = env::attached_deposit();
 
@@ -65,5 +75,20 @@ pub fn apply_storage_fee_and_refund(
         Some(Promise::new(env::predecessor_account_id()).transfer(refund))
     } else {
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::prefix_key;
+
+    #[test]
+    fn test_prefix_key() {
+        assert_eq!(prefix_key(b"a", b"b"), b"ab");
+        assert_eq!(prefix_key("a".as_ref(), "b".as_ref()), b"ab");
+        assert_eq!(prefix_key("a".as_ref(), b"b"), b"ab");
+        assert_eq!(prefix_key(&[], "abc".as_ref()), b"abc");
+        assert_eq!(prefix_key(&[], b""), [0u8; 0]);
+        assert_eq!(prefix_key("abc".as_ref(), b""), b"abc");
     }
 }

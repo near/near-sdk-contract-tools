@@ -23,10 +23,8 @@ use super::PostUpgrade;
 ///
 /// # Safety
 ///
-/// If the `source` is `RawUpgradeSource::FatPointer`, the `length` and
-/// `pointer` fields must be valid values to pass into
-/// `near_sys::promise_batch_action_deploy_contract` (i.e. pointer to a valid
-/// WASM blob or a register descriptor).
+/// Requires that `near_sdk::env::input()` contains the plain, raw bytes of a
+/// valid WebAssembly smart contract.
 pub unsafe fn upgrade(post_upgrade: PostUpgrade) {
     // Create a promise batch
     let promise_id = sys::promise_batch_create(

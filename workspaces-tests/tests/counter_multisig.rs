@@ -71,13 +71,9 @@ async fn success() {
     let request_id = create_request(alice, "request_increment").await;
 
     let is_approved = |request_id: u32| {
-        let view = contract.view(
-            "is_approved",
-            json!({ "request_id": request_id })
-                .to_string()
-                .as_bytes()
-                .to_vec(),
-        );
+        let view = contract
+            .view("is_approved")
+            .args_json(json!({ "request_id": request_id }));
         async move { view.await.unwrap().json::<bool>().unwrap() }
     };
 
@@ -109,7 +105,7 @@ async fn success() {
 
     let get_counter = || async {
         contract
-            .view("get_counter", vec![])
+            .view("get_counter")
             .await
             .unwrap()
             .json::<u32>()

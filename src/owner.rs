@@ -15,7 +15,7 @@
 //!
 //! The pattern consists of methods in [`Owner`] and [`OwnerExternal`]. The
 //! latter exposes methods externally and can be called by other contracts.
-//! This [derive macro](near_contract_tools_macros::Owner)
+//! This [derive macro](near_sdk_contract_tools_macros::Owner)
 //! derives default implementation both these traits.
 //!
 //! # Safety
@@ -32,11 +32,11 @@
 //!   respective [`Owner`] methods and expect the same invariants.
 #![allow(missing_docs)] // #[ext_contract(...)] does not play nicely with clippy
 
-use near_contract_tools_macros::event;
 use near_sdk::{
     borsh::{self, BorshSerialize},
     env, ext_contract, require, AccountId, BorshStorageKey,
 };
+use near_sdk_contract_tools_macros::event;
 
 use crate::{slot::Slot, standard::nep297::Event, DefaultStorageKey};
 
@@ -51,7 +51,7 @@ const NO_PROPOSED_OWNER_FAIL_MESSAGE: &str = "No proposed owner";
     standard = "x-own",
     version = "1.0.0",
     crate = "crate",
-    macros = "near_contract_tools_macros"
+    macros = "near_sdk_contract_tools_macros"
 )]
 #[derive(Debug, Clone)]
 pub enum OwnerEvent {
@@ -78,8 +78,8 @@ enum StorageKey {
     ProposedOwner,
 }
 
-/// A contract with an owner
-pub trait Owner {
+/// Internal functions for [`Owner`]. Using these methods may result in unexpected behavior.
+pub trait OwnerInternal {
     /// Storage root
     fn root() -> Slot<()> {
         Slot::new(DefaultStorageKey::Owner)
@@ -99,58 +99,24 @@ pub trait Owner {
     fn slot_proposed_owner() -> Slot<AccountId> {
         Self::root().field(StorageKey::ProposedOwner)
     }
+}
 
+/// A contract with an owner
+pub trait Owner {
     /// Updates the current owner and emits relevant event
-    fn update_owner(&mut self, new: Option<AccountId>) {
-        let owner = Self::slot_owner();
-        let old = owner.read();
-        if old != new {
-            OwnerEvent::Transfer {
-                old,
-                new: new.clone(),
-            }
-            .emit();
-            self.update_owner_unchecked(new);
-        }
-    }
+    fn update_owner(&mut self, new: Option<AccountId>);
 
     /// Updates proposed owner and emits relevant event
-    fn update_proposed(&mut self, new: Option<AccountId>) {
-        let proposed_owner = Self::slot_proposed_owner();
-        let old = proposed_owner.read();
-        if old != new {
-            OwnerEvent::Propose {
-                old,
-                new: new.clone(),
-            }
-            .emit();
-            self.update_proposed_unchecked(new);
-        }
-    }
+    fn update_proposed(&mut self, new: Option<AccountId>);
 
     /// Updates the current owner without any checks or emitting events
-    fn update_owner_unchecked(&mut self, new: Option<AccountId>) {
-        let mut owner = Self::slot_owner();
-        owner.set(new.as_ref());
-    }
+    fn update_owner_unchecked(&mut self, new: Option<AccountId>);
 
     /// Updates proposed owner without any checks or emitting events
-    fn update_proposed_unchecked(&mut self, new: Option<AccountId>) {
-        let mut proposed_owner = Self::slot_proposed_owner();
-        proposed_owner.set(new.as_ref());
-    }
+    fn update_proposed_unchecked(&mut self, new: Option<AccountId>);
 
     /// Same as require_owner but as a method
-    fn assert_owner(&self) {
-        require!(
-            &env::predecessor_account_id()
-                == Self::slot_owner()
-                    .read()
-                    .as_ref()
-                    .unwrap_or_else(|| env::panic_str(NO_OWNER_FAIL_MESSAGE)),
-            ONLY_OWNER_FAIL_MESSAGE,
-        );
-    }
+    fn assert_owner(&self);
 
     /// Initializes the contract owner. Can only be called once.
     ///
@@ -160,7 +126,7 @@ pub trait Owner {
     ///
     /// ```
     /// use near_sdk::{AccountId, near_bindgen};
-    /// use near_contract_tools::{Owner, owner::Owner};
+    /// use near_sdk_contract_tools::{Owner, owner::Owner};
     ///
     /// #[derive(Owner)]
     /// #[near_bindgen]
@@ -177,6 +143,102 @@ pub trait Owner {
     ///     }
     /// }
     /// ```
+    fn init(&mut self, owner_id: &AccountId);
+
+    /// Requires the predecessor to be the owner
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use near_sdk::{AccountId, near_bindgen};
+    /// use near_sdk_contract_tools::{Owner, owner::Owner};
+    ///
+    /// #[derive(Owner)]
+    /// #[near_bindgen]
+    /// struct Contract {}
+    ///
+    /// #[near_bindgen]
+    /// impl Contract {
+    ///     pub fn owner_only(&self) {
+    ///         Self::require_owner();
+    ///
+    ///         // ...
+    ///     }
+    /// }
+    /// ```
+    fn require_owner();
+
+    /// Removes the contract's owner. Can only be called by the current owner.
+    ///
+    /// Emits an `OwnerEvent::Transfer` event, and an `OwnerEvent::Propose`
+    /// event if there is a currently proposed owner.
+    fn renounce_owner(&mut self);
+
+    /// Prepares the contract to change owners, setting the proposed owner to
+    /// the provided account ID. Can only be called by the current owner.
+    ///
+    /// Emits an `OwnerEvent::Propose` event.
+    ///
+    /// The currently proposed owner may be reset by calling this function with
+    /// the argument `None`.
+    fn propose_owner(&mut self, account_id: Option<AccountId>);
+
+    /// Sets new owner equal to proposed owner. Can only be called by proposed
+    /// owner.
+    ///
+    /// Emits events corresponding to the transfer of ownership and reset of the
+    /// proposed owner.
+    fn accept_owner(&mut self);
+}
+
+impl<T: OwnerInternal> Owner for T {
+    fn update_owner(&mut self, new: Option<AccountId>) {
+        let owner = Self::slot_owner();
+        let old = owner.read();
+        if old != new {
+            OwnerEvent::Transfer {
+                old,
+                new: new.clone(),
+            }
+            .emit();
+            self.update_owner_unchecked(new);
+        }
+    }
+
+    fn update_proposed(&mut self, new: Option<AccountId>) {
+        let proposed_owner = Self::slot_proposed_owner();
+        let old = proposed_owner.read();
+        if old != new {
+            OwnerEvent::Propose {
+                old,
+                new: new.clone(),
+            }
+            .emit();
+            self.update_proposed_unchecked(new);
+        }
+    }
+
+    fn update_owner_unchecked(&mut self, new: Option<AccountId>) {
+        let mut owner = Self::slot_owner();
+        owner.set(new.as_ref());
+    }
+
+    fn update_proposed_unchecked(&mut self, new: Option<AccountId>) {
+        let mut proposed_owner = Self::slot_proposed_owner();
+        proposed_owner.set(new.as_ref());
+    }
+
+    fn assert_owner(&self) {
+        require!(
+            &env::predecessor_account_id()
+                == Self::slot_owner()
+                    .read()
+                    .as_ref()
+                    .unwrap_or_else(|| env::panic_str(NO_OWNER_FAIL_MESSAGE)),
+            ONLY_OWNER_FAIL_MESSAGE,
+        );
+    }
+
     fn init(&mut self, owner_id: &AccountId) {
         require!(
             !Self::slot_is_initialized().exists(),
@@ -193,27 +255,6 @@ pub trait Owner {
         .emit();
     }
 
-    /// Requires the predecessor to be the owner
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use near_sdk::{AccountId, near_bindgen};
-    /// use near_contract_tools::{Owner, owner::Owner};
-    ///
-    /// #[derive(Owner)]
-    /// #[near_bindgen]
-    /// struct Contract {}
-    ///
-    /// #[near_bindgen]
-    /// impl Contract {
-    ///     pub fn owner_only(&self) {
-    ///         Self::require_owner();
-    ///
-    ///         // ...
-    ///     }
-    /// }
-    /// ```
     fn require_owner() {
         require!(
             &env::predecessor_account_id()
@@ -225,10 +266,6 @@ pub trait Owner {
         );
     }
 
-    /// Removes the contract's owner. Can only be called by the current owner.
-    ///
-    /// Emits an `OwnerEvent::Transfer` event, and an `OwnerEvent::Propose`
-    /// event if there is a currently proposed owner.
     fn renounce_owner(&mut self) {
         Self::require_owner();
 
@@ -236,24 +273,12 @@ pub trait Owner {
         self.update_owner(None);
     }
 
-    /// Prepares the contract to change owners, setting the proposed owner to
-    /// the provided account ID. Can only be called by the current owner.
-    ///
-    /// Emits an `OwnerEvent::Propose` event.
-    ///
-    /// The currently proposed owner may be reset by calling this function with
-    /// the argument `None`.
     fn propose_owner(&mut self, account_id: Option<AccountId>) {
         Self::require_owner();
 
         self.update_proposed(account_id);
     }
 
-    /// Sets new owner equal to proposed owner. Can only be called by proposed
-    /// owner.
-    ///
-    /// Emits events corresponding to the transfer of ownership and reset of the
-    /// proposed owner.
     fn accept_owner(&mut self) {
         let proposed_owner = Self::slot_proposed_owner()
             .take()
