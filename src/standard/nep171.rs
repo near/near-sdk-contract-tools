@@ -8,7 +8,7 @@ use near_sdk_contract_tools_macros::event;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::slot::Slot;
+use crate::{slot::Slot, DefaultStorageKey};
 
 use super::nep297::Event;
 
@@ -110,7 +110,9 @@ pub trait Nep171Extension<T> {
 }
 
 pub trait Nep171ControllerInternal {
-    fn root() -> Slot<()>;
+    fn root() -> Slot<()> {
+        Slot::root(DefaultStorageKey::Nep171)
+    }
 
     fn slot_token_owner(token_id: TokenId) -> Slot<AccountId> {
         Self::root().field(StorageKey::TokenOwner(token_id))
@@ -136,8 +138,12 @@ pub trait Nep171Controller {
 
 /// Transfer metadata generic over both types of transfer (`nft_transfer` and
 /// `nft_transfer_call`).
-#[derive(Serialize, Deserialize, BorshSerialize, BorshDeserialize, PartialEq, Eq, Clone, Debug)]
+#[derive(
+    Serialize, Deserialize, BorshSerialize, BorshDeserialize, PartialEq, Eq, Clone, Debug, Hash,
+)]
 pub struct Nep171Transfer {
+    /// Current owner account ID.
+    pub owner_id: AccountId,
     /// Sending account ID.
     pub sender_id: AccountId,
     /// Receiving account ID.
@@ -167,7 +173,7 @@ pub trait Nep171Hook<T = ()> {
     /// Executed after a token transfer is conducted.
     ///
     /// Receives the state value returned by `before_transfer`.
-    fn after_transfer(&mut self, _transfer: &Nep171Transfer, _state: T) {}
+    fn after_transfer(&mut self, _transfer: &Nep171Transfer, _state: T);
 }
 
 impl<T: Nep171ControllerInternal> Nep171Controller for T {

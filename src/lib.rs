@@ -1,5 +1,8 @@
 #![doc = include_str!("../README.md")]
 
+use near_sdk::IntoStorageKey;
+pub use near_sdk_contract_tools_macros::*;
+
 /// Default storage keys used by various traits' `root()` functions.
 #[derive(Clone, Debug)]
 pub enum DefaultStorageKey {
@@ -7,6 +10,8 @@ pub enum DefaultStorageKey {
     ApprovalManager,
     /// Default storage key for [`standard::nep141::Nep141Controller::root`]
     Nep141,
+    /// Default storage key for [`standard::nep171::Nep171Controller::root`]
+    Nep171,
     /// Default storage key for [`owner::Owner::root`]
     Owner,
     /// Default storage key for [`pause::Pause::root`]
@@ -20,6 +25,7 @@ impl IntoStorageKey for DefaultStorageKey {
         match self {
             DefaultStorageKey::ApprovalManager => b"~am".to_vec(),
             DefaultStorageKey::Nep141 => b"~$141".to_vec(),
+            DefaultStorageKey::Nep171 => b"~$171".to_vec(),
             DefaultStorageKey::Owner => b"~o".to_vec(),
             DefaultStorageKey::Pause => b"~p".to_vec(),
             DefaultStorageKey::Rbac => b"~r".to_vec(),
@@ -37,6 +43,3 @@ pub mod rbac;
 pub mod slot;
 pub mod upgrade;
 pub mod utils;
-
-use near_sdk::IntoStorageKey;
-pub use near_sdk_contract_tools_macros::*;

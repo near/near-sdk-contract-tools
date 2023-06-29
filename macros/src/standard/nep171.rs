@@ -59,30 +59,87 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
         }
 
         #[#near_sdk::near_bindgen]
+        impl #imp #me::standard::nep171::Nep171Resolver for #ident #ty #wher {
+            #[private]
+            fn nft_resolve_transfer(
+                &mut self,
+                previous_owner_id: #near_sdk::AccountId,
+                receiver_id: #near_sdk::AccountId,
+                token_id: #me::standard::nep171::TokenId,
+                approved_account_ids: Option<std::collections::HashMap<#near_sdk::AccountId, u64>>,
+            ) -> bool {
+                let _ = approved_account_ids; // #[near_bindgen] cares about parameter names
+
+                #near_sdk::require!(
+                    #near_sdk::env::promise_results_count() == 1,
+                    "Requires exactly one promise result.",
+                );
+
+                let should_revert =
+                    if let #near_sdk::PromiseResult::Successful(value) = #near_sdk::env::promise_result(0) {
+                        #near_sdk::serde_json::from_slice::<bool>(&value).unwrap_or(true)
+                    } else {
+                        true
+                    };
+
+                if should_revert {
+                    let transfer = #me::standard::nep171::Nep171Transfer {
+                        token_id: token_id.clone(),
+                        owner_id: receiver_id.clone(),
+                        sender_id: receiver_id.clone(),
+                        receiver_id: previous_owner_id.clone(),
+                        approval_id: None,
+                        memo: None,
+                        msg: None,
+                    };
+
+                    #before_transfer
+
+                    let result = #me::standard::nep171::Nep171Controller::transfer(
+                        self,
+                        token_id,
+                        receiver_id.clone(),
+                        receiver_id,
+                        previous_owner_id,
+                        None,
+                    )
+                    .is_err();
+
+                    #after_transfer
+
+                    result
+                } else {
+                    true
+                }
+            }
+        }
+
+        #[#near_sdk::near_bindgen]
         impl #imp #me::standard::nep171::Nep171 for #ident #ty #wher {
-            #[payable]
             fn nft_transfer(
                 &mut self,
                 receiver_id: #near_sdk::AccountId,
-                token_id: String,
+                token_id: #me::standard::nep171::TokenId,
                 approval_id: Option<u64>,
                 memo: Option<String>,
             ) {
-                use #me::{
-                    standard::{
-                        nep171::{Nep171Controller, event},
-                        nep297::Event,
-                    },
-                };
+                use #me::standard::nep171::*;
+
+                #near_sdk::require!(
+                    approval_id.is_none(),
+                    APPROVAL_MANAGEMENT_NOT_SUPPORTED_MESSAGE,
+                );
 
                 #near_sdk::assert_one_yocto();
+
                 let sender_id = #near_sdk::env::predecessor_account_id();
-                let amount: u128 = amount.into();
 
                 let transfer = #me::standard::nep171::Nep171Transfer {
+                    token_id: token_id.clone(),
+                    owner_id: sender_id.clone(),
                     sender_id: sender_id.clone(),
                     receiver_id: receiver_id.clone(),
-                    amount,
+                    approval_id: None,
                     memo: memo.clone(),
                     msg: None,
                 };
@@ -91,76 +148,89 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
 
                 Nep171Controller::transfer(
                     self,
+                    token_id,
                     sender_id.clone(),
-                    receiver_id.clone(),
-                    amount,
+                    sender_id,
+                    receiver_id,
                     memo,
-                );
+                )
+                .unwrap();
 
                 #after_transfer
             }
 
-            #[payable]
-            fn ft_transfer_call(
+            fn nft_transfer_call(
                 &mut self,
                 receiver_id: #near_sdk::AccountId,
-                amount: #near_sdk::json_types::U128,
+                token_id: #me::standard::nep171::TokenId,
+                approval_id: Option<u64>,
                 memo: Option<String>,
                 msg: String,
-            ) -> #near_sdk::Promise {
+            ) -> #near_sdk::PromiseOrValue<bool> {
+                use #me::standard::nep171::*;
+
+                #near_sdk::require!(
+                    approval_id.is_none(),
+                    APPROVAL_MANAGEMENT_NOT_SUPPORTED_MESSAGE,
+                );
+
                 #near_sdk::assert_one_yocto();
+
+                #near_sdk::require!(
+                    #near_sdk::env::prepaid_gas() > GAS_FOR_NFT_TRANSFER_CALL,
+                    INSUFFICIENT_GAS_MESSAGE,
+                );
+
                 let sender_id = #near_sdk::env::predecessor_account_id();
-                let amount: u128 = amount.into();
 
                 let transfer = #me::standard::nep171::Nep171Transfer {
+                    token_id: token_id.clone(),
+                    owner_id: sender_id.clone(),
                     sender_id: sender_id.clone(),
                     receiver_id: receiver_id.clone(),
-                    amount,
+                    approval_id: None,
                     memo: memo.clone(),
-                    msg: None,
+                    msg: Some(msg.clone()),
                 };
 
                 #before_transfer
 
-                let r = #me::standard::nep171::Nep171Controller::transfer_call(
+                Nep171Controller::transfer(
                     self,
+                    token_id.clone(),
+                    sender_id.clone(),
                     sender_id.clone(),
                     receiver_id.clone(),
-                    amount,
                     memo,
-                    msg.clone(),
-                    #near_sdk::env::prepaid_gas(),
-                );
+                )
+                .unwrap();
 
                 #after_transfer
 
-                r
+                ext_nep171_receiver::ext(receiver_id.clone())
+                    .with_static_gas(#near_sdk::env::prepaid_gas() - GAS_FOR_NFT_TRANSFER_CALL)
+                    .nft_on_transfer(
+                        sender_id.clone(),
+                        receiver_id.clone(),
+                        token_id.clone(),
+                        msg,
+                    )
+                    .then(
+                        ext_nep171_resolver::ext(#near_sdk::env::current_account_id())
+                            .with_static_gas(GAS_FOR_RESOLVE_TRANSFER)
+                            .nft_resolve_transfer(sender_id, receiver_id, token_id, None),
+                    )
+                    .into()
             }
 
-            fn ft_total_supply(&self) -> #near_sdk::json_types::U128 {
-                <Self as #me::standard::nep171::Nep171Controller>::total_supply().into()
-            }
+            fn nft_token(
+                &self,
+                token_id: #me::standard::nep171::TokenId,
+            ) -> Option<#me::standard::nep171::Token> {
+                use #me::standard::nep171::*;
 
-            fn ft_balance_of(&self, account_id: #near_sdk::AccountId) -> #near_sdk::json_types::U128 {
-                <Self as #me::standard::nep171::Nep171Controller>::balance_of(&account_id).into()
-            }
-        }
-
-        #[#near_sdk::near_bindgen]
-        impl #imp #me::standard::nep171::Nep171Resolver for #ident #ty #wher {
-            #[private]
-            fn ft_resolve_transfer(
-                &mut self,
-                sender_id: #near_sdk::AccountId,
-                receiver_id: #near_sdk::AccountId,
-                amount: #near_sdk::json_types::U128,
-            ) -> #near_sdk::json_types::U128 {
-                #me::standard::nep171::Nep171Controller::resolve_transfer(
-                    self,
-                    sender_id,
-                    receiver_id,
-                    amount.into(),
-                ).into()
+                Nep171Controller::token_owner(self, token_id.clone())
+                    .map(|owner_id| Token { token_id, owner_id })
             }
         }
     })
