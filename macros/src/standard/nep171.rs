@@ -41,15 +41,15 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
         }
     });
 
-    let before_transfer = no_hooks.is_present().not().then(|| {
+    let before_nft_transfer = no_hooks.is_present().not().then(|| {
         quote! {
-            let hook_state = <Self as #me::standard::nep171::Nep171Hook::<_>>::before_transfer(self, &transfer);
+            let hook_state = <Self as #me::standard::nep171::Nep171Hook::<_>>::before_nft_transfer(self, &transfer);
         }
     });
 
-    let after_transfer = no_hooks.is_present().not().then(|| {
+    let after_nft_transfer = no_hooks.is_present().not().then(|| {
         quote! {
-            <Self as #me::standard::nep171::Nep171Hook::<_>>::after_transfer(self, &transfer, hook_state);
+            <Self as #me::standard::nep171::Nep171Hook::<_>>::after_nft_transfer(self, &transfer, hook_state);
         }
     });
 
@@ -93,7 +93,7 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
                         msg: None,
                     };
 
-                    #before_transfer
+                    #before_nft_transfer
 
                     let result = #me::standard::nep171::Nep171Controller::transfer(
                         self,
@@ -105,7 +105,7 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
                     )
                     .is_err();
 
-                    #after_transfer
+                    #after_nft_transfer
 
                     result
                 } else {
@@ -144,7 +144,7 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
                     msg: None,
                 };
 
-                #before_transfer
+                #before_nft_transfer
 
                 Nep171Controller::transfer(
                     self,
@@ -156,7 +156,7 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
                 )
                 .unwrap();
 
-                #after_transfer
+                #after_nft_transfer
             }
 
             fn nft_transfer_call(
@@ -193,7 +193,7 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
                     msg: Some(msg.clone()),
                 };
 
-                #before_transfer
+                #before_nft_transfer
 
                 Nep171Controller::transfer(
                     self,
@@ -205,7 +205,7 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
                 )
                 .unwrap();
 
-                #after_transfer
+                #after_nft_transfer
 
                 ext_nep171_receiver::ext(receiver_id.clone())
                     .with_static_gas(#near_sdk::env::prepaid_gas() - GAS_FOR_NFT_TRANSFER_CALL)

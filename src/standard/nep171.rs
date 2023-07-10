@@ -82,25 +82,74 @@ enum StorageKey {
     TokenOwner(String),
 }
 
-#[derive(Error, Clone, Debug)]
-pub enum Nep171TransferError {
+pub mod error {
+    use near_sdk::AccountId;
+    use thiserror::Error;
+
+    use super::TokenId;
+
+    #[derive(Error, Clone, Debug)]
+    #[error("Token `{token_id}` already exists")]
+    pub struct AlreadyExists {
+        pub token_id: TokenId,
+    }
+
+    #[derive(Error, Clone, Debug)]
+    #[error("Token `{token_id}` does not exist")]
+    pub struct DoesNotExist {
+        pub token_id: TokenId,
+    }
+
+    #[derive(Error, Clone, Debug)]
+    #[error(
+        "Token `{token_id}` is owned by `{actual_owner_id}` instead of expected `{expected_owner_id}`",
+    )]
+    pub struct NotOwnedByExpectedOwner {
+        pub expected_owner_id: AccountId,
+        pub actual_owner_id: AccountId,
+        pub token_id: TokenId,
+    }
+
+    #[derive(Error, Clone, Debug)]
     #[error("Sender `{sender_id}` does not have permission to transfer token `{token_id}`")]
-    NotApproved {
-        sender_id: AccountId,
-        token_id: TokenId,
-    },
+    pub struct NotApproved {
+        pub sender_id: AccountId,
+        pub token_id: TokenId,
+    }
+
+    #[derive(Error, Clone, Debug)]
     #[error("Receiver must be different from current owner `{current_owner_id}` to transfer token `{token_id}`")]
-    ReceiverIsCurrentOwner {
-        current_owner_id: AccountId,
-        token_id: TokenId,
-    },
-    #[error("Token `{token_id}` is no longer owned by the expected owner `{expected_owner_id}`")]
-    NotOwnedByExpectedOwner {
-        expected_owner_id: AccountId,
-        token_id: TokenId,
-    },
+    pub struct ReceiverIsCurrentOwner {
+        pub current_owner_id: AccountId,
+        pub token_id: TokenId,
+    }
 }
 
+#[derive(Error, Clone, Debug)]
+pub enum Nep171BurnError {
+    #[error(transparent)]
+    DoesNotExist(#[from] error::DoesNotExist),
+    #[error(transparent)]
+    NotOwnedByExpectedOwner(#[from] error::NotOwnedByExpectedOwner),
+}
+
+#[derive(Error, Clone, Debug)]
+pub enum Nep171MintError {
+    #[error(transparent)]
+    AlreadyExists(#[from] error::AlreadyExists),
+}
+
+#[derive(Error, Clone, Debug)]
+pub enum Nep171TransferError {
+    #[error(transparent)]
+    DoesNotExist(#[from] error::DoesNotExist),
+    #[error(transparent)]
+    NotApproved(#[from] error::NotApproved),
+    #[error(transparent)]
+    ReceiverIsCurrentOwner(#[from] error::ReceiverIsCurrentOwner),
+    #[error(transparent)]
+    NotOwnedByExpectedOwner(#[from] error::NotOwnedByExpectedOwner),
+}
 pub trait Nep171Extension<T> {
     type Event: crate::standard::nep297::Event;
 
@@ -129,9 +178,15 @@ pub trait Nep171Controller {
         memo: Option<String>,
     ) -> Result<(), Nep171TransferError>;
 
-    fn mint(token_id: TokenId, new_owner_id: &AccountId) -> bool;
+    fn mint(&mut self, token_id: TokenId, new_owner_id: &AccountId) -> Result<(), Nep171MintError>;
 
-    fn burn(token_id: TokenId) -> bool;
+    fn burn(
+        &mut self,
+        token_id: TokenId,
+        current_owner_id: &AccountId,
+    ) -> Result<(), Nep171BurnError>;
+
+    fn burn_unchecked(&mut self, token_id: TokenId) -> bool;
 
     fn token_owner(&self, token_id: TokenId) -> Option<AccountId>;
 }
@@ -168,12 +223,12 @@ pub trait Nep171Hook<T = ()> {
     ///
     /// May return an optional state value which will be passed along to the
     /// following `after_transfer`.
-    fn before_transfer(&mut self, _transfer: &Nep171Transfer) -> T;
+    fn before_nft_transfer(&mut self, _transfer: &Nep171Transfer) -> T;
 
     /// Executed after a token transfer is conducted.
     ///
     /// Receives the state value returned by `before_transfer`.
-    fn after_transfer(&mut self, _transfer: &Nep171Transfer, _state: T);
+    fn after_nft_transfer(&mut self, _transfer: &Nep171Transfer, _state: T);
 }
 
 impl<T: Nep171ControllerInternal> Nep171Controller for T {
@@ -186,18 +241,20 @@ impl<T: Nep171ControllerInternal> Nep171Controller for T {
         memo: Option<String>,
     ) -> Result<(), Nep171TransferError> {
         if current_owner_id == receiver_id {
-            return Err(Nep171TransferError::ReceiverIsCurrentOwner {
+            return Err(error::ReceiverIsCurrentOwner {
                 current_owner_id,
                 token_id,
-            });
+            }
+            .into());
         }
 
         // This version doesn't implement approval management
         if sender_id != current_owner_id {
-            return Err(Nep171TransferError::NotApproved {
+            return Err(error::NotApproved {
                 sender_id,
                 token_id,
-            });
+            }
+            .into());
         }
 
         let mut slot = Self::slot_token_owner(token_id.clone());
@@ -206,17 +263,16 @@ impl<T: Nep171ControllerInternal> Nep171Controller for T {
             owner_id
         } else {
             // Using if-let instead of .ok_or_else() to avoid .clone()
-            return Err(Nep171TransferError::NotOwnedByExpectedOwner {
-                expected_owner_id: current_owner_id,
-                token_id,
-            });
+            return Err(error::DoesNotExist { token_id }.into());
         };
 
         if current_owner_id != actual_current_owner_id {
-            return Err(Nep171TransferError::NotOwnedByExpectedOwner {
+            return Err(error::NotOwnedByExpectedOwner {
                 expected_owner_id: current_owner_id,
+                actual_owner_id: actual_current_owner_id,
                 token_id,
-            });
+            }
+            .into());
         }
 
         slot.write(&receiver_id);
@@ -233,17 +289,42 @@ impl<T: Nep171ControllerInternal> Nep171Controller for T {
         Ok(())
     }
 
-    fn mint(token_id: TokenId, new_owner_id: &AccountId) -> bool {
-        let mut slot = Self::slot_token_owner(token_id);
+    fn mint(&mut self, token_id: TokenId, new_owner_id: &AccountId) -> Result<(), Nep171MintError> {
+        let mut slot = Self::slot_token_owner(token_id.clone());
         if !slot.exists() {
             slot.write(new_owner_id);
-            true
+            Ok(())
         } else {
-            false
+            Err(error::AlreadyExists { token_id }.into())
         }
     }
 
-    fn burn(token_id: TokenId) -> bool {
+    fn burn(
+        &mut self,
+        token_id: TokenId,
+        current_owner_id: &AccountId,
+    ) -> Result<(), Nep171BurnError> {
+        let mut slot = Self::slot_token_owner(token_id.clone());
+        let actual_owner_id = if let Some(account_id) = slot.read() {
+            account_id
+        } else {
+            return Err(error::DoesNotExist { token_id }.into());
+        };
+
+        if current_owner_id != &actual_owner_id {
+            return Err(error::NotOwnedByExpectedOwner {
+                expected_owner_id: current_owner_id.clone(),
+                actual_owner_id,
+                token_id,
+            }
+            .into());
+        }
+
+        slot.remove();
+        Ok(())
+    }
+
+    fn burn_unchecked(&mut self, token_id: TokenId) -> bool {
         Self::slot_token_owner(token_id).remove()
     }
 
@@ -258,52 +339,65 @@ pub struct Token {
     pub owner_id: AccountId,
 }
 
-#[ext_contract(ext_nep171)]
-pub trait Nep171 {
-    fn nft_transfer(
-        &mut self,
-        receiver_id: AccountId,
-        token_id: TokenId,
-        approval_id: Option<u64>,
-        memo: Option<String>,
-    );
+// separate module with re-export because ext_contract doesn't play well with #![warn(missing_docs)]
+mod ext {
+    #![allow(missing_docs)]
 
-    fn nft_transfer_call(
-        &mut self,
-        receiver_id: AccountId,
-        token_id: TokenId,
-        approval_id: Option<u64>,
-        memo: Option<String>,
-        msg: String,
-    ) -> PromiseOrValue<bool>;
+    use std::collections::HashMap;
 
-    fn nft_token(&self, token_id: TokenId) -> Option<Token>;
+    use near_sdk::{ext_contract, AccountId, PromiseOrValue};
+
+    use super::{Token, TokenId};
+
+    #[ext_contract(ext_nep171)]
+    pub trait Nep171 {
+        fn nft_transfer(
+            &mut self,
+            receiver_id: AccountId,
+            token_id: TokenId,
+            approval_id: Option<u64>,
+            memo: Option<String>,
+        );
+
+        fn nft_transfer_call(
+            &mut self,
+            receiver_id: AccountId,
+            token_id: TokenId,
+            approval_id: Option<u64>,
+            memo: Option<String>,
+            msg: String,
+        ) -> PromiseOrValue<bool>;
+
+        fn nft_token(&self, token_id: TokenId) -> Option<Token>;
+    }
+
+    #[ext_contract(ext_nep171_resolver)]
+    pub trait Nep171Resolver {
+        fn nft_resolve_transfer(
+            &mut self,
+            previous_owner_id: AccountId,
+            receiver_id: AccountId,
+            token_id: TokenId,
+            approved_account_ids: Option<HashMap<AccountId, u64>>,
+        ) -> bool;
+    }
+
+    /// A contract that may be the recipient of an `nft_transfer_call` function
+    /// call.
+    #[ext_contract(ext_nep171_receiver)]
+    pub trait Nep171Receiver {
+        /// Function that is called in an `nft_transfer_call` promise chain.
+        /// Returns the number of tokens "used", that is, those that will be kept
+        /// in the receiving contract's account. (The contract will attempt to
+        /// refund the difference from `amount` to the original sender.)
+        fn nft_on_transfer(
+            &mut self,
+            sender_id: AccountId,
+            previous_owner_id: AccountId,
+            token_id: TokenId,
+            msg: String,
+        ) -> PromiseOrValue<bool>;
+    }
 }
 
-#[ext_contract(ext_nep171_resolver)]
-pub trait Nep171Resolver {
-    fn nft_resolve_transfer(
-        &mut self,
-        previous_owner_id: AccountId,
-        receiver_id: AccountId,
-        token_id: TokenId,
-        approved_account_ids: Option<HashMap<AccountId, u64>>,
-    ) -> bool;
-}
-
-/// A contract that may be the recipient of an `nft_transfer_call` function
-/// call.
-#[ext_contract(ext_nep171_receiver)]
-pub trait Nep171Receiver {
-    /// Function that is called in an `nft_transfer_call` promise chain.
-    /// Returns the number of tokens "used", that is, those that will be kept
-    /// in the receiving contract's account. (The contract will attempt to
-    /// refund the difference from `amount` to the original sender.)
-    fn nft_on_transfer(
-        &mut self,
-        sender_id: AccountId,
-        previous_owner_id: AccountId,
-        token_id: TokenId,
-        msg: String,
-    ) -> PromiseOrValue<bool>;
-}
+pub use ext::*;
