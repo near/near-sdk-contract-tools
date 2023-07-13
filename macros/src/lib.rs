@@ -147,6 +147,12 @@ pub fn derive_fungible_token(input: TokenStream) -> TokenStream {
     make_derive(input, standard::fungible_token::expand)
 }
 
+/// Adds NEP-171 non-fungible token core functionality to a contract. Exposes
+/// `nft_*` functions to the public blockchain, implements internal controller
+/// and receiver functionality (see: [`near_sdk_contract_tools::standard::nep171`]).
+///
+/// The storage key prefix for the fields can be optionally specified (default:
+/// `"~$171"`) using `#[nep171(storage_key = "<expression>")]`.
 #[proc_macro_derive(Nep171, attributes(nep171))]
 pub fn derive_nep171(input: TokenStream) -> TokenStream {
     make_derive(input, standard::nep171::expand)
