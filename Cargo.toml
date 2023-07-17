@@ -6,14 +6,15 @@ Helpful functions and macros for developing smart contracts on NEAR Protocol.
 """
 documentation = "https://docs.rs/near-sdk-contract-tools"
 edition = "2021"
+exclude = ["documents/"]
 license = "GPL-3.0"
 name = "near-sdk-contract-tools"
 repository = "https://github.com/NEARFoundation/near-sdk-contract-tools"
-version = "0.7.2"
+version = "1.0.1"
 
 [dependencies]
 near-sdk = {version = "4.1.0", default-features = false}
-near-sdk-contract-tools-macros = {version = "=0.7.2", path = "./macros"}
+near-sdk-contract-tools-macros = {version = "=1.0.1", path = "./macros"}
 serde = "1.0.144"
 serde_json = "1.0.85"
 thiserror = "1.0.35"
