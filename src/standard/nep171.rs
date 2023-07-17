@@ -228,7 +228,7 @@ pub trait Nep171Controller {
     /// Transfer a token from `sender_id` to `receiver_id`.
     fn transfer(
         &mut self,
-        token_id: &TokenId, // TODO: Change to &[TokenId]
+        token_id: &[TokenId],
         current_owner_id: AccountId,
         sender_id: AccountId,
         receiver_id: AccountId,
@@ -240,6 +240,7 @@ pub trait Nep171Controller {
         &mut self,
         token_ids: &[TokenId],
         new_owner_id: &AccountId,
+        memo: Option<String>,
     ) -> Result<(), Nep171MintError>;
 
     /// Burns tokens `token_ids` owned by `current_owner_id`.
@@ -247,6 +248,7 @@ pub trait Nep171Controller {
         &mut self,
         token_ids: &[TokenId],
         current_owner_id: &AccountId,
+        memo: Option<String>,
     ) -> Result<(), Nep171BurnError>;
 
     /// Burns tokens `token_ids` without checking the owners.
@@ -299,54 +301,64 @@ pub trait Nep171Hook<T = ()> {
 impl<T: Nep171ControllerInternal> Nep171Controller for T {
     fn transfer(
         &mut self,
-        token_id: &TokenId,
+        token_ids: &[TokenId],
         current_owner_id: AccountId,
         sender_id: AccountId,
         receiver_id: AccountId,
         memo: Option<String>,
     ) -> Result<(), Nep171TransferError> {
-        if current_owner_id == receiver_id {
-            return Err(error::TokenReceiverIsCurrentOwnerError {
-                current_owner_id,
-                token_id: token_id.clone(),
-            }
-            .into());
+        if token_ids.is_empty() {
+            return Ok(());
         }
 
-        // This version doesn't implement approval management
-        if sender_id != current_owner_id {
-            return Err(error::SenderNotApprovedError {
-                sender_id,
-                token_id: token_id.clone(),
+        for token_id in token_ids {
+            let slot = Self::slot_token_owner(token_id);
+
+            let actual_current_owner_id =
+                slot.read().ok_or_else(|| error::TokenDoesNotExistError {
+                    token_id: token_id.clone(),
+                })?;
+
+            if current_owner_id != actual_current_owner_id {
+                return Err(error::TokenNotOwnedByExpectedOwnerError {
+                    expected_owner_id: current_owner_id,
+                    actual_owner_id: actual_current_owner_id,
+                    token_id: token_id.clone(),
+                }
+                .into());
             }
-            .into());
-        }
 
-        let mut slot = Self::slot_token_owner(token_id);
-
-        let actual_current_owner_id = slot.read().ok_or_else(|| error::TokenDoesNotExistError {
-            token_id: token_id.clone(),
-        })?;
-
-        if current_owner_id != actual_current_owner_id {
-            return Err(error::TokenNotOwnedByExpectedOwnerError {
-                expected_owner_id: current_owner_id,
-                actual_owner_id: actual_current_owner_id,
-                token_id: token_id.clone(),
+            // This version doesn't implement approval management
+            if sender_id != current_owner_id {
+                return Err(error::SenderNotApprovedError {
+                    sender_id,
+                    token_id: token_id.clone(),
+                }
+                .into());
             }
-            .into());
-        }
 
-        slot.write(&receiver_id);
+            if receiver_id == current_owner_id {
+                return Err(error::TokenReceiverIsCurrentOwnerError {
+                    current_owner_id,
+                    token_id: token_id.clone(),
+                }
+                .into());
+            }
+        }
 
         Nep171Event::NftTransfer(vec![event::NftTransferLog {
             authorized_id: None,
-            old_owner_id: actual_current_owner_id,
-            new_owner_id: receiver_id,
-            token_ids: vec![token_id.clone()],
+            old_owner_id: current_owner_id,
+            new_owner_id: receiver_id.clone(),
+            token_ids: token_ids.iter().map(ToString::to_string).collect(),
             memo,
         }])
         .emit();
+
+        for token_id in token_ids {
+            let mut slot = Self::slot_token_owner(token_id);
+            slot.write(&receiver_id);
+        }
 
         Ok(())
     }
@@ -355,7 +367,12 @@ impl<T: Nep171ControllerInternal> Nep171Controller for T {
         &mut self,
         token_ids: &[TokenId],
         new_owner_id: &AccountId,
+        memo: Option<String>,
     ) -> Result<(), Nep171MintError> {
+        if token_ids.is_empty() {
+            return Ok(());
+        }
+
         for token_id in token_ids {
             let slot = Self::slot_token_owner(token_id);
             if slot.exists() {
@@ -369,7 +386,7 @@ impl<T: Nep171ControllerInternal> Nep171Controller for T {
         Nep171Event::NftMint(vec![event::NftMintLog {
             token_ids: token_ids.iter().map(ToString::to_string).collect(),
             owner_id: new_owner_id.clone(),
-            memo: None,
+            memo,
         }])
         .emit();
 
@@ -385,7 +402,12 @@ impl<T: Nep171ControllerInternal> Nep171Controller for T {
         &mut self,
         token_ids: &[TokenId],
         current_owner_id: &AccountId,
+        memo: Option<String>,
     ) -> Result<(), Nep171BurnError> {
+        if token_ids.is_empty() {
+            return Ok(());
+        }
+
         for token_id in token_ids {
             if let Some(actual_owner_id) = self.token_owner(token_id) {
                 if &actual_owner_id != current_owner_id {
@@ -410,7 +432,7 @@ impl<T: Nep171ControllerInternal> Nep171Controller for T {
             token_ids: token_ids.iter().map(ToString::to_string).collect(),
             owner_id: current_owner_id.clone(),
             authorized_id: None,
-            memo: None,
+            memo,
         }])
         .emit();
 

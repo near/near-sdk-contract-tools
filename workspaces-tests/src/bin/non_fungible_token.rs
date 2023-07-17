@@ -5,9 +5,7 @@ pub fn main() {}
 
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
-    env,
-    json_types::U128,
-    log, near_bindgen, PanicOnDefault,
+    env, log, near_bindgen, PanicOnDefault,
 };
 use near_sdk_contract_tools::{standard::nep171::*, Nep171};
 
@@ -33,7 +31,7 @@ impl Contract {
     }
 
     pub fn mint(&mut self, token_ids: Vec<TokenId>) {
-        Nep171Controller::mint(self, &token_ids, &env::predecessor_account_id())
+        Nep171Controller::mint(self, &token_ids, &env::predecessor_account_id(), None)
             .unwrap_or_else(|e| env::panic_str(&format!("Failed to mint: {:#?}", e)));
     }
 }

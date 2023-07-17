@@ -97,7 +97,7 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
 
                     let result = #me::standard::nep171::Nep171Controller::transfer(
                         self,
-                        &token_id,
+                        &[token_id],
                         receiver_id.clone(),
                         receiver_id,
                         previous_owner_id,
@@ -148,7 +148,7 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
 
                 Nep171Controller::transfer(
                     self,
-                    &token_id,
+                    &[token_id],
                     sender_id.clone(),
                     sender_id,
                     receiver_id,
@@ -195,15 +195,19 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
 
                 #before_nft_transfer
 
+                let token_ids = [token_id];
+
                 Nep171Controller::transfer(
                     self,
-                    &token_id,
+                    &token_ids,
                     sender_id.clone(),
                     sender_id.clone(),
                     receiver_id.clone(),
                     memo,
                 )
                 .unwrap();
+
+                let [token_id] = token_ids;
 
                 #after_nft_transfer
 
