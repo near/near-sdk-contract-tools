@@ -108,8 +108,8 @@ pub mod event {
 }
 
 #[derive(BorshSerialize, BorshStorageKey)]
-enum StorageKey {
-    TokenOwner(String),
+enum StorageKey<'a> {
+    TokenOwner(&'a str),
 }
 
 /// Potential errors produced by various token manipulations.
@@ -218,7 +218,7 @@ pub trait Nep171ControllerInternal {
     }
 
     /// Storage slot for the owner of a token.
-    fn slot_token_owner(token_id: TokenId) -> Slot<AccountId> {
+    fn slot_token_owner(token_id: &TokenId) -> Slot<AccountId> {
         Self::root().field(StorageKey::TokenOwner(token_id))
     }
 }
@@ -228,7 +228,7 @@ pub trait Nep171Controller {
     /// Transfer a token from `sender_id` to `receiver_id`.
     fn transfer(
         &mut self,
-        token_id: TokenId,
+        token_id: &TokenId, // TODO: Change to &[TokenId]
         current_owner_id: AccountId,
         sender_id: AccountId,
         receiver_id: AccountId,
@@ -236,20 +236,24 @@ pub trait Nep171Controller {
     ) -> Result<(), Nep171TransferError>;
 
     /// Mints a new token `token_id` to `owner_id`.
-    fn mint(&mut self, token_id: TokenId, new_owner_id: &AccountId) -> Result<(), Nep171MintError>;
+    fn mint(
+        &mut self,
+        token_ids: &[TokenId],
+        new_owner_id: &AccountId,
+    ) -> Result<(), Nep171MintError>;
 
-    /// Burns a token `token_id` owned by `current_owner_id`.
+    /// Burns tokens `token_ids` owned by `current_owner_id`.
     fn burn(
         &mut self,
-        token_id: TokenId,
+        token_ids: &[TokenId],
         current_owner_id: &AccountId,
     ) -> Result<(), Nep171BurnError>;
 
-    /// Burns a token `token_id` without checking the owner.
-    fn burn_unchecked(&mut self, token_id: TokenId) -> bool;
+    /// Burns tokens `token_ids` without checking the owners.
+    fn burn_unchecked(&mut self, token_ids: &[TokenId]) -> bool;
 
     /// Returns the owner of a token, if it exists.
-    fn token_owner(&self, token_id: TokenId) -> Option<AccountId>;
+    fn token_owner(&self, token_id: &TokenId) -> Option<AccountId>;
 }
 
 /// Transfer metadata generic over both types of transfer (`nft_transfer` and
@@ -295,7 +299,7 @@ pub trait Nep171Hook<T = ()> {
 impl<T: Nep171ControllerInternal> Nep171Controller for T {
     fn transfer(
         &mut self,
-        token_id: TokenId,
+        token_id: &TokenId,
         current_owner_id: AccountId,
         sender_id: AccountId,
         receiver_id: AccountId,
@@ -304,7 +308,7 @@ impl<T: Nep171ControllerInternal> Nep171Controller for T {
         if current_owner_id == receiver_id {
             return Err(error::TokenReceiverIsCurrentOwnerError {
                 current_owner_id,
-                token_id,
+                token_id: token_id.clone(),
             }
             .into());
         }
@@ -313,25 +317,22 @@ impl<T: Nep171ControllerInternal> Nep171Controller for T {
         if sender_id != current_owner_id {
             return Err(error::SenderNotApprovedError {
                 sender_id,
-                token_id,
+                token_id: token_id.clone(),
             }
             .into());
         }
 
-        let mut slot = Self::slot_token_owner(token_id.clone());
+        let mut slot = Self::slot_token_owner(token_id);
 
-        let actual_current_owner_id = if let Some(owner_id) = slot.read() {
-            owner_id
-        } else {
-            // Using if-let instead of .ok_or_else() to avoid .clone()
-            return Err(error::TokenDoesNotExistError { token_id }.into());
-        };
+        let actual_current_owner_id = slot.read().ok_or_else(|| error::TokenDoesNotExistError {
+            token_id: token_id.clone(),
+        })?;
 
         if current_owner_id != actual_current_owner_id {
             return Err(error::TokenNotOwnedByExpectedOwnerError {
                 expected_owner_id: current_owner_id,
                 actual_owner_id: actual_current_owner_id,
-                token_id,
+                token_id: token_id.clone(),
             }
             .into());
         }
@@ -342,7 +343,7 @@ impl<T: Nep171ControllerInternal> Nep171Controller for T {
             authorized_id: None,
             old_owner_id: actual_current_owner_id,
             new_owner_id: receiver_id,
-            token_ids: vec![token_id],
+            token_ids: vec![token_id.clone()],
             memo,
         }])
         .emit();
@@ -350,52 +351,99 @@ impl<T: Nep171ControllerInternal> Nep171Controller for T {
         Ok(())
     }
 
-    fn mint(&mut self, token_id: TokenId, new_owner_id: &AccountId) -> Result<(), Nep171MintError> {
-        let mut slot = Self::slot_token_owner(token_id.clone());
-        if !slot.exists() {
-            slot.write(new_owner_id);
-            Ok(())
-        } else {
-            Err(error::TokenAlreadyExistsError { token_id }.into())
+    fn mint(
+        &mut self,
+        token_ids: &[TokenId],
+        new_owner_id: &AccountId,
+    ) -> Result<(), Nep171MintError> {
+        for token_id in token_ids {
+            let slot = Self::slot_token_owner(token_id);
+            if slot.exists() {
+                return Err(error::TokenAlreadyExistsError {
+                    token_id: token_id.to_string(),
+                }
+                .into());
+            }
         }
+
+        Nep171Event::NftMint(vec![event::NftMintLog {
+            token_ids: token_ids.iter().map(ToString::to_string).collect(),
+            owner_id: new_owner_id.clone(),
+            memo: None,
+        }])
+        .emit();
+
+        token_ids.iter().for_each(|token_id| {
+            let mut slot = Self::slot_token_owner(token_id);
+            slot.write(new_owner_id);
+        });
+
+        Ok(())
     }
 
     fn burn(
         &mut self,
-        token_id: TokenId,
+        token_ids: &[TokenId],
         current_owner_id: &AccountId,
     ) -> Result<(), Nep171BurnError> {
-        let mut slot = Self::slot_token_owner(token_id.clone());
-        let actual_owner_id = if let Some(account_id) = slot.read() {
-            account_id
-        } else {
-            return Err(error::TokenDoesNotExistError { token_id }.into());
-        };
-
-        if current_owner_id != &actual_owner_id {
-            return Err(error::TokenNotOwnedByExpectedOwnerError {
-                expected_owner_id: current_owner_id.clone(),
-                actual_owner_id,
-                token_id,
+        for token_id in token_ids {
+            if let Some(actual_owner_id) = self.token_owner(token_id) {
+                if &actual_owner_id != current_owner_id {
+                    return Err(error::TokenNotOwnedByExpectedOwnerError {
+                        expected_owner_id: current_owner_id.clone(),
+                        actual_owner_id,
+                        token_id: (*token_id).clone(),
+                    }
+                    .into());
+                }
+            } else {
+                return Err(error::TokenDoesNotExistError {
+                    token_id: (*token_id).clone(),
+                }
+                .into());
             }
-            .into());
         }
 
-        slot.remove();
+        self.burn_unchecked(token_ids);
+
+        Nep171Event::NftBurn(vec![event::NftBurnLog {
+            token_ids: token_ids.iter().map(ToString::to_string).collect(),
+            owner_id: current_owner_id.clone(),
+            authorized_id: None,
+            memo: None,
+        }])
+        .emit();
+
         Ok(())
     }
 
-    fn burn_unchecked(&mut self, token_id: TokenId) -> bool {
-        Self::slot_token_owner(token_id).remove()
+    fn burn_unchecked(&mut self, token_ids: &[TokenId]) -> bool {
+        let mut removed_successfully = true;
+
+        for token_id in token_ids {
+            removed_successfully &= Self::slot_token_owner(token_id).remove();
+        }
+
+        removed_successfully
     }
 
-    fn token_owner(&self, token_id: TokenId) -> Option<AccountId> {
+    fn token_owner(&self, token_id: &TokenId) -> Option<AccountId> {
         Self::slot_token_owner(token_id).read()
     }
 }
 
 /// Token information structure.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Hash,
+    PartialEq,
+    PartialOrd,
+    Serialize,
+    Deserialize,
+    BorshSerialize,
+    BorshDeserialize,
+)]
 pub struct Token {
     /// Token ID.
     pub token_id: TokenId,

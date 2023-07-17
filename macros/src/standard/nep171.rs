@@ -97,7 +97,7 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
 
                     let result = #me::standard::nep171::Nep171Controller::transfer(
                         self,
-                        token_id,
+                        &token_id,
                         receiver_id.clone(),
                         receiver_id,
                         previous_owner_id,
@@ -148,7 +148,7 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
 
                 Nep171Controller::transfer(
                     self,
-                    token_id,
+                    &token_id,
                     sender_id.clone(),
                     sender_id,
                     receiver_id,
@@ -197,7 +197,7 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
 
                 Nep171Controller::transfer(
                     self,
-                    token_id.clone(),
+                    &token_id,
                     sender_id.clone(),
                     sender_id.clone(),
                     receiver_id.clone(),
@@ -229,7 +229,7 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
             ) -> Option<#me::standard::nep171::Token> {
                 use #me::standard::nep171::*;
 
-                Nep171Controller::token_owner(self, token_id.clone())
+                Nep171Controller::token_owner(self, &token_id)
                     .map(|owner_id| Token { token_id, owner_id })
             }
         }

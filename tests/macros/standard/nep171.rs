@@ -51,7 +51,7 @@ impl NonFungibleToken {
     }
 
     pub fn mint(&mut self, token_id: TokenId, owner_id: AccountId) {
-        Nep171Controller::mint(self, token_id, &owner_id).unwrap_or_else(|e| {
+        Nep171Controller::mint(self, &[token_id], &owner_id).unwrap_or_else(|e| {
             env::panic_str(&format!("Mint failed: {e:?}"));
         });
     }

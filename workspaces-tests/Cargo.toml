@@ -21,6 +21,9 @@ name = "fungible_token"
 name = "native_multisig"
 
 [[bin]]
+name = "non_fungible_token"
+
+[[bin]]
 name = "rbac"
 
 [[bin]]
