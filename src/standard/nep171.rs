@@ -52,15 +52,13 @@ pub mod event {
     use near_sdk::AccountId;
     use serde::Serialize;
 
-    use super::TokenId;
-
     /// Tokens minted to a single owner.
     #[derive(Serialize, Debug, Clone)]
     pub struct NftMintLog {
         /// To whom were the new tokens minted?
         pub owner_id: AccountId,
         /// Which tokens were minted?
-        pub token_ids: Vec<TokenId>,
+        pub token_ids: Vec<String>,
         /// Additional mint information.
         #[serde(skip_serializing_if = "Option::is_none")]
         pub memo: Option<String>,
@@ -77,7 +75,7 @@ pub mod event {
         /// Account ID of the new owner.
         pub new_owner_id: AccountId,
         /// IDs of the transferred tokens.
-        pub token_ids: Vec<TokenId>,
+        pub token_ids: Vec<String>,
         /// Additional transfer information.
         #[serde(skip_serializing_if = "Option::is_none")]
         pub memo: Option<String>,
@@ -89,7 +87,7 @@ pub mod event {
         /// What is the ID of the account from which the tokens were burned?
         pub owner_id: AccountId,
         /// IDs of the burned tokens.
-        pub token_ids: Vec<TokenId>,
+        pub token_ids: Vec<String>,
         /// NEP-178 authorized account ID.
         #[serde(skip_serializing_if = "Option::is_none")]
         pub authorized_id: Option<AccountId>,
@@ -528,9 +526,9 @@ mod ext {
     #[ext_contract(ext_nep171_receiver)]
     pub trait Nep171Receiver {
         /// Function that is called in an `nft_transfer_call` promise chain.
-        /// Returns the number of tokens "used", that is, those that will be kept
-        /// in the receiving contract's account. (The contract will attempt to
-        /// refund the difference from `amount` to the original sender.)
+        /// Performs some action after receiving a non-fungible token.
+        ///
+        /// Returns `true` if token should be returned to `sender_id`.
         fn nft_on_transfer(
             &mut self,
             sender_id: AccountId,

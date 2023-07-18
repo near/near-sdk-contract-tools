@@ -24,6 +24,9 @@ name = "native_multisig"
 name = "non_fungible_token"
 
 [[bin]]
+name = "non_fungible_token_receiver"
+
+[[bin]]
 name = "rbac"
 
 [[bin]]

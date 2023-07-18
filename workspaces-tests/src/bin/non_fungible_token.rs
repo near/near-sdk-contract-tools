@@ -15,11 +15,11 @@ pub struct Contract {}
 
 impl Nep171Hook for Contract {
     fn before_nft_transfer(&mut self, transfer: &Nep171Transfer) {
-        log!(format!("before_nft_transfer({})", transfer.token_id));
+        log!("before_nft_transfer({})", transfer.token_id);
     }
 
     fn after_nft_transfer(&mut self, transfer: &Nep171Transfer, _state: ()) {
-        log!(format!("after_nft_transfer({})", transfer.token_id));
+        log!("after_nft_transfer({})", transfer.token_id);
     }
 }
 

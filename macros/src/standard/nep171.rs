@@ -116,6 +116,7 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
 
         #[#near_sdk::near_bindgen]
         impl #imp #me::standard::nep171::Nep171 for #ident #ty #wher {
+            #[payable]
             fn nft_transfer(
                 &mut self,
                 receiver_id: #near_sdk::AccountId,
@@ -154,11 +155,12 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
                     receiver_id,
                     memo,
                 )
-                .unwrap();
+                .unwrap_or_else(|e| #near_sdk::env::panic_str(&e.to_string()));
 
                 #after_nft_transfer
             }
 
+            #[payable]
             fn nft_transfer_call(
                 &mut self,
                 receiver_id: #near_sdk::AccountId,
@@ -177,7 +179,7 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
                 #near_sdk::assert_one_yocto();
 
                 #near_sdk::require!(
-                    #near_sdk::env::prepaid_gas() > GAS_FOR_NFT_TRANSFER_CALL,
+                    #near_sdk::env::prepaid_gas() >= GAS_FOR_NFT_TRANSFER_CALL,
                     INSUFFICIENT_GAS_MESSAGE,
                 );
 
@@ -205,7 +207,7 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
                     receiver_id.clone(),
                     memo,
                 )
-                .unwrap();
+                .unwrap_or_else(|e| #near_sdk::env::panic_str(&e.to_string()));
 
                 let [token_id] = token_ids;
 
@@ -215,7 +217,7 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
                     .with_static_gas(#near_sdk::env::prepaid_gas() - GAS_FOR_NFT_TRANSFER_CALL)
                     .nft_on_transfer(
                         sender_id.clone(),
-                        receiver_id.clone(),
+                        sender_id.clone(),
                         token_id.clone(),
                         msg,
                     )
