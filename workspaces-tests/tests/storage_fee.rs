@@ -14,7 +14,7 @@ struct Setup<T: DevNetwork> {
 
 async fn setup<T: DevNetwork>(worker: Worker<T>, num_accounts: usize) -> Setup<T> {
     // Initialize contract
-    let contract = worker.dev_deploy(&WASM.to_vec()).await.unwrap();
+    let contract = worker.dev_deploy(WASM).await.unwrap();
     contract.call("new").transact().await.unwrap().unwrap();
 
     // Initialize user accounts

@@ -16,7 +16,7 @@ async fn setup(num_accounts: usize) -> Setup {
     let worker = workspaces::sandbox().await.unwrap();
 
     // Initialize contract
-    let contract = worker.dev_deploy(&WASM.to_vec()).await.unwrap();
+    let contract = worker.dev_deploy(WASM).await.unwrap();
     contract.call("new").transact().await.unwrap().unwrap();
 
     // Initialize user accounts
