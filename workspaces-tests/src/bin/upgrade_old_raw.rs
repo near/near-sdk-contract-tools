@@ -1,10 +1,6 @@
 #![allow(missing_docs)]
 
-use near_sdk_contract_tools::{
-    owner::{Owner, OwnerExternal},
-    upgrade::PostUpgrade,
-    Owner,
-};
+use near_sdk_contract_tools::{owner::*, upgrade::PostUpgrade, Owner};
 
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},

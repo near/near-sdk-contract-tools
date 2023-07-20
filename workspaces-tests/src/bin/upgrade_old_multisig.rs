@@ -10,7 +10,7 @@ use near_sdk::{
 };
 use near_sdk_contract_tools::{
     approval::{self, ApprovalManager},
-    owner::{Owner, OwnerExternal},
+    owner::*,
     rbac::Rbac,
     Owner, Rbac, SimpleMultisig, Upgrade,
 };

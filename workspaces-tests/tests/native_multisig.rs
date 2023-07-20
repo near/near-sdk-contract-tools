@@ -30,7 +30,7 @@ struct Setup<T: DevNetwork> {
 
 async fn setup<T: DevNetwork>(worker: Worker<T>, num_accounts: usize) -> Setup<T> {
     // Initialize contract
-    let contract = worker.dev_deploy(&WASM.to_vec()).await.unwrap();
+    let contract = worker.dev_deploy(WASM).await.unwrap();
     contract.call("new").transact().await.unwrap().unwrap();
 
     // Initialize user accounts
@@ -328,11 +328,10 @@ async fn add_both_access_key_kinds_and_delete() {
         let new_key_json_string = near_sdk::serde_json::to_string(&new_public_key_string).unwrap();
 
         assert!(
-            keys_before
+            !keys_before
                 .iter()
-                .find(|a| near_sdk::serde_json::to_string(&a.public_key).unwrap()
-                    == new_key_json_string)
-                .is_none(),
+                .any(|a| near_sdk::serde_json::to_string(&a.public_key).unwrap()
+                    == new_key_json_string),
             "New key does not exist in access keys before being added"
         );
 
@@ -386,11 +385,10 @@ async fn add_both_access_key_kinds_and_delete() {
         let new_key_json_string = near_sdk::serde_json::to_string(&new_public_key_string).unwrap();
 
         assert!(
-            keys_before
+            !keys_before
                 .iter()
-                .find(|a| near_sdk::serde_json::to_string(&a.public_key).unwrap()
-                    == new_key_json_string)
-                .is_none(),
+                .any(|a| near_sdk::serde_json::to_string(&a.public_key).unwrap()
+                    == new_key_json_string),
             "New key does not exist in access keys before being added"
         );
 
@@ -467,13 +465,10 @@ async fn add_both_access_key_kinds_and_delete() {
         let full_json = near_sdk::serde_json::to_string(&full_access_key).unwrap();
         let func_json = near_sdk::serde_json::to_string(&function_call_key).unwrap();
 
-        assert!(keys_after
-            .iter()
-            .find(|a| {
-                let k = near_sdk::serde_json::to_string(&a.public_key).unwrap();
-                k == full_json || k == func_json
-            })
-            .is_none());
+        assert!(!keys_after.iter().any(|a| {
+            let k = near_sdk::serde_json::to_string(&a.public_key).unwrap();
+            k == full_json || k == func_json
+        }));
     }
 }
 
@@ -634,7 +629,7 @@ async fn external_xcc() {
     let bob = &accounts[1];
     let charlie = &accounts[2];
 
-    let second_contract = worker.dev_deploy(&SECOND_WASM.to_vec()).await.unwrap();
+    let second_contract = worker.dev_deploy(SECOND_WASM).await.unwrap();
     second_contract
         .call("new")
         .args_json(json!({ "owner_id": contract.id() }))
