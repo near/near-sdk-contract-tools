@@ -1,15 +1,11 @@
 #![cfg(not(windows))]
 
-use near_sdk::{json_types::U128, serde_json::json};
+use near_sdk::serde_json::json;
 use near_sdk_contract_tools::standard::{
-    nep171::{
-        event::NftTransferLog, Nep171Event, Nep171Receiver, Token, GAS_FOR_NFT_TRANSFER_CALL,
-    },
+    nep171::{event::NftTransferLog, Nep171Event, Token},
     nep297::Event,
 };
-use workspaces::{
-    operations::Function, result::ExecutionFinalResult, Account, AccountId, Contract,
-};
+use workspaces::{operations::Function, result::ExecutionFinalResult, Account, Contract};
 
 const WASM: &[u8] =
     include_bytes!("../../target/wasm32-unknown-unknown/release/non_fungible_token.wasm");

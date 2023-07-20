@@ -20,6 +20,14 @@ impl From<Token> for TokenRecord {
 }
 
 #[derive(Nep171, BorshDeserialize, BorshSerialize)]
+#[nep171(no_hooks)]
+#[near_bindgen]
+struct NonFungibleTokenNoHooks {
+    pub before_nft_transfer_balance_record: store::Vector<Option<TokenRecord>>,
+    pub after_nft_transfer_balance_record: store::Vector<Option<TokenRecord>>,
+}
+
+#[derive(Nep171, BorshDeserialize, BorshSerialize)]
 #[near_bindgen]
 struct NonFungibleToken {
     pub before_nft_transfer_balance_record: store::Vector<Option<TokenRecord>>,

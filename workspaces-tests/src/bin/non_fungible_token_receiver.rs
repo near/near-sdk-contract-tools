@@ -5,9 +5,9 @@ pub fn main() {}
 
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
-    env, log, near_bindgen, AccountId, PanicOnDefault, PromiseOrValue,
+    log, near_bindgen, AccountId, PanicOnDefault, PromiseOrValue,
 };
-use near_sdk_contract_tools::{standard::nep171::*, Nep171};
+use near_sdk_contract_tools::standard::nep171::*;
 
 #[derive(PanicOnDefault, BorshSerialize, BorshDeserialize)]
 #[near_bindgen]
