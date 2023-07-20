@@ -223,10 +223,24 @@ pub trait Nep171ControllerInternal {
 
 /// Non-public controller interface for NEP-171 implementations.
 pub trait Nep171Controller {
+    /// Transfer a token from `sender_id` to `receiver_id`, calling
+    /// `predicate` after performing required validity checks, but immediately
+    /// before performing the actual transfer, and returns the value returned
+    /// by `predicate`.
+    fn and_transfer<T>(
+        &self,
+        predicate: impl FnOnce() -> T,
+        token_ids: &[TokenId],
+        current_owner_id: AccountId,
+        sender_id: AccountId,
+        receiver_id: AccountId,
+        memo: Option<String>,
+    ) -> Result<T, Nep171TransferError>;
+
     /// Transfer a token from `sender_id` to `receiver_id`.
     fn transfer(
         &mut self,
-        token_id: &[TokenId],
+        token_ids: &[TokenId],
         current_owner_id: AccountId,
         sender_id: AccountId,
         receiver_id: AccountId,
@@ -288,12 +302,16 @@ pub trait Nep171Hook<T = ()> {
     ///
     /// May return an optional state value which will be passed along to the
     /// following `after_transfer`.
-    fn before_nft_transfer(&mut self, _transfer: &Nep171Transfer) -> T;
+    ///
+    /// MUST NOT PANIC.
+    fn before_nft_transfer(&self, transfer: &Nep171Transfer) -> T;
 
     /// Executed after a token transfer is conducted.
     ///
     /// Receives the state value returned by `before_transfer`.
-    fn after_nft_transfer(&mut self, _transfer: &Nep171Transfer, _state: T);
+    ///
+    /// MUST NOT PANIC.
+    fn after_nft_transfer(&mut self, transfer: &Nep171Transfer, state: T);
 }
 
 impl<T: Nep171ControllerInternal> Nep171Controller for T {
@@ -305,10 +323,25 @@ impl<T: Nep171ControllerInternal> Nep171Controller for T {
         receiver_id: AccountId,
         memo: Option<String>,
     ) -> Result<(), Nep171TransferError> {
-        if token_ids.is_empty() {
-            return Ok(());
-        }
+        self.and_transfer(
+            || {},
+            token_ids,
+            current_owner_id,
+            sender_id,
+            receiver_id,
+            memo,
+        )
+    }
 
+    fn and_transfer<P>(
+        &self,
+        predicate: impl FnOnce() -> P,
+        token_ids: &[TokenId],
+        current_owner_id: AccountId,
+        sender_id: AccountId,
+        receiver_id: AccountId,
+        memo: Option<String>,
+    ) -> Result<P, Nep171TransferError> {
         for token_id in token_ids {
             let slot = Self::slot_token_owner(token_id);
 
@@ -344,21 +377,25 @@ impl<T: Nep171ControllerInternal> Nep171Controller for T {
             }
         }
 
-        Nep171Event::NftTransfer(vec![event::NftTransferLog {
-            authorized_id: None,
-            old_owner_id: current_owner_id,
-            new_owner_id: receiver_id.clone(),
-            token_ids: token_ids.iter().map(ToString::to_string).collect(),
-            memo,
-        }])
-        .emit();
+        let result = predicate();
+
+        if !token_ids.is_empty() {
+            Nep171Event::NftTransfer(vec![event::NftTransferLog {
+                authorized_id: None,
+                old_owner_id: current_owner_id,
+                new_owner_id: receiver_id.clone(),
+                token_ids: token_ids.iter().map(ToString::to_string).collect(),
+                memo,
+            }])
+            .emit();
+        }
 
         for token_id in token_ids {
             let mut slot = Self::slot_token_owner(token_id);
             slot.write(&receiver_id);
         }
 
-        Ok(())
+        Ok(result)
     }
 
     fn mint(

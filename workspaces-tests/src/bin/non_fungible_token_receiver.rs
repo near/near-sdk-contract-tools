@@ -5,9 +5,9 @@ pub fn main() {}
 
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
-    log, near_bindgen, AccountId, PanicOnDefault, PromiseOrValue,
+    env, log, near_bindgen, AccountId, PanicOnDefault, PromiseOrValue,
 };
-use near_sdk_contract_tools::standard::nep171::*;
+use near_sdk_contract_tools::standard::nep171::{ext_nep171, *};
 
 #[derive(PanicOnDefault, BorshSerialize, BorshDeserialize)]
 #[near_bindgen]
@@ -29,6 +29,17 @@ impl Nep171Receiver for Contract {
             sender_id,
         );
 
+        if msg == "panic" {
+            near_sdk::env::panic_str("panic requested");
+        } else if let Some(account_id) = msg.strip_prefix("transfer:") {
+            log!("Transferring {} to {}", token_id, account_id);
+            return ext_nep171::ext(env::predecessor_account_id())
+                .with_attached_deposit(1)
+                .nft_transfer(account_id.parse().unwrap(), token_id, None, None)
+                .then(Contract::ext(env::current_account_id()).return_true()) // ask to return the token even though we don't own it anymore
+                .into();
+        }
+
         PromiseOrValue::Value(msg == "return")
     }
 }
@@ -38,5 +49,10 @@ impl Contract {
     #[init]
     pub fn new() -> Self {
         Self {}
+    }
+
+    pub fn return_true(&self) -> bool {
+        log!("returning true");
+        true
     }
 }

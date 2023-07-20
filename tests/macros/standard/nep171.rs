@@ -34,15 +34,20 @@ struct NonFungibleToken {
     pub after_nft_transfer_balance_record: store::Vector<Option<TokenRecord>>,
 }
 
-impl Nep171Hook for NonFungibleToken {
-    fn before_nft_transfer(&mut self, transfer: &Nep171Transfer) {
+impl Nep171Hook<Option<TokenRecord>> for NonFungibleToken {
+    fn before_nft_transfer(&self, transfer: &Nep171Transfer) -> Option<TokenRecord> {
         let token = Nep171::nft_token(self, transfer.token_id.clone());
-        self.before_nft_transfer_balance_record
-            .push(token.map(Into::into));
+        token.map(Into::into)
     }
 
-    fn after_nft_transfer(&mut self, transfer: &Nep171Transfer, _state: ()) {
+    fn after_nft_transfer(
+        &mut self,
+        transfer: &Nep171Transfer,
+        before_nft_transfer: Option<TokenRecord>,
+    ) {
         let token = Nep171::nft_token(self, transfer.token_id.clone());
+        self.before_nft_transfer_balance_record
+            .push(before_nft_transfer);
         self.after_nft_transfer_balance_record
             .push(token.map(Into::into));
     }

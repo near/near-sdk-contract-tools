@@ -43,7 +43,14 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
 
     let before_nft_transfer = no_hooks.is_present().not().then(|| {
         quote! {
-            let hook_state = <Self as #me::standard::nep171::Nep171Hook::<_>>::before_nft_transfer(self, &transfer);
+            let hook_state = <Self as #me::standard::nep171::Nep171Hook::<_>>::before_nft_transfer(&self, &transfer);
+        }
+    });
+
+    let before_nft_transfer_predicate_body = no_hooks.is_present().not().then(|| {
+        quote! {
+            let hook_state = <Self as #me::standard::nep171::Nep171Hook::<_>>::before_nft_transfer(&self, &transfer);
+            hook_state
         }
     });
 
@@ -77,7 +84,8 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
 
                 let should_revert =
                     if let #near_sdk::PromiseResult::Successful(value) = #near_sdk::env::promise_result(0) {
-                        #near_sdk::serde_json::from_slice::<bool>(&value).unwrap_or(true)
+                        let value = #near_sdk::serde_json::from_slice::<bool>(&value).unwrap_or(true);
+                        value
                     } else {
                         true
                     };
@@ -93,21 +101,19 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
                         msg: None,
                     };
 
-                    #before_nft_transfer
-
-                    let result = #me::standard::nep171::Nep171Controller::transfer(
+                    let result = #me::standard::nep171::Nep171Controller::and_transfer(
                         self,
+                        || { #before_nft_transfer_predicate_body },
                         &[token_id],
                         receiver_id.clone(),
                         receiver_id,
                         previous_owner_id,
                         None,
-                    )
-                    .is_err();
+                    );
 
-                    #after_nft_transfer
-
-                    result
+                    result.map(|hook_state| {
+                        #after_nft_transfer
+                    }).is_err()
                 } else {
                     true
                 }

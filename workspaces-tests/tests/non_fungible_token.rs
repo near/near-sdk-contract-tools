@@ -393,3 +393,142 @@ async fn transfer_call_return_success() {
         }),
     );
 }
+
+#[tokio::test]
+async fn transfer_call_receiver_panic() {
+    let Setup { contract, accounts } = setup_balances(2, |i| vec![format!("token_{i}")]).await;
+    let alice = &accounts[0];
+    let bob = &accounts[1];
+
+    bob.batch(bob.id())
+        .deploy(RECEIVER_WASM)
+        .call(Function::new("new"))
+        .transact()
+        .await
+        .unwrap()
+        .unwrap();
+
+    let result = alice
+        .call(contract.id(), "nft_transfer_call")
+        .args_json(json!({
+            "token_id": "token_0",
+            "receiver_id": bob.id(),
+            "msg": "panic",
+        }))
+        .gas(30_000_000_000_000)
+        .deposit(1)
+        .transact()
+        .await
+        .unwrap()
+        .unwrap();
+
+    let logs = result.logs();
+
+    assert_eq!(
+        vec![
+            "before_nft_transfer(token_0)".to_string(),
+            Nep171Event::NftTransfer(vec![NftTransferLog {
+                token_ids: vec!["token_0".to_string()],
+                authorized_id: None,
+                old_owner_id: alice.id().parse().unwrap(),
+                new_owner_id: bob.id().parse().unwrap(),
+                memo: None,
+            }])
+            .to_event_string(),
+            "after_nft_transfer(token_0)".to_string(),
+            format!("Received token_0 from {} via {}", alice.id(), alice.id()),
+            "before_nft_transfer(token_0)".to_string(),
+            Nep171Event::NftTransfer(vec![NftTransferLog {
+                token_ids: vec!["token_0".to_string()],
+                authorized_id: None,
+                old_owner_id: bob.id().parse().unwrap(),
+                new_owner_id: alice.id().parse().unwrap(),
+                memo: None,
+            }])
+            .to_event_string(),
+            "after_nft_transfer(token_0)".to_string(),
+        ],
+        logs
+    );
+
+    // returned
+    assert_eq!(
+        nft_token(&contract, "token_0").await,
+        Some(Token {
+            token_id: "token_0".to_string(),
+            owner_id: alice.id().parse().unwrap(),
+        }),
+    );
+}
+
+#[tokio::test]
+async fn transfer_call_receiver_send_return() {
+    let Setup { contract, accounts } = setup_balances(3, |i| vec![format!("token_{i}")]).await;
+    let alice = &accounts[0];
+    let bob = &accounts[1];
+    let charlie = &accounts[2];
+
+    bob.batch(bob.id())
+        .deploy(RECEIVER_WASM)
+        .call(Function::new("new"))
+        .transact()
+        .await
+        .unwrap()
+        .unwrap();
+
+    let result = alice
+        .call(contract.id(), "nft_transfer_call")
+        .args_json(json!({
+            "token_id": "token_0",
+            "receiver_id": bob.id(),
+            "msg": format!("transfer:{}", charlie.id()),
+        }))
+        .gas(300_000_000_000_000) // xtra gas
+        .deposit(1)
+        .transact()
+        .await
+        .unwrap()
+        .unwrap();
+
+    let logs = result.logs();
+
+    println!("{logs:#?}");
+
+    assert_eq!(
+        vec![
+            "before_nft_transfer(token_0)".to_string(),
+            Nep171Event::NftTransfer(vec![NftTransferLog {
+                token_ids: vec!["token_0".to_string()],
+                authorized_id: None,
+                old_owner_id: alice.id().parse().unwrap(),
+                new_owner_id: bob.id().parse().unwrap(),
+                memo: None,
+            }])
+            .to_event_string(),
+            "after_nft_transfer(token_0)".to_string(),
+            format!("Received token_0 from {} via {}", alice.id(), alice.id()),
+            format!("Transferring token_0 to {}", charlie.id()),
+            "before_nft_transfer(token_0)".to_string(),
+            Nep171Event::NftTransfer(vec![NftTransferLog {
+                token_ids: vec!["token_0".to_string()],
+                authorized_id: None,
+                old_owner_id: bob.id().parse().unwrap(),
+                new_owner_id: charlie.id().parse().unwrap(),
+                memo: None,
+            }])
+            .to_event_string(),
+            "after_nft_transfer(token_0)".to_string(),
+            "returning true".to_string(),
+        ],
+        logs
+    );
+
+    // not returned
+    assert_eq!(
+        nft_token(&contract, "token_0").await,
+        Some(Token {
+            token_id: "token_0".to_string(),
+            owner_id: charlie.id().parse().unwrap(),
+        }),
+    );
+}
