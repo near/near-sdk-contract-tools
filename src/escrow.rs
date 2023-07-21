@@ -1,3 +1,27 @@
+//! Escrow pattern implements locking functionality over some arbitrary storage key.
+//!
+//! Upon locking something, it adds a flag in the store that some item on some `id` is locked with some `state`.
+//! This allows you to verify if an item is locked, and add some additional functionality to unlock the item.
+//!
+//!
+//! The crate exports a [derive macro](near_sdk_contract_tools_macros::Escrow)
+//! that derives a default implementation for escrow.
+//!
+//! Note: Due to https://github.com/rust-lang/rust/issues/29661 we can't yet provide a default implementation for `state` or `id`.
+//! This means you must provide them even if you don't plan to store state, like so:
+//! ```
+//! #[derive(Escrow)]
+//! #[escrow(id = "u64", state = "()")]
+//! #[near_bindgen]
+//! struct Contract {
+//!     is_ready: bool,
+//! }
+//!
+//! # Safety
+//! The state for this contract is stored under the `<Self as EscrowInternal>::root()`, make sure you don't
+//! accidentally collide these storage entries in your contract.
+//! You can change the key this is stored under by providing `root`.
+//!
 use crate::{event, standard::nep297::Event};
 use crate::{slot::Slot, DefaultStorageKey};
 use near_sdk::{
@@ -77,6 +101,8 @@ pub trait Escrow {
     fn lock(&mut self, id: &Self::Id, state: &Self::State);
 
     /// Unlock and release some `Self::State` by it's `Self::Id`
+    ///
+    /// Optionally, you can provide a handler which would allow you to inject logic if you should unlock or not
     fn unlock(&mut self, id: &Self::Id, lock_handler: impl FnOnce(&Self::State) -> bool);
 
     /// Check if the item is locked

@@ -183,16 +183,6 @@ pub fn derive_simple_multisig(input: TokenStream) -> TokenStream {
     make_derive(input, approval::simple_multisig::expand)
 }
 
-/// Creates a managed, lazily-loaded `Escrow` implementation for the targeted
-/// `#[near_bindgen]` struct.
-///
-/// The storage key prefix for the fields can be optionally specified (default:
-/// `"~es"`) using `#[escrow(storage_key = "<expression>")]`.
-#[proc_macro_derive(Escrow, attributes(escrow))]
-pub fn derive_escrow(input: TokenStream) -> TokenStream {
-    make_derive(input, escrow::expand)
-}
-
 /// Smart `#[event]` macro.
 ///
 /// See documentation on the [`derive@Nep297`] derive macro for more details.
@@ -224,4 +214,16 @@ pub fn event(attr: TokenStream, item: TokenStream) -> TokenStream {
 #[proc_macro_derive(Upgrade, attributes(upgrade))]
 pub fn derive_upgrade(input: TokenStream) -> TokenStream {
     make_derive(input, upgrade::expand)
+}
+
+/// Creates a managed, lazily-loaded `Escrow` implementation for the targeted
+/// `#[near_bindgen]` struct.
+///
+/// Fields include:
+///  - `id` - the type required for id, must be `borsh::BorshSerialize` & `serde::Serialize`, for events
+///  - `state` - the type required for id, must be `borsh::BorshSerialize` & `borsh::BorshSerialize`
+///  - `storage_key` Storage prefix for escrow data (optional, default: `b"~es"`)
+#[proc_macro_derive(Escrow, attributes(escrow))]
+pub fn derive_escrow(input: TokenStream) -> TokenStream {
+    make_derive(input, escrow::expand)
 }
