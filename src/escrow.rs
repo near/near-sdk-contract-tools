@@ -78,6 +78,9 @@ pub trait Escrow {
 
     /// Unlock and release some `Self::State` by it's `Self::Id`
     fn unlock(&mut self, id: &Self::Id, lock_handler: impl FnOnce(&Self::State) -> bool);
+
+    /// Check if the item is locked
+    fn is_locked(&self, id: &Self::Id) -> bool;
 }
 
 impl<T> Escrow for T
@@ -92,7 +95,7 @@ where
     fn lock(&mut self, id: &Self::Id, state: &Self::State) {
         require!(self.get_locked(id).is_none(), ESCROW_ALREADY_LOCKED_MESSAGE);
 
-        self.set_locked(id, &state);
+        self.set_locked(id, state);
         Lock {
             id: id.to_owned(),
             locked: Some(state),
@@ -102,15 +105,19 @@ where
 
     fn unlock(&mut self, id: &Self::Id, lock_handler: impl FnOnce(&Self::State) -> bool) {
         let lock = self
-            .get_locked(&id)
+            .get_locked(id)
             .unwrap_or_else(|| panic_str(ESCROW_NOT_LOCKED_MESSAGE));
 
         if lock_handler(&lock) {
-            self.set_unlocked(&id);
+            self.set_unlocked(id);
             Lock::<_, Self::State> { id, locked: None }.emit();
         } else {
             panic_str(ESCROW_LOCK_HANDLER_FAILED_MESSAGE)
         }
+    }
+
+    fn is_locked(&self, id: &Self::Id) -> bool {
+        self.get_locked(id).is_some()
     }
 }
 
