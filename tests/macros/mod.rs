@@ -4,15 +4,17 @@ use near_sdk::{
     test_utils::VMContextBuilder,
     testing_env, AccountId, BorshStorageKey,
 };
+use near_sdk_contract_tools::escrow::Escrow;
 use near_sdk_contract_tools::{
     migrate::{MigrateExternal, MigrateHook},
     owner::Owner,
     pause::Pause,
     rbac::Rbac,
     standard::nep297::Event,
-    Migrate, Owner, Pause, Rbac,
+    Escrow, Migrate, Owner, Pause, Rbac,
 };
 
+mod escrow;
 mod event;
 mod migrate;
 mod owner;
@@ -51,10 +53,11 @@ enum Role {
     CanSetValue,
 }
 
-#[derive(Owner, Pause, Rbac, BorshDeserialize, BorshSerialize)]
+#[derive(Owner, Pause, Rbac, Escrow, BorshDeserialize, BorshSerialize)]
 #[owner(storage_key = "StorageKey::Owner")]
 #[pause(storage_key = "StorageKey::Pause")]
 #[rbac(storage_key = "StorageKey::Rbac", roles = "Role")]
+#[escrow(storage_key = "StorageKey::Owner", id = "u64", state = "String")]
 #[near_bindgen]
 struct Integration {
     pub value: u32,
@@ -108,6 +111,18 @@ impl Integration {
 
     pub fn get_value(&self) -> u32 {
         self.value
+    }
+
+    pub fn lock_data(&mut self, id: u64, data: String) {
+        self.lock(&id, &data);
+    }
+
+    pub fn unlock_data(&mut self, id: u64) {
+        self.unlock(&id, |data| data.len() > 0);
+    }
+
+    pub fn check_is_locked(&self, id: u64) -> bool {
+        self.is_locked(&id)
     }
 }
 
@@ -271,6 +286,10 @@ fn integration() {
     migrated.set_value(8);
 
     assert_eq!(migrated.get_value(), 8);
+
+    c.lock_data(1, "Data".to_string());
+    assert!(c.check_is_locked(1));
+    c.unlock_data(1);
 }
 
 #[test]
@@ -349,6 +368,22 @@ fn integration_fail_migrate_paused() {
     env::state_write(&c);
 
     <MigrateIntegration as MigrateExternal>::migrate();
+}
+#[test]
+#[should_panic(expected = "Already locked")]
+fn integration_fail_cannot_lock_twice() {
+    let owner: AccountId = "owner".parse().unwrap();
+    let context = VMContextBuilder::new()
+        .predecessor_account_id(owner.clone())
+        .build();
+
+    testing_env!(context);
+    let mut c = Integration::new(owner.clone());
+
+    let id = 1;
+    let data = "Data".to_string();
+    c.lock_data(id, data.clone());
+    c.lock_data(id, data.clone());
 }
 
 #[cfg(test)]
