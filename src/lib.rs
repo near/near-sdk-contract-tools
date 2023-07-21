@@ -30,6 +30,7 @@ impl IntoStorageKey for DefaultStorageKey {
 pub mod standard;
 
 pub mod approval;
+pub mod fast_account_id;
 pub mod migrate;
 pub mod owner;
 pub mod pause;
