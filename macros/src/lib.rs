@@ -5,6 +5,7 @@ use proc_macro::TokenStream;
 use syn::{parse_macro_input, AttributeArgs, DeriveInput, Item};
 
 mod approval;
+mod escrow;
 mod migrate;
 mod owner;
 mod pause;
@@ -180,6 +181,16 @@ pub fn derive_migrate(input: TokenStream) -> TokenStream {
 #[proc_macro_derive(SimpleMultisig, attributes(simple_multisig))]
 pub fn derive_simple_multisig(input: TokenStream) -> TokenStream {
     make_derive(input, approval::simple_multisig::expand)
+}
+
+/// Creates a managed, lazily-loaded `Escrow` implementation for the targeted
+/// `#[near_bindgen]` struct.
+///
+/// The storage key prefix for the fields can be optionally specified (default:
+/// `"~es"`) using `#[escrow(storage_key = "<expression>")]`.
+#[proc_macro_derive(Escrow, attributes(escrow))]
+pub fn derive_escrow(input: TokenStream) -> TokenStream {
+    make_derive(input, escrow::expand)
 }
 
 /// Smart `#[event]` macro.

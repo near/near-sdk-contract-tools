@@ -13,6 +13,8 @@ pub enum DefaultStorageKey {
     Pause,
     /// Default storage key for [`rbac::Rbac::root`]
     Rbac,
+    /// Default storage key for [`escrow::Escrow::root`]
+    Escrow,
 }
 
 impl IntoStorageKey for DefaultStorageKey {
@@ -23,6 +25,7 @@ impl IntoStorageKey for DefaultStorageKey {
             DefaultStorageKey::Owner => b"~o".to_vec(),
             DefaultStorageKey::Pause => b"~p".to_vec(),
             DefaultStorageKey::Rbac => b"~r".to_vec(),
+            DefaultStorageKey::Escrow => b"~es".to_vec(),
         }
     }
 }
@@ -30,6 +33,7 @@ impl IntoStorageKey for DefaultStorageKey {
 pub mod standard;
 
 pub mod approval;
+pub mod escrow;
 pub mod migrate;
 pub mod owner;
 pub mod pause;
