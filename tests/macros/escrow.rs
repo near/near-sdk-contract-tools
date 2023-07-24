@@ -77,7 +77,7 @@ fn test_can_unlock() {
 }
 
 #[test]
-#[should_panic(expected = "Lock handler failed, not unlocking")]
+#[should_panic(expected = "Unlock handler failed")]
 fn test_cannot_unlock_until_ready() {
     testing_env!(get_context(ONE_YOCTO, None));
     let mut contract = IsReadyLockableContract::new();

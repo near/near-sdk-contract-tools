@@ -23,7 +23,7 @@ use near_sdk::{
 
 const ESCROW_ALREADY_LOCKED_MESSAGE: &str = "Already locked";
 const ESCROW_NOT_LOCKED_MESSAGE: &str = "Lock required";
-const ESCROW_LOCK_HANDLER_FAILED_MESSAGE: &str = "Lock handler failed, not unlocking";
+const ESCROW_UNLOCK_HANDLER_FAILED_MESSAGE: &str = "Unlock handler failed";
 
 #[derive(BorshSerialize, BorshStorageKey)]
 enum StorageKey<'a, T> {
@@ -90,8 +90,8 @@ pub trait Escrow {
 
     /// Unlock and release some `Self::State` by it's `Self::Id`
     ///
-    /// Optionally, you can provide a handler which would allow you to inject logic if you should unlock or not
-    fn unlock(&mut self, id: &Self::Id, lock_handler: impl FnOnce(&Self::State) -> bool);
+    /// Optionally, you can provide a handler which would allow you to inject logic if you should unlock or not.
+    fn unlock(&mut self, id: &Self::Id, unlock_handler: impl FnOnce(&Self::State) -> bool);
 
     /// Check if the item is locked
     fn is_locked(&self, id: &Self::Id) -> bool;
@@ -100,8 +100,6 @@ pub trait Escrow {
 impl<T> Escrow for T
 where
     T: EscrowInternal,
-    <T as EscrowInternal>::Id: Serialize,
-    <T as EscrowInternal>::State: Serialize,
 {
     type Id = <Self as EscrowInternal>::Id;
     type State = <Self as EscrowInternal>::State;
@@ -110,6 +108,42 @@ where
         require!(self.get_locked(id).is_none(), ESCROW_ALREADY_LOCKED_MESSAGE);
 
         self.set_locked(id, state);
+    }
+
+    fn unlock(&mut self, id: &Self::Id, unlock_handler: impl FnOnce(&Self::State) -> bool) {
+        let lock = self
+            .get_locked(id)
+            .unwrap_or_else(|| panic_str(ESCROW_NOT_LOCKED_MESSAGE));
+
+        if unlock_handler(&lock) {
+            self.set_unlocked(id);
+        } else {
+            panic_str(ESCROW_UNLOCK_HANDLER_FAILED_MESSAGE)
+        }
+    }
+
+    fn is_locked(&self, id: &Self::Id) -> bool {
+        self.get_locked(id).is_some()
+    }
+}
+
+/// A wrapper trait allowing all implementations of `State` and `Id` that implement [`serde::Serialize`]
+/// to emit an event on success if they want to.
+pub trait EventEmittedOnEscrow<Id: Serialize, State: Serialize> {
+    /// Optionally implement an event on success of lock
+    fn lock_emit(&mut self, id: &Id, state: &State);
+    /// Optionally implement an event on success of unlock
+    fn unlock_emit(&mut self, id: &Id, unlock_handler: impl FnOnce(&State) -> bool);
+}
+
+impl<T> EventEmittedOnEscrow<<T as Escrow>::Id, <T as Escrow>::State> for T
+where
+    T: Escrow + EscrowInternal,
+    <T as Escrow>::Id: Serialize,
+    <T as Escrow>::State: Serialize,
+{
+    fn lock_emit(&mut self, id: &<T as Escrow>::Id, state: &<T as Escrow>::State) {
+        self.lock(id, state);
         Lock {
             id: id.to_owned(),
             locked: Some(state),
@@ -117,21 +151,13 @@ where
         .emit();
     }
 
-    fn unlock(&mut self, id: &Self::Id, lock_handler: impl FnOnce(&Self::State) -> bool) {
-        let lock = self
-            .get_locked(id)
-            .unwrap_or_else(|| panic_str(ESCROW_NOT_LOCKED_MESSAGE));
-
-        if lock_handler(&lock) {
-            self.set_unlocked(id);
-            Lock::<_, Self::State> { id, locked: None }.emit();
-        } else {
-            panic_str(ESCROW_LOCK_HANDLER_FAILED_MESSAGE)
-        }
-    }
-
-    fn is_locked(&self, id: &Self::Id) -> bool {
-        self.get_locked(id).is_some()
+    fn unlock_emit(
+        &mut self,
+        id: &<T as Escrow>::Id,
+        unlock_handler: impl FnOnce(&<T as Escrow>::State) -> bool,
+    ) {
+        self.unlock(id, unlock_handler);
+        Lock::<_, <T as Escrow>::State> { id, locked: None }.emit();
     }
 }
 
@@ -206,7 +232,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Lock handler failed, not unlocking")]
+    #[should_panic(expected = "Unlock handler failed")]
     fn test_cannot_unlock_until_ready() {
         testing_env!(get_context(ONE_YOCTO, None));
         let mut contract = Contract::new();
