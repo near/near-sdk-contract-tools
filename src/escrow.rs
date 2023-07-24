@@ -10,18 +10,19 @@
 //! Note: Due to https://github.com/rust-lang/rust/issues/29661 we can't yet provide a default implementation for `state` or `id`.
 //! This means you must provide them even if you don't plan to store state, like so:
 //! ```
+//! use near_sdk_contract_tools::Escrow;
+//! use near_sdk::near_bindgen;
 //! #[derive(Escrow)]
 //! #[escrow(id = "u64", state = "()")]
 //! #[near_bindgen]
 //! struct Contract {
 //!     is_ready: bool,
 //! }
-//!
+//! ```
 //! # Safety
-//! The state for this contract is stored under the `<Self as EscrowInternal>::root()`, make sure you don't
+//! The state for this contract is stored under the [root][EscrowInternal::root], make sure you dont
 //! accidentally collide these storage entries in your contract.
-//! You can change the key this is stored under by providing `root`.
-//!
+//! You can change the key this is stored under by providing [storage_key] to the macro.
 use crate::{event, standard::nep297::Event};
 use crate::{slot::Slot, DefaultStorageKey};
 use near_sdk::{
