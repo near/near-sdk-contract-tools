@@ -1,11 +1,11 @@
 use near_sdk::{
-    borsh, borsh::BorshSerialize, near_bindgen, test_utils::VMContextBuilder, testing_env,
-    AccountId, Balance, BorshStorageKey, VMContext, ONE_YOCTO,
+    borsh, borsh::BorshSerialize, json_types::U64, near_bindgen, test_utils::VMContextBuilder,
+    testing_env, AccountId, Balance, BorshStorageKey, VMContext, ONE_YOCTO,
 };
 use near_sdk_contract_tools::escrow::{Escrow, EscrowInternal};
 use near_sdk_contract_tools::Escrow;
 
-const ID: u64 = 1;
+const ID: U64 = U64(1);
 const IS_NOT_READY: bool = false;
 
 #[derive(BorshStorageKey, BorshSerialize)]
@@ -13,25 +13,33 @@ enum StorageKey {
     MyStorageKey,
 }
 
+// Ensure compilation of default state type.
 #[derive(Escrow)]
-#[escrow(id = "u64", state = "bool", storage_key = "StorageKey::MyStorageKey")]
+#[escrow(id = "U64")]
 #[near_bindgen]
-struct IsReadyLockableContract {
-    is_ready: bool,
-}
+struct StatelessLock {}
+
+#[derive(Escrow)]
+#[escrow(id = "U64", state = "bool", storage_key = "StorageKey::MyStorageKey")]
+#[near_bindgen]
+struct IsReadyLockableContract {}
 
 #[near_bindgen]
 impl IsReadyLockableContract {
     #[init]
     pub fn new() -> Self {
-        Self { is_ready: false }
+        Self {}
     }
+}
+
+fn alice() -> AccountId {
+    "alice".parse().unwrap()
 }
 
 fn get_context(attached_deposit: Balance, signer: Option<AccountId>) -> VMContext {
     VMContextBuilder::new()
-        .signer_account_id(signer.clone().unwrap_or("alice".parse().unwrap()))
-        .predecessor_account_id(signer.unwrap_or("alice".parse().unwrap()))
+        .signer_account_id(signer.clone().unwrap_or_else(alice))
+        .predecessor_account_id(signer.unwrap_or_else(alice))
         .attached_deposit(attached_deposit)
         .is_view(false)
         .build()

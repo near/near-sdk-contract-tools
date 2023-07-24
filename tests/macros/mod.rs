@@ -118,7 +118,7 @@ impl Integration {
     }
 
     pub fn unlock_data(&mut self, id: u64) {
-        self.unlock(&id, |data| data.len() > 0);
+        self.unlock(&id, |data| !data.is_empty());
     }
 
     pub fn check_is_locked(&self, id: u64) -> bool {

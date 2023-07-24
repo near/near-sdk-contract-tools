@@ -1,7 +1,5 @@
 #![cfg(not(windows))]
 
-use std::collections::HashSet;
-
 use near_sdk::{
     serde::{Deserialize, Serialize},
     serde_json::{self, json},
@@ -56,12 +54,10 @@ async fn setup(num_accounts: usize, wasm: &[u8]) -> Setup {
 
 #[tokio::test]
 async fn happy() {
-    let Setup { contract, accounts } = setup(4, WASM).await;
+    let Setup { contract, accounts } = setup(2, WASM).await;
 
     let alice = &accounts[0];
     let bob = &accounts[1];
-    let charlie = &accounts[2];
-    let daisy = &accounts[3];
 
     let call = |who: Account, contract: AccountId, method: String, args: Vec<u8>| async move {
         who.call(&contract, &method)
@@ -81,7 +77,7 @@ async fn happy() {
         )
     };
     let mix = |who: Account, contract: AccountId, colour: PrimaryColour, with: PrimaryColour| async move {
-        who.call(&contract, &"mix".to_string())
+        who.call(&contract, "mix")
             .args(serde_json::to_vec(&json!({ "colour": colour, "with": with })).unwrap())
             .transact()
             .await
@@ -110,7 +106,7 @@ async fn happy() {
         .json::<bool>()
         .unwrap();
 
-    assert_eq!(locked, false);
+    assert!(!locked);
     assert_eq!(pair_x, bob.clone().id().to_owned());
     assert_eq!(pair_y, alice.clone().id().to_owned());
     assert_eq!(mixed_colour, SecondaryColour::Purple);
@@ -119,12 +115,9 @@ async fn happy() {
 #[tokio::test]
 #[should_panic(expected = "Already locked")]
 async fn unhappy_cant_lock() {
-    let Setup { contract, accounts } = setup(4, WASM).await;
+    let Setup { contract, accounts } = setup(1, WASM).await;
 
     let alice = &accounts[0];
-    let bob = &accounts[1];
-    let charlie = &accounts[2];
-    let daisy = &accounts[3];
 
     let call = |who: Account, contract: AccountId, method: String, args: Vec<u8>| async move {
         who.call(&contract, &method)

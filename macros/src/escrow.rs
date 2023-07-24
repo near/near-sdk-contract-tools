@@ -8,7 +8,7 @@ use syn::Expr;
 pub struct EscrowMeta {
     pub storage_key: Option<Expr>,
     pub id: Expr,
-    pub state: Expr,
+    pub state: Option<Expr>,
 
     pub generics: syn::Generics,
     pub ident: syn::Ident,
@@ -42,6 +42,10 @@ pub fn expand(meta: EscrowMeta) -> Result<TokenStream, darling::Error> {
             }
         }
     });
+
+    let state = state
+        .map(|state| quote! { #state })
+        .unwrap_or_else(|| quote! { () });
 
     Ok(quote! {
         impl #imp #me::escrow::EscrowInternal for #ident #ty #wher {

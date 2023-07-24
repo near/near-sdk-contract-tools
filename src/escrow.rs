@@ -3,22 +3,9 @@
 //! Upon locking something, it adds a flag in the store that some item on some `id` is locked with some `state`.
 //! This allows you to verify if an item is locked, and add some additional functionality to unlock the item.
 //!
-//!
 //! The crate exports a [derive macro](near_sdk_contract_tools_macros::Escrow)
 //! that derives a default implementation for escrow.
 //!
-//! Note: Due to https://github.com/rust-lang/rust/issues/29661 we can't yet provide a default implementation for `state` or `id`.
-//! This means you must provide them even if you don't plan to store state, like so:
-//! ```
-//! use near_sdk_contract_tools::Escrow;
-//! use near_sdk::near_bindgen;
-//! #[derive(Escrow)]
-//! #[escrow(id = "u64", state = "()")]
-//! #[near_bindgen]
-//! struct Contract {
-//!     is_ready: bool,
-//! }
-//! ```
 //! # Safety
 //! The state for this contract is stored under the [root][EscrowInternal::root], make sure you dont
 //! accidentally collide these storage entries in your contract.
@@ -48,7 +35,7 @@ enum StorageKey<'a, T> {
     standard = "x-escrow",
     version = "1.0.0",
     crate = "crate",
-    macros = "near_sdk_contract_tools_macros"
+    macros = "crate"
 )]
 pub struct Lock<Id: Serialize, State: Serialize> {
     /// The identifier for a lock
@@ -164,22 +151,24 @@ mod tests {
     #[derive(Escrow)]
     #[escrow(id = "u64", state = "bool", crate = "crate")]
     #[near_bindgen]
-    struct Contract {
-        is_ready: bool,
-    }
+    struct Contract {}
 
     #[near_bindgen]
     impl Contract {
         #[init]
         pub fn new() -> Self {
-            Self { is_ready: false }
+            Self {}
         }
+    }
+
+    fn alice() -> AccountId {
+        "alice".parse().unwrap()
     }
 
     fn get_context(attached_deposit: Balance, signer: Option<AccountId>) -> VMContext {
         VMContextBuilder::new()
-            .signer_account_id(signer.clone().unwrap_or("alice".parse().unwrap()))
-            .predecessor_account_id(signer.unwrap_or("alice".parse().unwrap()))
+            .signer_account_id(signer.clone().unwrap_or_else(alice))
+            .predecessor_account_id(signer.unwrap_or_else(alice))
             .attached_deposit(attached_deposit)
             .is_view(false)
             .build()

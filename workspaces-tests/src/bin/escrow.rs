@@ -8,7 +8,7 @@ use near_sdk::{
 };
 use near_sdk_contract_tools::{escrow::Escrow, Escrow};
 
-pub fn main() {}
+pub fn main() {} // Ignore
 
 #[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize, Clone)]
 #[serde(crate = "near_sdk::serde")]
