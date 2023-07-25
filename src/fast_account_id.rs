@@ -1,7 +1,7 @@
 //! A fast alternative to `near_sdk::AccountId` that is faster to use, and has a
 //! smaller Borsh serialization footprint.
 
-use std::{ops::Deref, sync::Arc};
+use std::{ops::Deref, rc::Rc, str::FromStr};
 
 use near_sdk::borsh::{BorshDeserialize, BorshSerialize};
 
@@ -10,10 +10,15 @@ use near_sdk::borsh::{BorshDeserialize, BorshSerialize};
 ///
 /// Limitations:
 ///  - Does not implement `serde` serialization traits.
-///  - No parsing/validation logic. This is basically just a string wrapper
-///     with NEAR-account-ID-specific serialization logic.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct FastAccountId(Arc<str>);
+pub struct FastAccountId(Rc<str>);
+
+impl FastAccountId {
+    /// Creates a new `FastAccountId` from a `&str` without performing any checks.
+    pub fn new_unchecked(account_id: &str) -> Self {
+        Self(Rc::from(account_id))
+    }
+}
 
 impl std::fmt::Display for FastAccountId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -37,13 +42,29 @@ impl AsRef<str> for FastAccountId {
 
 impl From<near_sdk::AccountId> for FastAccountId {
     fn from(account_id: near_sdk::AccountId) -> Self {
-        Self(Arc::from(account_id.as_str()))
+        Self(Rc::from(account_id.as_str()))
     }
 }
 
-impl From<&str> for FastAccountId {
-    fn from(account_id: &str) -> Self {
-        Self(Arc::from(account_id))
+impl From<FastAccountId> for near_sdk::AccountId {
+    fn from(account_id: FastAccountId) -> Self {
+        Self::new_unchecked(account_id.0.to_string())
+    }
+}
+
+impl FromStr for FastAccountId {
+    type Err = <near_sdk::AccountId as FromStr>::Err;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        near_sdk::AccountId::from_str(s).map(Self::from)
+    }
+}
+
+impl TryFrom<&str> for FastAccountId {
+    type Error = <near_sdk::AccountId as FromStr>::Err;
+
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
+        near_sdk::AccountId::from_str(s).map(Self::from)
     }
 }
 
@@ -51,7 +72,7 @@ impl BorshSerialize for FastAccountId {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         let len: u8 = self.0.len() as u8;
         writer.write_all(&[len])?;
-        let compressed = compress_account_id(&self.0).unwrap();
+        let compressed = compress_account_id(&self.0).ok_or(std::io::ErrorKind::InvalidData)?;
         writer.write_all(&compressed)?;
         Ok(())
     }
@@ -63,7 +84,7 @@ impl BorshDeserialize for FastAccountId {
         let compressed = &buf[1..];
         let account_id = decompress_account_id(compressed, len);
         *buf = &buf[1 + compressed_size(len)..];
-        Ok(Self(Arc::from(account_id)))
+        Ok(Self(Rc::from(account_id)))
     }
 }
 
@@ -79,8 +100,7 @@ fn append_sub_byte(v: &mut [u8], start_bit: usize, sub_byte: u8, num_bits: usize
     let sub_bits = sub_byte & (0b1111_1111 >> (8 - num_bits));
 
     let bit_offset = start_bit % 8;
-    let keep_mask = !(0b1111_1111 << bit_offset)
-        | !(0b1111_1111 >> (8usize.saturating_sub(num_bits + bit_offset)));
+    let keep_mask = !select_bits_mask(bit_offset, num_bits);
     let first_byte = (v[start_bit / 8] & keep_mask) | (sub_bits << bit_offset);
 
     v[start_bit / 8] = first_byte;
@@ -95,8 +115,7 @@ fn read_sub_byte(v: &[u8], start_bit: usize, num_bits: usize) -> u8 {
     assert!(num_bits <= 8);
 
     let bit_offset = start_bit % 8;
-    let keep_mask = (0b1111_1111 << bit_offset)
-        & (0b1111_1111 >> (8usize.saturating_sub(num_bits + bit_offset)));
+    let keep_mask = select_bits_mask(bit_offset, num_bits);
     let first_byte = v[start_bit / 8] & keep_mask;
 
     let mut sub_byte = first_byte >> bit_offset;
@@ -109,6 +128,11 @@ fn read_sub_byte(v: &[u8], start_bit: usize, num_bits: usize) -> u8 {
     }
 
     sub_byte
+}
+
+const fn select_bits_mask(start_bit_index: usize, num_bits: usize) -> u8 {
+    (0b1111_1111 << start_bit_index)
+        & (0b1111_1111 >> (8usize.saturating_sub(num_bits + start_bit_index)))
 }
 
 fn decompress_account_id(compressed: &[u8], len: usize) -> String {
@@ -130,7 +154,7 @@ fn compress_account_id(account_id: &str) -> Option<Vec<u8>> {
 
     let mut i = 0;
     for c in account_id.as_bytes() {
-        let index = char_index(*c).unwrap() as u8;
+        let index = char_index(*c)? as u8;
         append_sub_byte(&mut v, i, index, 6);
         i += 6;
     }
@@ -163,9 +187,10 @@ mod tests {
     }
 
     #[test]
-    fn test() {
+    fn test_compression_decompression() {
         let account_id = "test.near";
         let compressed = compress_account_id(account_id).unwrap();
+        assert_eq!(compressed.len(), 7);
         let decompressed = decompress_account_id(&compressed, account_id.len());
         assert_eq!(account_id, decompressed);
     }
@@ -173,9 +198,15 @@ mod tests {
     #[test]
     fn test_account_id_borsh() {
         let account_id = "0".repeat(64);
-        let account_id = FastAccountId(Arc::from(account_id));
+        let sdk_account_id = near_sdk::AccountId::new_unchecked(account_id.clone());
+        let expected_serialized_length = 64 * 3 / 4 + 1; // no +1 for remainder (64 * 3 % 4 == 0), but +1 for length
+        let account_id = FastAccountId::new_unchecked(&account_id);
         let serialized = account_id.try_to_vec().unwrap();
+        assert_eq!(serialized.len(), expected_serialized_length);
         let deserializalized = FastAccountId::try_from_slice(&serialized).unwrap();
         assert_eq!(account_id, deserializalized);
+
+        let sdk_serialized = sdk_account_id.try_to_vec().unwrap();
+        assert!(sdk_serialized.len() > serialized.len()); // gottem
     }
 }
