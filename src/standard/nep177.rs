@@ -9,7 +9,19 @@ use near_sdk::{
 };
 use thiserror::Error;
 
-use crate::{slot::Slot, standard::nep171::*, DefaultStorageKey};
+use crate::{
+    slot::Slot,
+    standard::{
+        nep171::{
+            self,
+            error::{TokenAlreadyExistsError, TokenDoesNotExistError},
+            event::{NftContractMetadataUpdateLog, NftMetadataUpdateLog},
+            *,
+        },
+        nep297::Event,
+    },
+    DefaultStorageKey,
+};
 
 pub struct Token {
     pub token_id: TokenId,
@@ -18,8 +30,17 @@ pub struct Token {
 }
 
 impl Token {
-    pub fn load(contract: &impl Nep171Controller, token_id: TokenId) -> Option<Self> {
-        todo!()
+    pub fn load(
+        contract: &(impl Nep171Controller + Nep177Controller),
+        token_id: TokenId,
+    ) -> Option<Self> {
+        let owner_id = contract.token_owner(&token_id)?;
+        let metadata = contract.token_metadata(&token_id)?;
+        Some(Self {
+            token_id,
+            owner_id,
+            metadata,
+        })
     }
 }
 
@@ -95,16 +116,38 @@ pub trait Nep177ControllerInternal {
 }
 
 pub trait Nep177Controller {
+    fn mint_with_metadata(
+        &mut self,
+        token_id: TokenId,
+        owner_id: AccountId,
+        metadata: TokenMetadata,
+    ) -> Result<(), Nep171MintError>;
+
+    fn burn_with_metadata(
+        &mut self,
+        token_id: TokenId,
+        current_owner_id: &AccountId,
+    ) -> Result<(), Nep171BurnError>;
+
+    fn update_token_metadata_unchecked(
+        &mut self,
+        token_id: TokenId,
+        metadata: Option<TokenMetadata>,
+    );
+
     fn update_token_metadata(
         &mut self,
-        token_id: &TokenId,
+        token_id: TokenId,
         metadata: TokenMetadata,
     ) -> Result<(), UpdateTokenMetadataError>;
 
     fn update_contract_metadata(&mut self, metadata: ContractMetadata);
+
+    fn token_metadata(&self, token_id: &TokenId) -> Option<TokenMetadata>;
 }
 
 #[derive(Error, Debug)]
+#[non_exhaustive]
 pub enum UpdateTokenMetadataError {
     #[error(transparent)]
     TokenNotFound(#[from] TokenDoesNotExistError),
@@ -113,22 +156,63 @@ pub enum UpdateTokenMetadataError {
 impl<T: Nep177ControllerInternal + Nep171Controller> Nep177Controller for T {
     fn update_token_metadata(
         &mut self,
-        token_id: &TokenId,
+        token_id: TokenId,
         metadata: TokenMetadata,
     ) -> Result<(), UpdateTokenMetadataError> {
-        if self.token_owner(token_id).is_some() {
-            Self::slot_token_metadata(token_id).set(Some(&metadata));
+        if self.token_owner(&token_id).is_some() {
+            self.update_token_metadata_unchecked(token_id, Some(metadata));
             Ok(())
         } else {
-            Err(TokenDoesNotExistError {
-                token_id: token_id.clone(),
-            }
-            .into())
+            Err(TokenDoesNotExistError { token_id }.into())
         }
     }
 
     fn update_contract_metadata(&mut self, metadata: ContractMetadata) {
         Self::slot_contract_metadata().set(Some(&metadata));
+        Nep171Event::ContractMetadataUpdate(vec![NftContractMetadataUpdateLog { memo: None }])
+            .emit();
+    }
+
+    fn mint_with_metadata(
+        &mut self,
+        token_id: TokenId,
+        owner_id: AccountId,
+        metadata: TokenMetadata,
+    ) -> Result<(), Nep171MintError> {
+        let token_ids = [token_id];
+        self.mint(&token_ids, &owner_id, None)?;
+        let [token_id] = token_ids;
+        self.update_token_metadata_unchecked(token_id, Some(metadata));
+        Ok(())
+    }
+
+    fn burn_with_metadata(
+        &mut self,
+        token_id: TokenId,
+        current_owner_id: &AccountId,
+    ) -> Result<(), Nep171BurnError> {
+        let token_ids = [token_id];
+        self.burn(&token_ids, current_owner_id, None)?;
+        let [token_id] = token_ids;
+        self.update_token_metadata_unchecked(token_id, None);
+        Ok(())
+    }
+
+    fn update_token_metadata_unchecked(
+        &mut self,
+        token_id: TokenId,
+        metadata: Option<TokenMetadata>,
+    ) {
+        <Self as Nep177ControllerInternal>::slot_token_metadata(&token_id).set(metadata.as_ref());
+        nep171::Nep171Event::NftMetadataUpdate(vec![NftMetadataUpdateLog {
+            token_ids: vec![token_id],
+            memo: None,
+        }])
+        .emit();
+    }
+
+    fn token_metadata(&self, token_id: &TokenId) -> Option<TokenMetadata> {
+        <Self as Nep177ControllerInternal>::slot_token_metadata(token_id).read()
     }
 }
 
@@ -145,5 +229,3 @@ mod ext {
 }
 
 pub use ext::*;
-
-use super::nep171::{self, error::TokenDoesNotExistError};
