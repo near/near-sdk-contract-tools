@@ -521,6 +521,14 @@ pub struct Token {
     pub owner_id: AccountId,
 }
 
+impl Token {
+    pub fn load(contract: &impl Nep171Controller, token_id: TokenId) -> Option<Self> {
+        contract
+            .token_owner(&token_id)
+            .map(|owner_id| Self { token_id, owner_id })
+    }
+}
+
 // separate module with re-export because ext_contract doesn't play well with #![warn(missing_docs)]
 mod ext {
     #![allow(missing_docs)]
@@ -533,7 +541,7 @@ mod ext {
 
     /// Interface of contracts that implement NEP-171.
     #[ext_contract(ext_nep171)]
-    pub trait Nep171 {
+    pub trait Nep171<T = Token> {
         /// Transfer a token.
         fn nft_transfer(
             &mut self,
@@ -554,7 +562,7 @@ mod ext {
         ) -> PromiseOrValue<bool>;
 
         /// Get individual token information.
-        fn nft_token(&self, token_id: TokenId) -> Option<Token>;
+        fn nft_token(&self, token_id: TokenId) -> Option<T>;
     }
 
     /// Original token contract follow-up to [`Nep171::nft_transfer_call`].

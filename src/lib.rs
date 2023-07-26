@@ -12,6 +12,8 @@ pub enum DefaultStorageKey {
     Nep141,
     /// Default storage key for [`standard::nep171::Nep171Controller::root`]
     Nep171,
+    /// Default storage key for [`standard::nep177::Nep177Controller::root`]
+    Nep177,
     /// Default storage key for [`owner::Owner::root`]
     Owner,
     /// Default storage key for [`pause::Pause::root`]
@@ -26,6 +28,7 @@ impl IntoStorageKey for DefaultStorageKey {
             DefaultStorageKey::ApprovalManager => b"~am".to_vec(),
             DefaultStorageKey::Nep141 => b"~$141".to_vec(),
             DefaultStorageKey::Nep171 => b"~$171".to_vec(),
+            DefaultStorageKey::Nep177 => b"~$177".to_vec(),
             DefaultStorageKey::Owner => b"~o".to_vec(),
             DefaultStorageKey::Pause => b"~p".to_vec(),
             DefaultStorageKey::Rbac => b"~r".to_vec(),

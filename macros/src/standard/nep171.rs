@@ -10,6 +10,9 @@ use syn::Expr;
 pub struct Nep171Meta {
     pub storage_key: Option<Expr>,
     pub no_hooks: Flag,
+    pub token_loader: Option<syn::Path>,
+    pub token_type: Option<syn::Path>,
+
     pub generics: syn::Generics,
     pub ident: syn::Ident,
 
@@ -24,6 +27,9 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
     let Nep171Meta {
         storage_key,
         no_hooks,
+        token_loader,
+        token_type,
+
         generics,
         ident,
 
@@ -32,6 +38,18 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
     } = meta;
 
     let (imp, ty, wher) = generics.split_for_impl();
+
+    let token_type = token_type
+        .map(|token_type| quote! { #token_type })
+        .unwrap_or_else(|| {
+            quote! { #me::standard::nep171::Token }
+        });
+
+    let token_loader = token_loader
+        .map(|token_loader| quote! { #token_loader })
+        .unwrap_or_else(|| {
+            quote! { #me::standard::nep171::Token::load }
+        });
 
     let root = storage_key.map(|storage_key| {
         quote! {
@@ -130,7 +148,7 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
         }
 
         #[#near_sdk::near_bindgen]
-        impl #imp #me::standard::nep171::Nep171 for #ident #ty #wher {
+        impl #imp #me::standard::nep171::Nep171<#me::standard::nep171::Token> for #ident #ty #wher {
             #[payable]
             fn nft_transfer(
                 &mut self,
