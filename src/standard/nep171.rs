@@ -33,7 +33,7 @@ pub type TokenId = String;
     macros = "crate",
     serde = "serde",
     standard = "nep171",
-    version = "1.1.0"
+    version = "1.2.0"
 )]
 #[derive(Debug, Clone)]
 pub enum Nep171Event {
@@ -44,7 +44,9 @@ pub enum Nep171Event {
     /// Emitted when a token is burned.
     NftBurn(Vec<event::NftBurnLog>),
     /// Emitted when the metadata associated with an NFT contract is updated.
-    ContractMetadataUpdate(Vec<event::ContractMetadataUpdateLog>),
+    NftMetadataUpdate(Vec<event::NftMetadataUpdateLog>),
+    /// Emitted when the metadata associated with an NFT contract is updated.
+    ContractMetadataUpdate(Vec<event::NftContractMetadataUpdateLog>),
 }
 
 /// Event log metadata & associated structures.
@@ -96,9 +98,19 @@ pub mod event {
         pub memo: Option<String>,
     }
 
-    /// Contract metadata update metadata.
+    /// Token metadata update.
     #[derive(Serialize, Debug, Clone)]
-    pub struct ContractMetadataUpdateLog {
+    pub struct NftMetadataUpdateLog {
+        /// IDs of the updated tokens.
+        pub token_ids: Vec<String>,
+        /// Additional update information.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub memo: Option<String>,
+    }
+
+    /// Contract metadata update.
+    #[derive(Serialize, Debug, Clone)]
+    pub struct NftContractMetadataUpdateLog {
         /// Additional update information.
         #[serde(skip_serializing_if = "Option::is_none")]
         pub memo: Option<String>,
