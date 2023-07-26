@@ -48,7 +48,7 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
     let token_loader = token_loader
         .map(|token_loader| quote! { #token_loader })
         .unwrap_or_else(|| {
-            quote! { #me::standard::nep171::Token::load }
+            quote! { #token_type::load }
         });
 
     let root = storage_key.map(|storage_key| {
@@ -148,7 +148,7 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
         }
 
         #[#near_sdk::near_bindgen]
-        impl #imp #me::standard::nep171::Nep171<#me::standard::nep171::Token> for #ident #ty #wher {
+        impl #imp #me::standard::nep171::Nep171<#token_type> for #ident #ty #wher {
             #[payable]
             fn nft_transfer(
                 &mut self,
@@ -267,11 +267,8 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
             fn nft_token(
                 &self,
                 token_id: #me::standard::nep171::TokenId,
-            ) -> Option<#me::standard::nep171::Token> {
-                use #me::standard::nep171::*;
-
-                Nep171Controller::token_owner(self, &token_id)
-                    .map(|owner_id| Token { token_id, owner_id })
+            ) -> Option<#token_type> {
+                #token_loader(self, token_id)
             }
         }
     })

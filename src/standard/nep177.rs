@@ -3,6 +3,7 @@
 //! Reference: <https://github.com/near/NEPs/blob/master/neps/nep-0177.md>
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
+    env,
     json_types::U64,
     serde::*,
     AccountId, BorshStorageKey,
@@ -23,6 +24,12 @@ use crate::{
     DefaultStorageKey,
 };
 
+const CONTRACT_METADATA_NOT_INITIALIZED_ERROR: &str = "Contract metadata not initialized";
+
+#[derive(
+    Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize, BorshSerialize, BorshDeserialize,
+)]
+#[serde(crate = "near_sdk::serde")]
 pub struct Token {
     pub token_id: TokenId,
     pub owner_id: AccountId,
@@ -65,6 +72,22 @@ pub struct ContractMetadata {
     pub base_uri: Option<String>,
     pub reference: Option<String>,
     pub reference_hash: Option<String>,
+}
+
+impl ContractMetadata {
+    pub const SPEC: &'static str = "nft-1.0.0";
+
+    pub fn new(name: String, symbol: String, base_uri: Option<String>) -> Self {
+        Self {
+            spec: Self::SPEC.to_string(),
+            name,
+            symbol,
+            icon: None,
+            base_uri,
+            reference: None,
+            reference_hash: None,
+        }
+    }
 }
 
 #[derive(
@@ -129,19 +152,17 @@ pub trait Nep177Controller {
         current_owner_id: &AccountId,
     ) -> Result<(), Nep171BurnError>;
 
-    fn update_token_metadata_unchecked(
-        &mut self,
-        token_id: TokenId,
-        metadata: Option<TokenMetadata>,
-    );
+    fn set_token_metadata_unchecked(&mut self, token_id: TokenId, metadata: Option<TokenMetadata>);
 
-    fn update_token_metadata(
+    fn set_token_metadata(
         &mut self,
         token_id: TokenId,
         metadata: TokenMetadata,
     ) -> Result<(), UpdateTokenMetadataError>;
 
-    fn update_contract_metadata(&mut self, metadata: ContractMetadata);
+    fn set_contract_metadata(&mut self, metadata: ContractMetadata);
+
+    fn contract_metadata(&self) -> ContractMetadata;
 
     fn token_metadata(&self, token_id: &TokenId) -> Option<TokenMetadata>;
 }
@@ -154,20 +175,20 @@ pub enum UpdateTokenMetadataError {
 }
 
 impl<T: Nep177ControllerInternal + Nep171Controller> Nep177Controller for T {
-    fn update_token_metadata(
+    fn set_token_metadata(
         &mut self,
         token_id: TokenId,
         metadata: TokenMetadata,
     ) -> Result<(), UpdateTokenMetadataError> {
         if self.token_owner(&token_id).is_some() {
-            self.update_token_metadata_unchecked(token_id, Some(metadata));
+            self.set_token_metadata_unchecked(token_id, Some(metadata));
             Ok(())
         } else {
             Err(TokenDoesNotExistError { token_id }.into())
         }
     }
 
-    fn update_contract_metadata(&mut self, metadata: ContractMetadata) {
+    fn set_contract_metadata(&mut self, metadata: ContractMetadata) {
         Self::slot_contract_metadata().set(Some(&metadata));
         Nep171Event::ContractMetadataUpdate(vec![NftContractMetadataUpdateLog { memo: None }])
             .emit();
@@ -182,7 +203,7 @@ impl<T: Nep177ControllerInternal + Nep171Controller> Nep177Controller for T {
         let token_ids = [token_id];
         self.mint(&token_ids, &owner_id, None)?;
         let [token_id] = token_ids;
-        self.update_token_metadata_unchecked(token_id, Some(metadata));
+        self.set_token_metadata_unchecked(token_id, Some(metadata));
         Ok(())
     }
 
@@ -194,15 +215,11 @@ impl<T: Nep177ControllerInternal + Nep171Controller> Nep177Controller for T {
         let token_ids = [token_id];
         self.burn(&token_ids, current_owner_id, None)?;
         let [token_id] = token_ids;
-        self.update_token_metadata_unchecked(token_id, None);
+        self.set_token_metadata_unchecked(token_id, None);
         Ok(())
     }
 
-    fn update_token_metadata_unchecked(
-        &mut self,
-        token_id: TokenId,
-        metadata: Option<TokenMetadata>,
-    ) {
+    fn set_token_metadata_unchecked(&mut self, token_id: TokenId, metadata: Option<TokenMetadata>) {
         <Self as Nep177ControllerInternal>::slot_token_metadata(&token_id).set(metadata.as_ref());
         nep171::Nep171Event::NftMetadataUpdate(vec![NftMetadataUpdateLog {
             token_ids: vec![token_id],
@@ -213,6 +230,12 @@ impl<T: Nep177ControllerInternal + Nep171Controller> Nep177Controller for T {
 
     fn token_metadata(&self, token_id: &TokenId) -> Option<TokenMetadata> {
         <Self as Nep177ControllerInternal>::slot_token_metadata(token_id).read()
+    }
+
+    fn contract_metadata(&self) -> ContractMetadata {
+        Self::slot_contract_metadata()
+            .read()
+            .unwrap_or_else(|| env::panic_str(CONTRACT_METADATA_NOT_INITIALIZED_ERROR))
     }
 }
 

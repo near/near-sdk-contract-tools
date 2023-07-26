@@ -516,15 +516,7 @@ impl<T: Nep171ControllerInternal> Nep171Controller for T {
 
 /// Token information structure.
 #[derive(
-    Debug,
-    Clone,
-    Hash,
-    PartialEq,
-    PartialOrd,
-    Serialize,
-    Deserialize,
-    BorshSerialize,
-    BorshDeserialize,
+    Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize, BorshSerialize, BorshDeserialize,
 )]
 pub struct Token {
     /// Token ID.
