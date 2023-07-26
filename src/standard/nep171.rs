@@ -223,21 +223,7 @@ pub trait Nep171ControllerInternal {
 
 /// Non-public controller interface for NEP-171 implementations.
 pub trait Nep171Controller {
-    /// Transfer a token from `sender_id` to `receiver_id`, calling
-    /// `predicate` after performing required validity checks, but immediately
-    /// before performing the actual transfer, and returns the value returned
-    /// by `predicate`.
-    fn and_transfer<T>(
-        &self,
-        predicate: impl FnOnce() -> T,
-        token_ids: &[TokenId],
-        current_owner_id: AccountId,
-        sender_id: AccountId,
-        receiver_id: AccountId,
-        memo: Option<String>,
-    ) -> Result<T, Nep171TransferError>;
-
-    /// Transfer a token from `sender_id` to `receiver_id`.
+    /// Transfer a token from `sender_id` to `receiver_id`. Checks that the transfer is valid using [`Nep171Controller::check_transfer`] before performing the transfer.
     fn transfer(
         &mut self,
         token_ids: &[TokenId],
@@ -246,6 +232,32 @@ pub trait Nep171Controller {
         receiver_id: AccountId,
         memo: Option<String>,
     ) -> Result<(), Nep171TransferError>;
+
+    /// Check if a token transfer is valid without actually performing it.
+    fn check_transfer(
+        &self,
+        token_ids: &[TokenId],
+        current_owner_id: &AccountId,
+        sender_id: &AccountId,
+        receiver_id: &AccountId,
+    ) -> Result<(), Nep171TransferError>;
+
+    /// Performs a token transfer without running [`Nep171Controller::check_transfer`].
+    ///
+    /// # Warning
+    ///
+    /// This function performs _no checks_. It is up to the caller to ensure that the transfer is valid. Possible unintended effects of invalid transfers include:
+    /// - Transferring a token "from" an account that does not own it.
+    /// - Creating token IDs that did not previously exist.
+    /// - Transferring a token to the account that already owns it.
+    fn transfer_unchecked(
+        &mut self,
+        token_ids: &[TokenId],
+        current_owner_id: AccountId,
+        sender_id: AccountId,
+        receiver_id: AccountId,
+        memo: Option<String>,
+    );
 
     /// Mints a new token `token_id` to `owner_id`.
     fn mint(
@@ -272,24 +284,22 @@ pub trait Nep171Controller {
 
 /// Transfer metadata generic over both types of transfer (`nft_transfer` and
 /// `nft_transfer_call`).
-#[derive(
-    Serialize, Deserialize, BorshSerialize, BorshDeserialize, PartialEq, Eq, Clone, Debug, Hash,
-)]
-pub struct Nep171Transfer {
+#[derive(Serialize, BorshSerialize, PartialEq, Eq, Clone, Debug, Hash)]
+pub struct Nep171Transfer<'a> {
     /// Current owner account ID.
-    pub owner_id: AccountId,
+    pub owner_id: &'a AccountId,
     /// Sending account ID.
-    pub sender_id: AccountId,
+    pub sender_id: &'a AccountId,
     /// Receiving account ID.
-    pub receiver_id: AccountId,
+    pub receiver_id: &'a AccountId,
     /// Optional approval ID.
     pub approval_id: Option<u64>,
     /// Token ID.
-    pub token_id: TokenId,
+    pub token_id: &'a TokenId,
     /// Optional memo string.
-    pub memo: Option<String>,
+    pub memo: Option<&'a str>,
     /// Message passed to contract located at `receiver_id` in the case of `nft_transfer_call`.
-    pub msg: Option<String>,
+    pub msg: Option<&'a str>,
 }
 
 /// Contracts may implement this trait to inject code into NEP-171 functions.
@@ -323,25 +333,22 @@ impl<T: Nep171ControllerInternal> Nep171Controller for T {
         receiver_id: AccountId,
         memo: Option<String>,
     ) -> Result<(), Nep171TransferError> {
-        self.and_transfer(
-            || {},
-            token_ids,
-            current_owner_id,
-            sender_id,
-            receiver_id,
-            memo,
-        )
+        match self.check_transfer(token_ids, &current_owner_id, &sender_id, &receiver_id) {
+            Ok(()) => {
+                self.transfer_unchecked(token_ids, current_owner_id, sender_id, receiver_id, memo);
+                Ok(())
+            }
+            e => e,
+        }
     }
 
-    fn and_transfer<P>(
+    fn check_transfer(
         &self,
-        predicate: impl FnOnce() -> P,
         token_ids: &[TokenId],
-        current_owner_id: AccountId,
-        sender_id: AccountId,
-        receiver_id: AccountId,
-        memo: Option<String>,
-    ) -> Result<P, Nep171TransferError> {
+        current_owner_id: &AccountId,
+        sender_id: &AccountId,
+        receiver_id: &AccountId,
+    ) -> Result<(), Nep171TransferError> {
         for token_id in token_ids {
             let slot = Self::slot_token_owner(token_id);
 
@@ -350,9 +357,9 @@ impl<T: Nep171ControllerInternal> Nep171Controller for T {
                     token_id: token_id.clone(),
                 })?;
 
-            if current_owner_id != actual_current_owner_id {
+            if current_owner_id != &actual_current_owner_id {
                 return Err(error::TokenNotOwnedByExpectedOwnerError {
-                    expected_owner_id: current_owner_id,
+                    expected_owner_id: current_owner_id.clone(),
                     actual_owner_id: actual_current_owner_id,
                     token_id: token_id.clone(),
                 }
@@ -362,7 +369,7 @@ impl<T: Nep171ControllerInternal> Nep171Controller for T {
             // This version doesn't implement approval management
             if sender_id != current_owner_id {
                 return Err(error::SenderNotApprovedError {
-                    sender_id,
+                    sender_id: sender_id.clone(),
                     token_id: token_id.clone(),
                 }
                 .into());
@@ -370,15 +377,23 @@ impl<T: Nep171ControllerInternal> Nep171Controller for T {
 
             if receiver_id == current_owner_id {
                 return Err(error::TokenReceiverIsCurrentOwnerError {
-                    current_owner_id,
+                    current_owner_id: current_owner_id.clone(),
                     token_id: token_id.clone(),
                 }
                 .into());
             }
         }
+        Ok(())
+    }
 
-        let result = predicate();
-
+    fn transfer_unchecked(
+        &mut self,
+        token_ids: &[TokenId],
+        current_owner_id: AccountId,
+        _sender_id: AccountId,
+        receiver_id: AccountId,
+        memo: Option<String>,
+    ) {
         if !token_ids.is_empty() {
             Nep171Event::NftTransfer(vec![event::NftTransferLog {
                 authorized_id: None,
@@ -394,8 +409,6 @@ impl<T: Nep171ControllerInternal> Nep171Controller for T {
             let mut slot = Self::slot_token_owner(token_id);
             slot.write(&receiver_id);
         }
-
-        Ok(result)
     }
 
     fn mint(

@@ -47,13 +47,6 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
         }
     });
 
-    let before_nft_transfer_predicate_body = no_hooks.is_present().not().then(|| {
-        quote! {
-            let hook_state = <Self as #me::standard::nep171::Nep171Hook::<_>>::before_nft_transfer(&self, &transfer);
-            hook_state
-        }
-    });
-
     let after_nft_transfer = no_hooks.is_present().not().then(|| {
         quote! {
             <Self as #me::standard::nep171::Nep171Hook::<_>>::after_nft_transfer(self, &transfer, hook_state);
@@ -91,29 +84,45 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
                     };
 
                 if should_revert {
-                    let transfer = #me::standard::nep171::Nep171Transfer {
-                        token_id: token_id.clone(),
-                        owner_id: receiver_id.clone(),
-                        sender_id: receiver_id.clone(),
-                        receiver_id: previous_owner_id.clone(),
-                        approval_id: None,
-                        memo: None,
-                        msg: None,
-                    };
+                    let token_ids = [token_id];
 
-                    let result = #me::standard::nep171::Nep171Controller::and_transfer(
+                    let check_result = #me::standard::nep171::Nep171Controller::check_transfer(
                         self,
-                        || { #before_nft_transfer_predicate_body },
-                        &[token_id],
-                        receiver_id.clone(),
-                        receiver_id,
-                        previous_owner_id,
-                        None,
+                        &token_ids,
+                        &receiver_id,
+                        &receiver_id,
+                        &previous_owner_id,
                     );
 
-                    result.map(|hook_state| {
-                        #after_nft_transfer
-                    }).is_err()
+                    match check_result {
+                        Ok(()) => {
+                            let transfer = #me::standard::nep171::Nep171Transfer {
+                                token_id: &token_ids[0],
+                                owner_id: &receiver_id,
+                                sender_id: &receiver_id,
+                                receiver_id: &previous_owner_id,
+                                approval_id: None,
+                                memo: None,
+                                msg: None,
+                            };
+
+                            #before_nft_transfer
+
+                            #me::standard::nep171::Nep171Controller::transfer_unchecked(
+                                self,
+                                &token_ids,
+                                receiver_id.clone(),
+                                receiver_id.clone(),
+                                previous_owner_id.clone(),
+                                None,
+                            );
+
+                            #after_nft_transfer
+
+                            false
+                        },
+                        Err(_) => true,
+                    }
                 } else {
                     true
                 }
@@ -141,13 +150,15 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
 
                 let sender_id = #near_sdk::env::predecessor_account_id();
 
+                let token_ids = [token_id];
+
                 let transfer = #me::standard::nep171::Nep171Transfer {
-                    token_id: token_id.clone(),
-                    owner_id: sender_id.clone(),
-                    sender_id: sender_id.clone(),
-                    receiver_id: receiver_id.clone(),
+                    token_id: &token_ids[0],
+                    owner_id: &sender_id,
+                    sender_id: &sender_id,
+                    receiver_id: &receiver_id,
                     approval_id: None,
-                    memo: memo.clone(),
+                    memo: memo.as_deref(),
                     msg: None,
                 };
 
@@ -155,11 +166,11 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
 
                 Nep171Controller::transfer(
                     self,
-                    &[token_id],
+                    &token_ids,
                     sender_id.clone(),
-                    sender_id,
-                    receiver_id,
-                    memo,
+                    sender_id.clone(),
+                    receiver_id.clone(),
+                    memo.clone(),
                 )
                 .unwrap_or_else(|e| #near_sdk::env::panic_str(&e.to_string()));
 
@@ -191,19 +202,19 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
 
                 let sender_id = #near_sdk::env::predecessor_account_id();
 
+                let token_ids = [token_id];
+
                 let transfer = #me::standard::nep171::Nep171Transfer {
-                    token_id: token_id.clone(),
-                    owner_id: sender_id.clone(),
-                    sender_id: sender_id.clone(),
-                    receiver_id: receiver_id.clone(),
+                    token_id: &token_ids[0],
+                    owner_id: &sender_id,
+                    sender_id: &sender_id,
+                    receiver_id: &receiver_id,
                     approval_id: None,
-                    memo: memo.clone(),
-                    msg: Some(msg.clone()),
+                    memo: memo.as_deref(),
+                    msg: Some(&msg),
                 };
 
                 #before_nft_transfer
-
-                let token_ids = [token_id];
 
                 Nep171Controller::transfer(
                     self,
@@ -211,13 +222,13 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
                     sender_id.clone(),
                     sender_id.clone(),
                     receiver_id.clone(),
-                    memo,
+                    memo.clone(),
                 )
                 .unwrap_or_else(|e| #near_sdk::env::panic_str(&e.to_string()));
 
-                let [token_id] = token_ids;
-
                 #after_nft_transfer
+
+                let [token_id] = token_ids;
 
                 ext_nep171_receiver::ext(receiver_id.clone())
                     .with_static_gas(#near_sdk::env::prepaid_gas() - GAS_FOR_NFT_TRANSFER_CALL)
@@ -225,12 +236,12 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
                         sender_id.clone(),
                         sender_id.clone(),
                         token_id.clone(),
-                        msg,
+                        msg.clone(),
                     )
                     .then(
                         ext_nep171_resolver::ext(#near_sdk::env::current_account_id())
                             .with_static_gas(GAS_FOR_RESOLVE_TRANSFER)
-                            .nft_resolve_transfer(sender_id, receiver_id, token_id, None),
+                            .nft_resolve_transfer(sender_id.clone(), receiver_id.clone(), token_id.clone(), None),
                     )
                     .into()
             }
