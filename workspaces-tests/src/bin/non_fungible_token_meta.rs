@@ -12,11 +12,11 @@ use near_sdk_contract_tools::{
         nep171::*,
         nep177::{self, *},
     },
-    Nep171, Nep177,
+    Nep171, Nep177, NonFungibleToken,
 };
 
-#[derive(PanicOnDefault, BorshSerialize, BorshDeserialize, Nep171, Nep177)]
-#[nep171(token_type = "nep177::Token", no_hooks)]
+#[derive(PanicOnDefault, BorshSerialize, BorshDeserialize, NonFungibleToken)]
+#[non_fungible_token(no_hooks)]
 #[near_bindgen]
 pub struct Contract {}
 
