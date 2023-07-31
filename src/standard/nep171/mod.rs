@@ -28,9 +28,6 @@ pub const GAS_FOR_RESOLVE_TRANSFER: Gas = Gas(5_000_000_000_000);
 pub const GAS_FOR_NFT_TRANSFER_CALL: Gas = Gas(25_000_000_000_000 + GAS_FOR_RESOLVE_TRANSFER.0);
 /// Error message when insufficient gas is attached to function calls with a minimum attached gas requirement (i.e. those that produce a promise chain, perform cross-contract calls).
 pub const INSUFFICIENT_GAS_MESSAGE: &str = "More gas is required";
-/// Error message when the NEP-171 implementation does not also implement NEP-178.
-pub const APPROVAL_MANAGEMENT_NOT_SUPPORTED_MESSAGE: &str =
-    "NEP-178: Approval Management is not supported";
 
 /// NFT token IDs.
 pub type TokenId = String;
@@ -88,6 +85,8 @@ pub enum Nep171TransferError {
     #[error(transparent)]
     TokenDoesNotExist(#[from] error::TokenDoesNotExistError),
     /// The token could not be transferred because the sender is not allowed to perform transfers of this token on behalf of its current owner. See: NEP-178.
+    ///
+    /// NOTE: If you only implement NEP-171, approval IDs will _not work_, and this error will always be returned whenever the sender is not the current owner.
     #[error(transparent)]
     SenderNotApproved(#[from] error::SenderNotApprovedError),
     /// The token could not be transferred because the token is being sent to the account that currently owns it. Reflexive transfers are not allowed.
@@ -114,14 +113,12 @@ pub trait Nep171ControllerInternal {
 /// Non-public controller interface for NEP-171 implementations.
 pub trait Nep171Controller {
     /// Transfer a token from `sender_id` to `receiver_id`. Checks that the transfer is valid using [`Nep171Controller::check_transfer`] before performing the transfer.
-    fn transfer(
+    fn external_transfer<Check: CheckExternalTransfer<Self>>(
         &mut self,
-        token_ids: &[TokenId],
-        current_owner_id: AccountId,
-        sender_id: AccountId,
-        receiver_id: AccountId,
-        memo: Option<String>,
-    ) -> Result<(), Nep171TransferError>;
+        transfer: &Nep171Transfer,
+    ) -> Result<(), Nep171TransferError>
+    where
+        Self: Sized;
 
     /// Check if a token transfer is valid without actually performing it.
     fn check_transfer(
@@ -188,7 +185,7 @@ pub struct Nep171Transfer<'a> {
     /// Receiving account ID.
     pub receiver_id: &'a AccountId,
     /// Optional approval ID.
-    pub approval_id: Option<u64>,
+    pub approval_id: Option<u32>,
     /// Token ID.
     pub token_id: &'a TokenId,
     /// Optional memo string.
@@ -197,40 +194,92 @@ pub struct Nep171Transfer<'a> {
     pub msg: Option<&'a str>,
 }
 
+/// Different ways of checking if a transfer is valid.
+pub trait CheckExternalTransfer<C> {
+    /// Checks if a transfer is valid.
+    fn check_external_transfer(
+        contract: &C,
+        transfer: &Nep171Transfer,
+    ) -> Result<(), Nep171TransferError>;
+}
+
+pub struct DefaultCheckExternalTransfer;
+
+impl<T: Nep171Controller> CheckExternalTransfer<T> for DefaultCheckExternalTransfer {
+    fn check_external_transfer(
+        contract: &T,
+        transfer: &Nep171Transfer,
+    ) -> Result<(), Nep171TransferError> {
+        contract.check_transfer(
+            &[transfer.token_id.to_string()],
+            transfer.owner_id,
+            transfer.sender_id,
+            transfer.receiver_id,
+        )
+    }
+}
+
 /// Contracts may implement this trait to inject code into NEP-171 functions.
 ///
 /// `T` is an optional value for passing state between different lifecycle
 /// hooks. This may be useful for charging callers for storage usage, for
 /// example.
-pub trait Nep171Hook<T = ()> {
+pub trait Nep171Hook<C = Self, S = ()> {
+    // TODO: Switch order of C, S generics
     /// Executed before a token transfer is conducted.
     ///
     /// May return an optional state value which will be passed along to the
     /// following `after_transfer`.
     ///
     /// MUST NOT PANIC.
-    fn before_nft_transfer(&self, transfer: &Nep171Transfer) -> T;
+    fn before_nft_transfer(contract: &C, transfer: &Nep171Transfer) -> S;
 
     /// Executed after a token transfer is conducted.
     ///
     /// Receives the state value returned by `before_transfer`.
     ///
     /// MUST NOT PANIC.
-    fn after_nft_transfer(&mut self, transfer: &Nep171Transfer, state: T);
+    fn after_nft_transfer(contract: &mut C, transfer: &Nep171Transfer, state: S);
+}
+
+impl<C> Nep171Hook<C, ()> for () {
+    fn before_nft_transfer(_contract: &C, _transfer: &Nep171Transfer) {}
+
+    fn after_nft_transfer(_contract: &mut C, _transfer: &Nep171Transfer, _state: ()) {}
+}
+
+impl<Cont, Stat0, Stat1, Handl0, Handl1> Nep171Hook<Cont, (Stat0, Stat1)> for (Handl0, Handl1)
+where
+    Handl0: Nep171Hook<Cont, Stat0>,
+    Handl1: Nep171Hook<Cont, Stat1>,
+{
+    fn before_nft_transfer(contract: &Cont, transfer: &Nep171Transfer) -> (Stat0, Stat1) {
+        (
+            Handl0::before_nft_transfer(contract, transfer),
+            Handl1::before_nft_transfer(contract, transfer),
+        )
+    }
+
+    fn after_nft_transfer(contract: &mut Cont, transfer: &Nep171Transfer, state: (Stat0, Stat1)) {
+        Handl0::after_nft_transfer(contract, transfer, state.0);
+        Handl1::after_nft_transfer(contract, transfer, state.1);
+    }
 }
 
 impl<T: Nep171ControllerInternal> Nep171Controller for T {
-    fn transfer(
+    fn external_transfer<Check: CheckExternalTransfer<T>>(
         &mut self,
-        token_ids: &[TokenId],
-        current_owner_id: AccountId,
-        sender_id: AccountId,
-        receiver_id: AccountId,
-        memo: Option<String>,
+        transfer: &Nep171Transfer,
     ) -> Result<(), Nep171TransferError> {
-        match self.check_transfer(token_ids, &current_owner_id, &sender_id, &receiver_id) {
+        match Check::check_external_transfer(self, transfer) {
             Ok(()) => {
-                self.transfer_unchecked(token_ids, current_owner_id, sender_id, receiver_id, memo);
+                self.transfer_unchecked(
+                    &[transfer.token_id.to_string()],
+                    transfer.owner_id.clone(),
+                    transfer.sender_id.clone(),
+                    transfer.receiver_id.clone(),
+                    transfer.memo.map(ToString::to_string),
+                );
                 Ok(())
             }
             e => e,

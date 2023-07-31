@@ -10,6 +10,8 @@ use syn::Expr;
 pub struct Nep171Meta {
     pub storage_key: Option<Expr>,
     pub no_hooks: Flag,
+    pub extension_hooks: Option<syn::Type>,
+    pub check_external_transfer: Option<syn::Type>,
     pub token_type: Option<syn::Type>,
 
     pub generics: syn::Generics,
@@ -26,6 +28,8 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
     let Nep171Meta {
         storage_key,
         no_hooks,
+        extension_hooks,
+        check_external_transfer,
         token_type,
 
         generics,
@@ -43,6 +47,12 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
             quote! { () }
         });
 
+    let check_external_transfer = check_external_transfer
+        .map(|check_external_transfer| quote! { #check_external_transfer })
+        .unwrap_or_else(|| {
+            quote! { #me::standard::nep171::DefaultCheckExternalTransfer }
+        });
+
     let root = storage_key.map(|storage_key| {
         quote! {
             fn root() -> #me::slot::Slot<()> {
@@ -51,15 +61,37 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
         }
     });
 
+    let extension_hooks_type = extension_hooks
+        .map(|extension_hooks| quote! { #extension_hooks })
+        .unwrap_or_else(|| {
+            quote! { () }
+        });
+
+    let self_hooks_type = no_hooks
+        .is_present()
+        .not()
+        .then(|| {
+            quote! {
+                Self
+            }
+        })
+        .unwrap_or_else(|| {
+            quote! {
+                ()
+            }
+        });
+
+    let hooks_type = quote! { (#self_hooks_type, #extension_hooks_type) };
+
     let before_nft_transfer = no_hooks.is_present().not().then(|| {
         quote! {
-            let hook_state = <Self as #me::standard::nep171::Nep171Hook::<_>>::before_nft_transfer(&self, &transfer);
+            let hook_state = <#hooks_type as #me::standard::nep171::Nep171Hook::<_, _>>::before_nft_transfer(&self, &transfer);
         }
     });
 
     let after_nft_transfer = no_hooks.is_present().not().then(|| {
         quote! {
-            <Self as #me::standard::nep171::Nep171Hook::<_>>::after_nft_transfer(self, &transfer, hook_state);
+            <#hooks_type as #me::standard::nep171::Nep171Hook::<_, _>>::after_nft_transfer(self, &transfer, hook_state);
         }
     });
 
@@ -146,15 +178,10 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
                 &mut self,
                 receiver_id: #near_sdk::AccountId,
                 token_id: #me::standard::nep171::TokenId,
-                approval_id: Option<u64>,
+                approval_id: Option<u32>,
                 memo: Option<String>,
             ) {
                 use #me::standard::nep171::*;
-
-                #near_sdk::require!(
-                    approval_id.is_none(),
-                    APPROVAL_MANAGEMENT_NOT_SUPPORTED_MESSAGE,
-                );
 
                 #near_sdk::assert_one_yocto();
 
@@ -167,22 +194,15 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
                     owner_id: &sender_id,
                     sender_id: &sender_id,
                     receiver_id: &receiver_id,
-                    approval_id: None,
+                    approval_id: approval_id.clone(),
                     memo: memo.as_deref(),
                     msg: None,
                 };
 
                 #before_nft_transfer
 
-                Nep171Controller::transfer(
-                    self,
-                    &token_ids,
-                    sender_id.clone(),
-                    sender_id.clone(),
-                    receiver_id.clone(),
-                    memo.clone(),
-                )
-                .unwrap_or_else(|e| #near_sdk::env::panic_str(&e.to_string()));
+                Nep171Controller::external_transfer::<#check_external_transfer>(self, &transfer)
+                    .unwrap_or_else(|e| #near_sdk::env::panic_str(&e.to_string()));
 
                 #after_nft_transfer
             }
@@ -192,16 +212,11 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
                 &mut self,
                 receiver_id: #near_sdk::AccountId,
                 token_id: #me::standard::nep171::TokenId,
-                approval_id: Option<u64>,
+                approval_id: Option<u32>,
                 memo: Option<String>,
                 msg: String,
             ) -> #near_sdk::PromiseOrValue<bool> {
                 use #me::standard::nep171::*;
-
-                #near_sdk::require!(
-                    approval_id.is_none(),
-                    APPROVAL_MANAGEMENT_NOT_SUPPORTED_MESSAGE,
-                );
 
                 #near_sdk::assert_one_yocto();
 
@@ -219,22 +234,15 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
                     owner_id: &sender_id,
                     sender_id: &sender_id,
                     receiver_id: &receiver_id,
-                    approval_id: None,
+                    approval_id: approval_id.clone(),
                     memo: memo.as_deref(),
                     msg: Some(&msg),
                 };
 
                 #before_nft_transfer
 
-                Nep171Controller::transfer(
-                    self,
-                    &token_ids,
-                    sender_id.clone(),
-                    sender_id.clone(),
-                    receiver_id.clone(),
-                    memo.clone(),
-                )
-                .unwrap_or_else(|e| #near_sdk::env::panic_str(&e.to_string()));
+                Nep171Controller::external_transfer::<#check_external_transfer>(self, &transfer)
+                    .unwrap_or_else(|e| #near_sdk::env::panic_str(&e.to_string()));
 
                 #after_nft_transfer
 

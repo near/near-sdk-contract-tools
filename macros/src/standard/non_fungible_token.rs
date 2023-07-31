@@ -11,6 +11,8 @@ pub struct NonFungibleTokenMeta {
     // NEP-171 fields
     pub storage_key: Option<Expr>,
     pub no_hooks: Flag,
+    pub extension_hooks: Option<syn::Type>,
+    pub check_external_transfer: Option<syn::Type>,
 
     // NEP-177 fields
     pub metadata_storage_key: Option<Expr>,
@@ -30,6 +32,8 @@ pub fn expand(meta: NonFungibleTokenMeta) -> Result<TokenStream, darling::Error>
     let NonFungibleTokenMeta {
         storage_key,
         no_hooks,
+        extension_hooks,
+        check_external_transfer,
 
         metadata_storage_key,
 
@@ -43,6 +47,8 @@ pub fn expand(meta: NonFungibleTokenMeta) -> Result<TokenStream, darling::Error>
     let expand_nep171 = nep171::expand(nep171::Nep171Meta {
         storage_key,
         no_hooks,
+        extension_hooks,
+        check_external_transfer,
 
         token_type: Some(syn::parse_quote! { ( #me::standard::nep177::TokenMetadata ) }),
 

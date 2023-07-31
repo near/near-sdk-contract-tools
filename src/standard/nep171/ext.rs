@@ -14,7 +14,7 @@ pub trait Nep171 {
         &mut self,
         receiver_id: AccountId,
         token_id: TokenId,
-        approval_id: Option<u64>,
+        approval_id: Option<u32>,
         memo: Option<String>,
     );
 
@@ -23,7 +23,7 @@ pub trait Nep171 {
         &mut self,
         receiver_id: AccountId,
         token_id: TokenId,
-        approval_id: Option<u64>,
+        approval_id: Option<u32>,
         memo: Option<String>,
         msg: String,
     ) -> PromiseOrValue<bool>;

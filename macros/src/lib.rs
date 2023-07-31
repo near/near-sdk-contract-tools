@@ -156,9 +156,7 @@ pub fn derive_fungible_token(input: TokenStream) -> TokenStream {
 ///
 /// Fields:
 /// - `no_hooks`: Flag. Removes the requirement for the contract to implement [`near_sdk_contract_tools::standard::nep171::Nep171Hooks`].
-/// - `token_type`: specify the type of the token returned by `nft_token`.
-/// - `token_loader`: A function that takes a reference to the contract, and
-///     the desired token ID, and returns a value of type `token_type`.
+/// - `token_type`: specify the token metadata loading extensions invoked by `nft_token`.
 #[proc_macro_derive(Nep171, attributes(nep171))]
 pub fn derive_nep171(input: TokenStream) -> TokenStream {
     make_derive(input, standard::nep171::expand)

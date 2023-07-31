@@ -284,7 +284,7 @@ mod ext {
 
     use super::*;
 
-    #[near_sdk::ext_contract(ext_nep171)]
+    #[near_sdk::ext_contract(ext_nep177)]
     pub trait Nep177 {
         fn nft_metadata(&self) -> ContractMetadata;
     }

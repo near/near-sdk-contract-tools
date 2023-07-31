@@ -14,11 +14,11 @@ use near_sdk_contract_tools::{standard::nep171::*, Nep171};
 pub struct Contract {}
 
 impl Nep171Hook for Contract {
-    fn before_nft_transfer(&self, transfer: &Nep171Transfer) {
+    fn before_nft_transfer(_contract: &Self, transfer: &Nep171Transfer) {
         log!("before_nft_transfer({})", transfer.token_id);
     }
 
-    fn after_nft_transfer(&mut self, transfer: &Nep171Transfer, _state: ()) {
+    fn after_nft_transfer(_contract: &mut Self, transfer: &Nep171Transfer, _state: ()) {
         log!("after_nft_transfer({})", transfer.token_id);
     }
 }
