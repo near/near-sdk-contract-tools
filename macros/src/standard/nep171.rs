@@ -10,8 +10,7 @@ use syn::Expr;
 pub struct Nep171Meta {
     pub storage_key: Option<Expr>,
     pub no_hooks: Flag,
-    pub token_loader: Option<syn::Path>,
-    pub token_type: Option<syn::Path>,
+    pub token_type: Option<syn::Type>,
 
     pub generics: syn::Generics,
     pub ident: syn::Ident,
@@ -27,7 +26,6 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
     let Nep171Meta {
         storage_key,
         no_hooks,
-        token_loader,
         token_type,
 
         generics,
@@ -42,13 +40,7 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
     let token_type = token_type
         .map(|token_type| quote! { #token_type })
         .unwrap_or_else(|| {
-            quote! { #me::standard::nep171::Token }
-        });
-
-    let token_loader = token_loader
-        .map(|token_loader| quote! { #token_loader })
-        .unwrap_or_else(|| {
-            quote! { #token_type::load }
+            quote! { () }
         });
 
     let root = storage_key.map(|storage_key| {
@@ -148,7 +140,7 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
         }
 
         #[#near_sdk::near_bindgen]
-        impl #imp #me::standard::nep171::Nep171<#token_type> for #ident #ty #wher {
+        impl #imp #me::standard::nep171::Nep171 for #ident #ty #wher {
             #[payable]
             fn nft_transfer(
                 &mut self,
@@ -267,8 +259,8 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
             fn nft_token(
                 &self,
                 token_id: #me::standard::nep171::TokenId,
-            ) -> Option<#token_type> {
-                #token_loader(self, token_id)
+            ) -> Option<#me::standard::nep171::Token> {
+                #me::standard::nep171::Nep171Controller::load_token::<#token_type>(self, &token_id)
             }
         }
     })

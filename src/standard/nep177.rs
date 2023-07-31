@@ -1,6 +1,8 @@
 //! NEP-177 non-fungible token contract metadata implementation.
 //!
 //! Reference: <https://github.com/near/NEPs/blob/master/neps/nep-0177.md>
+use std::error::Error;
+
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
     env,
@@ -27,36 +29,6 @@ use crate::{
 pub use ext::*;
 
 const CONTRACT_METADATA_NOT_INITIALIZED_ERROR: &str = "Contract metadata not initialized";
-
-/// Non-fungible token with metadata.
-#[derive(
-    Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize, BorshSerialize, BorshDeserialize,
-)]
-#[serde(crate = "near_sdk::serde")]
-pub struct Token {
-    /// The token ID.
-    pub token_id: TokenId,
-    /// The token owner.
-    pub owner_id: AccountId,
-    /// The token metadata.
-    pub metadata: TokenMetadata,
-}
-
-impl Token {
-    /// Loads token metadata.
-    pub fn load(
-        contract: &(impl Nep171Controller + Nep177Controller),
-        token_id: TokenId,
-    ) -> Option<Self> {
-        let owner_id = contract.token_owner(&token_id)?;
-        let metadata = contract.token_metadata(&token_id)?;
-        Some(Self {
-            token_id,
-            owner_id,
-            metadata,
-        })
-    }
-}
 
 /// Non-fungible token contract metadata.
 #[derive(
@@ -147,6 +119,29 @@ pub struct TokenMetadata {
     pub reference: Option<String>,
     /// Base-64-encoded SHA-256 hash of the referenced JSON file. Required if `reference` is present.
     pub reference_hash: Option<String>,
+}
+
+/// Error returned when trying to load token metadata that does not exist.
+#[derive(Error, Debug)]
+#[error("Token metadata does not exist: {0}")]
+pub struct TokenMetadataMissingError(pub TokenId);
+
+impl<C: Nep177Controller> LoadTokenMetadata<C> for TokenMetadata {
+    fn load(
+        contract: &C,
+        token_id: &TokenId,
+        metadata: &mut std::collections::HashMap<String, near_sdk::serde_json::Value>,
+    ) -> Result<(), Box<dyn Error>> {
+        metadata.insert(
+            "metadata".to_string(),
+            near_sdk::serde_json::to_value(
+                contract
+                    .token_metadata(token_id)
+                    .ok_or_else(|| TokenMetadataMissingError(token_id.to_string()))?,
+            )?,
+        );
+        Ok(())
+    }
 }
 
 #[derive(BorshSerialize, BorshStorageKey)]

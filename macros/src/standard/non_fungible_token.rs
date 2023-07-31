@@ -44,8 +44,7 @@ pub fn expand(meta: NonFungibleTokenMeta) -> Result<TokenStream, darling::Error>
         storage_key,
         no_hooks,
 
-        token_type: Some(syn::parse_quote! { #me::standard::nep177::Token }),
-        token_loader: None,
+        token_type: Some(syn::parse_quote! { ( #me::standard::nep177::TokenMetadata ) }),
 
         generics: generics.clone(),
         ident: ident.clone(),

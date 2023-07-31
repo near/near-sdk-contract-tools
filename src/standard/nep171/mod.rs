@@ -2,17 +2,25 @@
 //!
 //! Reference: <https://github.com/near/NEPs/blob/master/neps/nep-0171.md>
 
+use std::error::Error;
+
 use near_sdk::{
-    borsh::{self, BorshDeserialize, BorshSerialize},
+    borsh::{self, BorshSerialize},
+    serde::{Deserialize, Serialize},
     AccountId, BorshStorageKey, Gas,
 };
 use near_sdk_contract_tools_macros::event;
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::{slot::Slot, DefaultStorageKey};
 
 use super::nep297::Event;
+
+pub mod error;
+pub mod event;
+// separate module with re-export because ext_contract doesn't play well with #![warn(missing_docs)]
+mod ext;
+pub use ext::*;
 
 /// Minimum required gas for [`Nep171Resolver::nft_resolve_transfer`] call in promise chain during [`Nep171::nft_transfer_call`].
 pub const GAS_FOR_RESOLVE_TRANSFER: Gas = Gas(5_000_000_000_000);
@@ -49,139 +57,9 @@ pub enum Nep171Event {
     ContractMetadataUpdate(Vec<event::NftContractMetadataUpdateLog>),
 }
 
-/// Event log metadata & associated structures.
-pub mod event {
-    use near_sdk::AccountId;
-    use serde::Serialize;
-
-    /// Tokens minted to a single owner.
-    #[derive(Serialize, Debug, Clone)]
-    pub struct NftMintLog {
-        /// To whom were the new tokens minted?
-        pub owner_id: AccountId,
-        /// Which tokens were minted?
-        pub token_ids: Vec<String>,
-        /// Additional mint information.
-        #[serde(skip_serializing_if = "Option::is_none")]
-        pub memo: Option<String>,
-    }
-
-    /// Tokens are transferred from one account to another.
-    #[derive(Serialize, Debug, Clone)]
-    pub struct NftTransferLog {
-        /// NEP-178 authorized account ID.
-        #[serde(skip_serializing_if = "Option::is_none")]
-        pub authorized_id: Option<AccountId>,
-        /// Account ID of the previous owner.
-        pub old_owner_id: AccountId,
-        /// Account ID of the new owner.
-        pub new_owner_id: AccountId,
-        /// IDs of the transferred tokens.
-        pub token_ids: Vec<String>,
-        /// Additional transfer information.
-        #[serde(skip_serializing_if = "Option::is_none")]
-        pub memo: Option<String>,
-    }
-
-    /// Tokens are burned from a single holder.
-    #[derive(Serialize, Debug, Clone)]
-    pub struct NftBurnLog {
-        /// What is the ID of the account from which the tokens were burned?
-        pub owner_id: AccountId,
-        /// IDs of the burned tokens.
-        pub token_ids: Vec<String>,
-        /// NEP-178 authorized account ID.
-        #[serde(skip_serializing_if = "Option::is_none")]
-        pub authorized_id: Option<AccountId>,
-        /// Additional burn information.
-        #[serde(skip_serializing_if = "Option::is_none")]
-        pub memo: Option<String>,
-    }
-
-    /// Token metadata update.
-    #[derive(Serialize, Debug, Clone)]
-    pub struct NftMetadataUpdateLog {
-        /// IDs of the updated tokens.
-        pub token_ids: Vec<String>,
-        /// Additional update information.
-        #[serde(skip_serializing_if = "Option::is_none")]
-        pub memo: Option<String>,
-    }
-
-    /// Contract metadata update.
-    #[derive(Serialize, Debug, Clone)]
-    pub struct NftContractMetadataUpdateLog {
-        /// Additional update information.
-        #[serde(skip_serializing_if = "Option::is_none")]
-        pub memo: Option<String>,
-    }
-}
-
 #[derive(BorshSerialize, BorshStorageKey)]
 enum StorageKey<'a> {
     TokenOwner(&'a str),
-}
-
-/// Potential errors produced by various token manipulations.
-pub mod error {
-    use near_sdk::AccountId;
-    use thiserror::Error;
-
-    use super::TokenId;
-
-    /// Occurs when trying to create a token ID that already exists.
-    /// Overwriting pre-existing token IDs is not allowed.
-    #[derive(Error, Clone, Debug)]
-    #[error("Token `{token_id}` already exists")]
-    pub struct TokenAlreadyExistsError {
-        /// The conflicting token ID.
-        pub token_id: TokenId,
-    }
-
-    /// When attempting to interact with a non-existent token ID.
-    #[derive(Error, Clone, Debug)]
-    #[error("Token `{token_id}` does not exist")]
-    pub struct TokenDoesNotExistError {
-        /// The invalid token ID.
-        pub token_id: TokenId,
-    }
-
-    /// Occurs when performing a checked operation that expects a token to be
-    /// owned by a particular account, but the token is _not_ owned by that
-    /// account.
-    #[derive(Error, Clone, Debug)]
-    #[error(
-        "Token `{token_id}` is owned by `{actual_owner_id}` instead of expected `{expected_owner_id}`",
-    )]
-    pub struct TokenNotOwnedByExpectedOwnerError {
-        /// The token was supposed to be owned by this account.
-        pub expected_owner_id: AccountId,
-        /// The token is actually owned by this account.
-        pub actual_owner_id: AccountId,
-        /// The ID of the token in question.
-        pub token_id: TokenId,
-    }
-
-    /// Occurs when a particular account is not allowed to transfer a token (e.g. on behalf of another user). See: NEP-178.
-    #[derive(Error, Clone, Debug)]
-    #[error("Sender `{sender_id}` does not have permission to transfer token `{token_id}`")]
-    pub struct SenderNotApprovedError {
-        /// The unapproved sender.
-        pub sender_id: AccountId,
-        /// The ID of the token in question.
-        pub token_id: TokenId,
-    }
-
-    /// Occurs when attempting to perform a transfer of a token from one
-    /// account to the same account.
-    #[derive(Error, Clone, Debug)]
-    #[error("Receiver must be different from current owner `{current_owner_id}` to transfer token `{token_id}`")]
-    pub struct TokenReceiverIsCurrentOwnerError {
-        /// The account ID of current owner of the token.
-        pub current_owner_id: AccountId,
-        /// The ID of the token in question.
-        pub token_id: TokenId,
-    }
 }
 
 /// Potential errors encountered when performing a burn operation.
@@ -292,6 +170,11 @@ pub trait Nep171Controller {
 
     /// Returns the owner of a token, if it exists.
     fn token_owner(&self, token_id: &TokenId) -> Option<AccountId>;
+
+    /// Loads the metadata associated with a token.
+    fn load_token<T: LoadTokenMetadata<Self>>(&self, token_id: &TokenId) -> Option<Token>
+    where
+        Self: Sized;
 }
 
 /// Transfer metadata generic over both types of transfer (`nft_transfer` and
@@ -512,94 +395,71 @@ impl<T: Nep171ControllerInternal> Nep171Controller for T {
     fn token_owner(&self, token_id: &TokenId) -> Option<AccountId> {
         Self::slot_token_owner(token_id).read()
     }
+
+    fn load_token<L: LoadTokenMetadata<Self>>(&self, token_id: &TokenId) -> Option<Token> {
+        let mut metadata = std::collections::HashMap::new();
+        L::load(self, token_id, &mut metadata).ok()?;
+        Some(Token {
+            token_id: token_id.clone(),
+            owner_id: self.token_owner(token_id)?,
+            extensions_metadata: metadata,
+        })
+    }
 }
 
 /// Token information structure.
-#[derive(
-    Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize, BorshSerialize, BorshDeserialize,
-)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Token {
     /// Token ID.
     pub token_id: TokenId,
     /// Current owner of the token.
     pub owner_id: AccountId,
+    /// Metadata provided by extensions.
+    #[serde(flatten)]
+    pub extensions_metadata: std::collections::HashMap<String, near_sdk::serde_json::Value>,
 }
 
-impl Token {
-    /// Load token information from the contract.
-    pub fn load(contract: &impl Nep171Controller, token_id: TokenId) -> Option<Self> {
-        contract
-            .token_owner(&token_id)
-            .map(|owner_id| Self { token_id, owner_id })
-    }
+/// Trait for NFT extensions to load token metadata.
+pub trait LoadTokenMetadata<C> {
+    /// Load token metadata into `metadata`.
+    fn load(
+        contract: &C,
+        token_id: &TokenId,
+        metadata: &mut std::collections::HashMap<String, near_sdk::serde_json::Value>,
+    ) -> Result<(), Box<dyn Error>>;
 }
 
-// separate module with re-export because ext_contract doesn't play well with #![warn(missing_docs)]
-mod ext {
-    #![allow(missing_docs)]
-
-    use std::collections::HashMap;
-
-    use near_sdk::{ext_contract, AccountId, PromiseOrValue};
-
-    use super::{Token, TokenId};
-
-    /// Interface of contracts that implement NEP-171.
-    #[ext_contract(ext_nep171)]
-    pub trait Nep171<T = Token> {
-        /// Transfer a token.
-        fn nft_transfer(
-            &mut self,
-            receiver_id: AccountId,
-            token_id: TokenId,
-            approval_id: Option<u64>,
-            memo: Option<String>,
-        );
-
-        /// Transfer a token, and call [`Nep171Receiver::nft_on_transfer`] on the receiving account.
-        fn nft_transfer_call(
-            &mut self,
-            receiver_id: AccountId,
-            token_id: TokenId,
-            approval_id: Option<u64>,
-            memo: Option<String>,
-            msg: String,
-        ) -> PromiseOrValue<bool>;
-
-        /// Get individual token information.
-        fn nft_token(&self, token_id: TokenId) -> Option<T>;
-    }
-
-    /// Original token contract follow-up to [`Nep171::nft_transfer_call`].
-    #[ext_contract(ext_nep171_resolver)]
-    pub trait Nep171Resolver {
-        /// Final method call on the original token contract during an
-        /// [`Nep171::nft_transfer_call`] promise chain.
-        fn nft_resolve_transfer(
-            &mut self,
-            previous_owner_id: AccountId,
-            receiver_id: AccountId,
-            token_id: TokenId,
-            approved_account_ids: Option<HashMap<AccountId, u64>>,
-        ) -> bool;
-    }
-
-    /// A contract that may be the recipient of an `nft_transfer_call` function
-    /// call.
-    #[ext_contract(ext_nep171_receiver)]
-    pub trait Nep171Receiver {
-        /// Function that is called in an `nft_transfer_call` promise chain.
-        /// Performs some action after receiving a non-fungible token.
-        ///
-        /// Returns `true` if token should be returned to `sender_id`.
-        fn nft_on_transfer(
-            &mut self,
-            sender_id: AccountId,
-            previous_owner_id: AccountId,
-            token_id: TokenId,
-            msg: String,
-        ) -> PromiseOrValue<bool>;
+impl<C> LoadTokenMetadata<C> for () {
+    fn load(
+        _contract: &C,
+        _token_id: &TokenId,
+        _metadata: &mut std::collections::HashMap<String, near_sdk::serde_json::Value>,
+    ) -> Result<(), Box<dyn Error>> {
+        Ok(())
     }
 }
 
-pub use ext::*;
+impl<C, T: LoadTokenMetadata<C>> LoadTokenMetadata<C> for (T,) {
+    fn load(
+        contract: &C,
+        token_id: &TokenId,
+        metadata: &mut std::collections::HashMap<String, near_sdk::serde_json::Value>,
+    ) -> Result<(), Box<dyn Error>> {
+        T::load(contract, token_id, metadata)?;
+        Ok(())
+    }
+}
+
+impl<C, T: LoadTokenMetadata<C>, U: LoadTokenMetadata<C>> LoadTokenMetadata<C> for (T, U) {
+    fn load(
+        contract: &C,
+        token_id: &TokenId,
+        metadata: &mut std::collections::HashMap<String, near_sdk::serde_json::Value>,
+    ) -> Result<(), Box<dyn Error>> {
+        T::load(contract, token_id, metadata)?;
+        U::load(contract, token_id, metadata)?;
+        Ok(())
+    }
+}
+
+// further variations are technically unnecessary: just use (T, (U, V)) or ((T, U), V)

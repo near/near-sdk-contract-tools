@@ -90,6 +90,7 @@ async fn create_and_mint() {
         Some(Token {
             token_id: "token_0".to_string(),
             owner_id: alice.id().parse().unwrap(),
+            extensions_metadata: Default::default(),
         }),
     );
     assert_eq!(
@@ -97,6 +98,7 @@ async fn create_and_mint() {
         Some(Token {
             token_id: "token_1".to_string(),
             owner_id: bob.id().parse().unwrap(),
+            extensions_metadata: Default::default(),
         }),
     );
     assert_eq!(
@@ -104,6 +106,7 @@ async fn create_and_mint() {
         Some(Token {
             token_id: "token_2".to_string(),
             owner_id: charlie.id().parse().unwrap(),
+            extensions_metadata: Default::default(),
         }),
     );
     assert_eq!(token_3, None::<Token>);
@@ -145,8 +148,8 @@ async fn create_and_mint_with_metadata() {
         nft_token(&contract, "token_3"),
     );
 
-    fn token_meta(id: String) -> TokenMetadata {
-        TokenMetadata {
+    fn token_meta(id: String) -> near_sdk::serde_json::Value {
+        near_sdk::serde_json::to_value(TokenMetadata {
             title: Some(id),
             description: Some("description".to_string()),
             media: None,
@@ -159,32 +162,36 @@ async fn create_and_mint_with_metadata() {
             extra: None,
             reference: None,
             reference_hash: None,
-        }
+        })
+        .unwrap()
     }
 
     // Verify minted tokens
     assert_eq!(
         token_0,
-        Some(nep177::Token {
+        Some(Token {
             token_id: "token_0".to_string(),
             owner_id: alice.id().parse().unwrap(),
-            metadata: token_meta("token_0".to_string()),
+            extensions_metadata: [("metadata".to_string(), token_meta("token_0".to_string()))]
+                .into(),
         }),
     );
     assert_eq!(
         token_1,
-        Some(nep177::Token {
+        Some(Token {
             token_id: "token_1".to_string(),
             owner_id: bob.id().parse().unwrap(),
-            metadata: token_meta("token_1".to_string()),
+            extensions_metadata: [("metadata".to_string(), token_meta("token_1".to_string()))]
+                .into(),
         }),
     );
     assert_eq!(
         token_2,
-        Some(nep177::Token {
+        Some(Token {
             token_id: "token_2".to_string(),
             owner_id: charlie.id().parse().unwrap(),
-            metadata: token_meta("token_2".to_string()),
+            extensions_metadata: [("metadata".to_string(), token_meta("token_2".to_string()))]
+                .into(),
         }),
     );
     assert_eq!(token_3, None::<Token>);
@@ -237,6 +244,7 @@ async fn transfer_success() {
         Some(Token {
             token_id: "token_0".to_string(),
             owner_id: bob.id().parse().unwrap(),
+            extensions_metadata: Default::default(),
         }),
     );
     assert_eq!(
@@ -244,6 +252,7 @@ async fn transfer_success() {
         Some(Token {
             token_id: "token_1".to_string(),
             owner_id: bob.id().parse().unwrap(),
+            extensions_metadata: Default::default(),
         }),
     );
     assert_eq!(
@@ -251,6 +260,7 @@ async fn transfer_success() {
         Some(Token {
             token_id: "token_2".to_string(),
             owner_id: charlie.id().parse().unwrap(),
+            extensions_metadata: Default::default(),
         }),
     );
 }
@@ -419,6 +429,7 @@ async fn transfer_call_success() {
         Some(Token {
             token_id: "token_0".to_string(),
             owner_id: bob.id().parse().unwrap(),
+            extensions_metadata: Default::default(),
         }),
     );
 }
@@ -487,6 +498,7 @@ async fn transfer_call_return_success() {
         Some(Token {
             token_id: "token_0".to_string(),
             owner_id: alice.id().parse().unwrap(),
+            extensions_metadata: Default::default(),
         }),
     );
 }
@@ -555,6 +567,7 @@ async fn transfer_call_receiver_panic() {
         Some(Token {
             token_id: "token_0".to_string(),
             owner_id: alice.id().parse().unwrap(),
+            extensions_metadata: Default::default(),
         }),
     );
 }
@@ -628,6 +641,7 @@ async fn transfer_call_receiver_send_return() {
         Some(Token {
             token_id: "token_0".to_string(),
             owner_id: charlie.id().parse().unwrap(),
+            extensions_metadata: Default::default(),
         }),
     );
 }
