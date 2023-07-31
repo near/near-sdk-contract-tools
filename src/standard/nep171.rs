@@ -526,6 +526,7 @@ pub struct Token {
 }
 
 impl Token {
+    /// Load token information from the contract.
     pub fn load(contract: &impl Nep171Controller, token_id: TokenId) -> Option<Self> {
         contract
             .token_owner(&token_id)

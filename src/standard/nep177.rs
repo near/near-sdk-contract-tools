@@ -15,7 +15,7 @@ use crate::{
     standard::{
         nep171::{
             self,
-            error::{TokenAlreadyExistsError, TokenDoesNotExistError},
+            error::TokenDoesNotExistError,
             event::{NftContractMetadataUpdateLog, NftMetadataUpdateLog},
             *,
         },
@@ -24,19 +24,26 @@ use crate::{
     DefaultStorageKey,
 };
 
+pub use ext::*;
+
 const CONTRACT_METADATA_NOT_INITIALIZED_ERROR: &str = "Contract metadata not initialized";
 
+/// Non-fungible token with metadata.
 #[derive(
     Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize, BorshSerialize, BorshDeserialize,
 )]
 #[serde(crate = "near_sdk::serde")]
 pub struct Token {
+    /// The token ID.
     pub token_id: TokenId,
+    /// The token owner.
     pub owner_id: AccountId,
+    /// The token metadata.
     pub metadata: TokenMetadata,
 }
 
 impl Token {
+    /// Loads token metadata.
     pub fn load(
         contract: &(impl Nep171Controller + Nep177Controller),
         token_id: TokenId,
@@ -51,6 +58,7 @@ impl Token {
     }
 }
 
+/// Non-fungible token contract metadata.
 #[derive(
     Serialize,
     Deserialize,
@@ -65,18 +73,28 @@ impl Token {
 )]
 #[serde(crate = "near_sdk::serde")]
 pub struct ContractMetadata {
+    /// The metadata specification version. Essentially a version like "nft-2.0.0", replacing "2.0.0" with the implemented version of NEP-177.
     pub spec: String,
+    /// The name of the NFT contract, e.g. "Mochi Rising — Digital Edition" or "Metaverse 3".
     pub name: String,
+    /// The symbol of the NFT contract, e.g. "MOCHI" or "M3".
     pub symbol: String,
+    /// Data URI for the contract icon.
     pub icon: Option<String>,
+    /// Gateway known to have reliable access to decentralized storage assets referenced by `reference` or `media` URLs.
     pub base_uri: Option<String>,
+    /// URL to a JSON file with more info about the NFT contract.
     pub reference: Option<String>,
+    /// Base-64-encoded SHA-256 hash of the referenced JSON file. Required if `reference` is present.
     pub reference_hash: Option<String>,
 }
 
 impl ContractMetadata {
-    pub const SPEC: &'static str = "nft-1.0.0";
+    /// The metadata specification version.
+    pub const SPEC: &'static str = "nft-2.1.0";
 
+    /// Creates a new contract metadata, specifying the name, symbol, and
+    /// optional base URI. Other fields are set to `None`.
     pub fn new(name: String, symbol: String, base_uri: Option<String>) -> Self {
         Self {
             spec: Self::SPEC.to_string(),
@@ -90,6 +108,7 @@ impl ContractMetadata {
     }
 }
 
+/// Non-fungible token metadata.
 #[derive(
     Serialize,
     Deserialize,
@@ -104,17 +123,29 @@ impl ContractMetadata {
 )]
 #[serde(crate = "near_sdk::serde")]
 pub struct TokenMetadata {
+    /// This token's title, e.g. "Arch Nemesis: Mail Carrier" or "Parcel #5055".
     pub title: Option<String>,
+    /// Free-text description of this specific token.
     pub description: Option<String>,
+    /// The token's image or other associated media.
     pub media: Option<String>,
+    /// Base-64-encoded SHA-256 hash of the media. Required if `media` is present.
     pub media_hash: Option<String>,
+    /// Number of copies of this set of metadata in existence when token was minted.
     pub copies: Option<U64>,
+    /// When the token was issued, in milliseconds since the UNIX epoch.
     pub issued_at: Option<U64>,
+    /// When the token expires, in milliseconds since the UNIX epoch.
     pub expires_at: Option<U64>,
+    /// When the token starts being valid, in milliseconds since the UNIX epoch.
     pub starts_at: Option<U64>,
+    /// When the token was last updated, in milliseconds since the UNIX epoch.
     pub updated_at: Option<U64>,
+    /// Anything extra the NFT wants to store on-chain. Can be stringified JSON.
     pub extra: Option<String>,
+    /// URL to an off-chain JSON file with more info about the token.
     pub reference: Option<String>,
+    /// Base-64-encoded SHA-256 hash of the referenced JSON file. Required if `reference` is present.
     pub reference_hash: Option<String>,
 }
 
@@ -124,21 +155,27 @@ enum StorageKey<'a> {
     TokenMetadata(&'a TokenId),
 }
 
+/// Internal functions for [`Nep177Controller`].
 pub trait Nep177ControllerInternal {
+    /// Storage root.
     fn root() -> Slot<()> {
         Slot::root(DefaultStorageKey::Nep177)
     }
 
+    /// Storage slot for contract metadata.
     fn slot_contract_metadata() -> Slot<ContractMetadata> {
         Self::root().field(StorageKey::ContractMetadata)
     }
 
+    /// Storage slot for token metadata.
     fn slot_token_metadata(token_id: &TokenId) -> Slot<TokenMetadata> {
         Self::root().field(StorageKey::TokenMetadata(token_id))
     }
 }
 
+/// Functions for managing non-fungible tokens with attached metadata, NEP-177.
 pub trait Nep177Controller {
+    /// Mint a new token with metadata.
     fn mint_with_metadata(
         &mut self,
         token_id: TokenId,
@@ -146,30 +183,37 @@ pub trait Nep177Controller {
         metadata: TokenMetadata,
     ) -> Result<(), Nep171MintError>;
 
+    /// Burn a token with metadata.
     fn burn_with_metadata(
         &mut self,
         token_id: TokenId,
         current_owner_id: &AccountId,
     ) -> Result<(), Nep171BurnError>;
 
+    /// Sets the metadata for a token ID without checking whether the token exists, etc. and emits an [`Nep171Event::NftMetadataUpdate`] event.
     fn set_token_metadata_unchecked(&mut self, token_id: TokenId, metadata: Option<TokenMetadata>);
 
+    /// Sets the metadata for a token ID and emits an [`Nep171Event::NftMetadataUpdate`] event.
     fn set_token_metadata(
         &mut self,
         token_id: TokenId,
         metadata: TokenMetadata,
     ) -> Result<(), UpdateTokenMetadataError>;
 
+    /// Sets the contract metadata and emits an [`Nep171Event::ContractMetadataUpdate`] event.
     fn set_contract_metadata(&mut self, metadata: ContractMetadata);
 
+    /// Returns the contract metadata.
     fn contract_metadata(&self) -> ContractMetadata;
 
+    /// Returns the metadata for a token ID.
     fn token_metadata(&self, token_id: &TokenId) -> Option<TokenMetadata>;
 }
 
+/// Error returned when a token update fails.
 #[derive(Error, Debug)]
-#[non_exhaustive]
 pub enum UpdateTokenMetadataError {
+    /// The token does not exist.
     #[error(transparent)]
     TokenNotFound(#[from] TokenDoesNotExistError),
 }
@@ -250,5 +294,3 @@ mod ext {
         fn nft_metadata(&self) -> ContractMetadata;
     }
 }
-
-pub use ext::*;

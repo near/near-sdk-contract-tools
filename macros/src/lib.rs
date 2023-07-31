@@ -153,16 +153,27 @@ pub fn derive_fungible_token(input: TokenStream) -> TokenStream {
 ///
 /// The storage key prefix for the fields can be optionally specified (default:
 /// `"~$171"`) using `#[nep171(storage_key = "<expression>")]`.
+///
+/// Fields:
+/// - `no_hooks`: Flag. Removes the requirement for the contract to implement [`near_sdk_contract_tools::standard::nep171::Nep171Hooks`].
+/// - `token_type`: specify the type of the token returned by `nft_token`.
+/// - `token_loader`: A function that takes a reference to the contract, and
+///     the desired token ID, and returns a value of type `token_type`.
 #[proc_macro_derive(Nep171, attributes(nep171))]
 pub fn derive_nep171(input: TokenStream) -> TokenStream {
     make_derive(input, standard::nep171::expand)
 }
 
+/// Adds NEP-177 non-fungible token metadata functionality to a contract.
+///
+/// The storage key prefix for the fields can be optionally specified (default:
+/// `"~$177"`) using `#[nep177(storage_key = "<expression>")]`.
 #[proc_macro_derive(Nep177, attributes(nep177))]
 pub fn derive_nep177(input: TokenStream) -> TokenStream {
     make_derive(input, standard::nep177::expand)
 }
 
+/// Implements all NFT functionality at once, like `#[derive(Nep171, Nep177)]`.
 #[proc_macro_derive(NonFungibleToken, attributes(non_fungible_token))]
 pub fn derive_non_fungible_token(input: TokenStream) -> TokenStream {
     make_derive(input, standard::non_fungible_token::expand)

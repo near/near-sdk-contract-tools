@@ -8,11 +8,8 @@ use near_sdk::{
     env, near_bindgen, PanicOnDefault,
 };
 use near_sdk_contract_tools::{
-    standard::{
-        nep171::*,
-        nep177::{self, *},
-    },
-    Nep171, Nep177, NonFungibleToken,
+    standard::{nep171::*, nep177::*},
+    NonFungibleToken,
 };
 
 #[derive(PanicOnDefault, BorshSerialize, BorshDeserialize, NonFungibleToken)]
