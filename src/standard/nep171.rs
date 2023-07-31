@@ -516,21 +516,22 @@ impl<T: Nep171ControllerInternal> Nep171Controller for T {
 
 /// Token information structure.
 #[derive(
-    Debug,
-    Clone,
-    Hash,
-    PartialEq,
-    PartialOrd,
-    Serialize,
-    Deserialize,
-    BorshSerialize,
-    BorshDeserialize,
+    Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize, BorshSerialize, BorshDeserialize,
 )]
 pub struct Token {
     /// Token ID.
     pub token_id: TokenId,
     /// Current owner of the token.
     pub owner_id: AccountId,
+}
+
+impl Token {
+    /// Load token information from the contract.
+    pub fn load(contract: &impl Nep171Controller, token_id: TokenId) -> Option<Self> {
+        contract
+            .token_owner(&token_id)
+            .map(|owner_id| Self { token_id, owner_id })
+    }
 }
 
 // separate module with re-export because ext_contract doesn't play well with #![warn(missing_docs)]
@@ -545,7 +546,7 @@ mod ext {
 
     /// Interface of contracts that implement NEP-171.
     #[ext_contract(ext_nep171)]
-    pub trait Nep171 {
+    pub trait Nep171<T = Token> {
         /// Transfer a token.
         fn nft_transfer(
             &mut self,
@@ -566,7 +567,7 @@ mod ext {
         ) -> PromiseOrValue<bool>;
 
         /// Get individual token information.
-        fn nft_token(&self, token_id: TokenId) -> Option<Token>;
+        fn nft_token(&self, token_id: TokenId) -> Option<T>;
     }
 
     /// Original token contract follow-up to [`Nep171::nft_transfer_call`].

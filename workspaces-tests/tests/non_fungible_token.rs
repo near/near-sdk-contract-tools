@@ -1,8 +1,9 @@
 #![cfg(not(windows))]
 
-use near_sdk::serde_json::json;
+use near_sdk::{serde::de::DeserializeOwned, serde_json::json};
 use near_sdk_contract_tools::standard::{
     nep171::{event::NftTransferLog, Nep171Event, Token},
+    nep177::{self, TokenMetadata},
     nep297::Event,
 };
 use workspaces::{operations::Function, result::ExecutionFinalResult, Account, Contract};
@@ -10,16 +11,19 @@ use workspaces::{operations::Function, result::ExecutionFinalResult, Account, Co
 const WASM: &[u8] =
     include_bytes!("../../target/wasm32-unknown-unknown/release/non_fungible_token.wasm");
 
+const WASM_177: &[u8] =
+    include_bytes!("../../target/wasm32-unknown-unknown/release/non_fungible_token_meta.wasm");
+
 const RECEIVER_WASM: &[u8] =
     include_bytes!("../../target/wasm32-unknown-unknown/release/non_fungible_token_receiver.wasm");
 
-async fn nft_token(contract: &Contract, token_id: &str) -> Option<Token> {
+async fn nft_token<T: DeserializeOwned>(contract: &Contract, token_id: &str) -> Option<T> {
     contract
         .view("nft_token")
         .args_json(json!({ "token_id": token_id }))
         .await
         .unwrap()
-        .json::<Option<Token>>()
+        .json::<Option<T>>()
         .unwrap()
 }
 
@@ -29,11 +33,11 @@ struct Setup {
 }
 
 /// Setup for individual tests
-async fn setup(num_accounts: usize) -> Setup {
+async fn setup(wasm: &[u8], num_accounts: usize) -> Setup {
     let worker = workspaces::sandbox().await.unwrap();
 
     // Initialize contract
-    let contract = worker.dev_deploy(WASM).await.unwrap();
+    let contract = worker.dev_deploy(wasm).await.unwrap();
     contract.call("new").transact().await.unwrap().unwrap();
 
     // Initialize user accounts
@@ -45,8 +49,12 @@ async fn setup(num_accounts: usize) -> Setup {
     Setup { contract, accounts }
 }
 
-async fn setup_balances(num_accounts: usize, token_ids: impl Fn(usize) -> Vec<String>) -> Setup {
-    let s = setup(num_accounts).await;
+async fn setup_balances(
+    wasm: &[u8],
+    num_accounts: usize,
+    token_ids: impl Fn(usize) -> Vec<String>,
+) -> Setup {
+    let s = setup(wasm, num_accounts).await;
 
     for (i, account) in s.accounts.iter().enumerate() {
         account
@@ -62,8 +70,9 @@ async fn setup_balances(num_accounts: usize, token_ids: impl Fn(usize) -> Vec<St
 }
 
 #[tokio::test]
-async fn mint() {
-    let Setup { contract, accounts } = setup_balances(3, |i| vec![format!("token_{i}")]).await;
+async fn create_and_mint() {
+    let Setup { contract, accounts } =
+        setup_balances(WASM, 3, |i| vec![format!("token_{i}")]).await;
     let alice = &accounts[0];
     let bob = &accounts[1];
     let charlie = &accounts[2];
@@ -97,12 +106,94 @@ async fn mint() {
             owner_id: charlie.id().parse().unwrap(),
         }),
     );
-    assert_eq!(token_3, None);
+    assert_eq!(token_3, None::<Token>);
+}
+
+#[tokio::test]
+async fn create_and_mint_with_metadata() {
+    let Setup { contract, accounts } =
+        setup_balances(WASM_177, 3, |i| vec![format!("token_{i}")]).await;
+    let alice = &accounts[0];
+    let bob = &accounts[1];
+    let charlie = &accounts[2];
+
+    let metadata = contract
+        .view("nft_metadata")
+        .await
+        .unwrap()
+        .json::<Option<nep177::ContractMetadata>>()
+        .unwrap()
+        .unwrap();
+
+    assert_eq!(
+        metadata,
+        nep177::ContractMetadata {
+            spec: nep177::ContractMetadata::SPEC.to_string(),
+            name: "My NFT Smart Contract".to_string(),
+            symbol: "MNSC".to_string(),
+            icon: None,
+            base_uri: None,
+            reference: None,
+            reference_hash: None,
+        },
+    );
+
+    let (token_0, token_1, token_2, token_3) = tokio::join!(
+        nft_token(&contract, "token_0"),
+        nft_token(&contract, "token_1"),
+        nft_token(&contract, "token_2"),
+        nft_token(&contract, "token_3"),
+    );
+
+    fn token_meta(id: String) -> TokenMetadata {
+        TokenMetadata {
+            title: Some(id),
+            description: Some("description".to_string()),
+            media: None,
+            media_hash: None,
+            copies: None,
+            issued_at: None,
+            expires_at: None,
+            starts_at: None,
+            updated_at: None,
+            extra: None,
+            reference: None,
+            reference_hash: None,
+        }
+    }
+
+    // Verify minted tokens
+    assert_eq!(
+        token_0,
+        Some(nep177::Token {
+            token_id: "token_0".to_string(),
+            owner_id: alice.id().parse().unwrap(),
+            metadata: token_meta("token_0".to_string()),
+        }),
+    );
+    assert_eq!(
+        token_1,
+        Some(nep177::Token {
+            token_id: "token_1".to_string(),
+            owner_id: bob.id().parse().unwrap(),
+            metadata: token_meta("token_1".to_string()),
+        }),
+    );
+    assert_eq!(
+        token_2,
+        Some(nep177::Token {
+            token_id: "token_2".to_string(),
+            owner_id: charlie.id().parse().unwrap(),
+            metadata: token_meta("token_2".to_string()),
+        }),
+    );
+    assert_eq!(token_3, None::<Token>);
 }
 
 #[tokio::test]
 async fn transfer_success() {
-    let Setup { contract, accounts } = setup_balances(3, |i| vec![format!("token_{i}")]).await;
+    let Setup { contract, accounts } =
+        setup_balances(WASM, 3, |i| vec![format!("token_{i}")]).await;
     let alice = &accounts[0];
     let bob = &accounts[1];
     let charlie = &accounts[2];
@@ -167,7 +258,8 @@ async fn transfer_success() {
 #[tokio::test]
 #[should_panic = "Smart contract panicked: Requires attached deposit of exactly 1 yoctoNEAR"]
 async fn transfer_fail_no_deposit() {
-    let Setup { contract, accounts } = setup_balances(2, |i| vec![format!("token_{i}")]).await;
+    let Setup { contract, accounts } =
+        setup_balances(WASM, 2, |i| vec![format!("token_{i}")]).await;
     let alice = &accounts[0];
     let bob = &accounts[1];
 
@@ -186,7 +278,8 @@ async fn transfer_fail_no_deposit() {
 #[tokio::test]
 #[should_panic = "Smart contract panicked: Token `token_5` does not exist"]
 async fn transfer_fail_token_dne() {
-    let Setup { contract, accounts } = setup_balances(2, |i| vec![format!("token_{i}")]).await;
+    let Setup { contract, accounts } =
+        setup_balances(WASM, 2, |i| vec![format!("token_{i}")]).await;
     let alice = &accounts[0];
     let bob = &accounts[1];
 
@@ -225,7 +318,8 @@ fn expect_execution_error(result: &ExecutionFinalResult, expected_error: impl As
 
 #[tokio::test]
 async fn transfer_fail_not_owner() {
-    let Setup { contract, accounts } = setup_balances(3, |i| vec![format!("token_{i}")]).await;
+    let Setup { contract, accounts } =
+        setup_balances(WASM, 3, |i| vec![format!("token_{i}")]).await;
     let alice = &accounts[0];
     let bob = &accounts[1];
     let charlie = &accounts[2];
@@ -253,7 +347,8 @@ async fn transfer_fail_not_owner() {
 
 #[tokio::test]
 async fn transfer_fail_reflexive_transfer() {
-    let Setup { contract, accounts } = setup_balances(2, |i| vec![format!("token_{i}")]).await;
+    let Setup { contract, accounts } =
+        setup_balances(WASM, 2, |i| vec![format!("token_{i}")]).await;
     let alice = &accounts[0];
 
     let result = alice
@@ -272,7 +367,8 @@ async fn transfer_fail_reflexive_transfer() {
 
 #[tokio::test]
 async fn transfer_call_success() {
-    let Setup { contract, accounts } = setup_balances(2, |i| vec![format!("token_{i}")]).await;
+    let Setup { contract, accounts } =
+        setup_balances(WASM, 2, |i| vec![format!("token_{i}")]).await;
     let alice = &accounts[0];
     let bob = &accounts[1];
 
@@ -329,7 +425,8 @@ async fn transfer_call_success() {
 
 #[tokio::test]
 async fn transfer_call_return_success() {
-    let Setup { contract, accounts } = setup_balances(2, |i| vec![format!("token_{i}")]).await;
+    let Setup { contract, accounts } =
+        setup_balances(WASM, 2, |i| vec![format!("token_{i}")]).await;
     let alice = &accounts[0];
     let bob = &accounts[1];
 
@@ -396,7 +493,8 @@ async fn transfer_call_return_success() {
 
 #[tokio::test]
 async fn transfer_call_receiver_panic() {
-    let Setup { contract, accounts } = setup_balances(2, |i| vec![format!("token_{i}")]).await;
+    let Setup { contract, accounts } =
+        setup_balances(WASM, 2, |i| vec![format!("token_{i}")]).await;
     let alice = &accounts[0];
     let bob = &accounts[1];
 
@@ -463,7 +561,8 @@ async fn transfer_call_receiver_panic() {
 
 #[tokio::test]
 async fn transfer_call_receiver_send_return() {
-    let Setup { contract, accounts } = setup_balances(3, |i| vec![format!("token_{i}")]).await;
+    let Setup { contract, accounts } =
+        setup_balances(WASM, 3, |i| vec![format!("token_{i}")]).await;
     let alice = &accounts[0];
     let bob = &accounts[1];
     let charlie = &accounts[2];
