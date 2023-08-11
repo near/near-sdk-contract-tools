@@ -5,7 +5,7 @@ pub fn main() {}
 
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
-    env, near_bindgen, PanicOnDefault,
+    env, log, near_bindgen, PanicOnDefault,
 };
 use near_sdk_contract_tools::{
     standard::{nep171::*, nep177::*},
@@ -13,9 +13,18 @@ use near_sdk_contract_tools::{
 };
 
 #[derive(PanicOnDefault, BorshSerialize, BorshDeserialize, NonFungibleToken)]
-#[non_fungible_token(no_hooks)]
 #[near_bindgen]
 pub struct Contract {}
+
+impl Nep171Hook for Contract {
+    fn before_nft_transfer(_contract: &Self, transfer: &Nep171Transfer) {
+        log!("before_nft_transfer({})", transfer.token_id);
+    }
+
+    fn after_nft_transfer(_contract: &mut Self, transfer: &Nep171Transfer, _state: ()) {
+        log!("after_nft_transfer({})", transfer.token_id);
+    }
+}
 
 #[near_bindgen]
 impl Contract {

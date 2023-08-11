@@ -1,53 +1,22 @@
 #![cfg(not(windows))]
 
-use near_sdk::{serde::de::DeserializeOwned, serde_json::json};
+use near_sdk::serde_json::json;
 use near_sdk_contract_tools::standard::{
     nep171::{event::NftTransferLog, Nep171Event, Token},
     nep177::{self, TokenMetadata},
     nep297::Event,
 };
-use workspaces::{operations::Function, result::ExecutionFinalResult, Account, Contract};
+use workspaces::operations::Function;
+use workspaces_tests_utils::{expect_execution_error, nft_token, setup, Setup};
 
-const WASM: &[u8] =
-    include_bytes!("../../target/wasm32-unknown-unknown/release/non_fungible_token.wasm");
+const WASM_171_ONLY: &[u8] =
+    include_bytes!("../../target/wasm32-unknown-unknown/release/non_fungible_token_nep171.wasm");
 
-const WASM_177: &[u8] =
-    include_bytes!("../../target/wasm32-unknown-unknown/release/non_fungible_token_meta.wasm");
+const WASM_FULL: &[u8] =
+    include_bytes!("../../target/wasm32-unknown-unknown/release/non_fungible_token_full.wasm");
 
 const RECEIVER_WASM: &[u8] =
     include_bytes!("../../target/wasm32-unknown-unknown/release/non_fungible_token_receiver.wasm");
-
-async fn nft_token<T: DeserializeOwned>(contract: &Contract, token_id: &str) -> Option<T> {
-    contract
-        .view("nft_token")
-        .args_json(json!({ "token_id": token_id }))
-        .await
-        .unwrap()
-        .json::<Option<T>>()
-        .unwrap()
-}
-
-struct Setup {
-    pub contract: Contract,
-    pub accounts: Vec<Account>,
-}
-
-/// Setup for individual tests
-async fn setup(wasm: &[u8], num_accounts: usize) -> Setup {
-    let worker = workspaces::sandbox().await.unwrap();
-
-    // Initialize contract
-    let contract = worker.dev_deploy(wasm).await.unwrap();
-    contract.call("new").transact().await.unwrap().unwrap();
-
-    // Initialize user accounts
-    let mut accounts = vec![];
-    for _ in 0..num_accounts {
-        accounts.push(worker.dev_create_account().await.unwrap());
-    }
-
-    Setup { contract, accounts }
-}
 
 async fn setup_balances(
     wasm: &[u8],
@@ -72,7 +41,7 @@ async fn setup_balances(
 #[tokio::test]
 async fn create_and_mint() {
     let Setup { contract, accounts } =
-        setup_balances(WASM, 3, |i| vec![format!("token_{i}")]).await;
+        setup_balances(WASM_171_ONLY, 3, |i| vec![format!("token_{i}")]).await;
     let alice = &accounts[0];
     let bob = &accounts[1];
     let charlie = &accounts[2];
@@ -115,7 +84,7 @@ async fn create_and_mint() {
 #[tokio::test]
 async fn create_and_mint_with_metadata() {
     let Setup { contract, accounts } =
-        setup_balances(WASM_177, 3, |i| vec![format!("token_{i}")]).await;
+        setup_balances(WASM_FULL, 3, |i| vec![format!("token_{i}")]).await;
     let alice = &accounts[0];
     let bob = &accounts[1];
     let charlie = &accounts[2];
@@ -200,7 +169,7 @@ async fn create_and_mint_with_metadata() {
 #[tokio::test]
 async fn transfer_success() {
     let Setup { contract, accounts } =
-        setup_balances(WASM, 3, |i| vec![format!("token_{i}")]).await;
+        setup_balances(WASM_171_ONLY, 3, |i| vec![format!("token_{i}")]).await;
     let alice = &accounts[0];
     let bob = &accounts[1];
     let charlie = &accounts[2];
@@ -267,9 +236,19 @@ async fn transfer_success() {
 
 #[tokio::test]
 #[should_panic = "Smart contract panicked: Requires attached deposit of exactly 1 yoctoNEAR"]
-async fn transfer_fail_no_deposit() {
+async fn transfer_fail_no_deposit_full() {
+    transfer_fail_no_deposit(WASM_FULL).await;
+}
+
+#[tokio::test]
+#[should_panic = "Smart contract panicked: Requires attached deposit of exactly 1 yoctoNEAR"]
+async fn transfer_fail_no_deposit_171() {
+    transfer_fail_no_deposit(WASM_171_ONLY).await;
+}
+
+async fn transfer_fail_no_deposit(wasm: &[u8]) {
     let Setup { contract, accounts } =
-        setup_balances(WASM, 2, |i| vec![format!("token_{i}")]).await;
+        setup_balances(wasm, 2, |i| vec![format!("token_{i}")]).await;
     let alice = &accounts[0];
     let bob = &accounts[1];
 
@@ -287,9 +266,19 @@ async fn transfer_fail_no_deposit() {
 
 #[tokio::test]
 #[should_panic = "Smart contract panicked: Token `token_5` does not exist"]
-async fn transfer_fail_token_dne() {
+async fn transfer_fail_token_dne_full() {
+    transfer_fail_token_dne(WASM_FULL).await;
+}
+
+#[tokio::test]
+#[should_panic = "Smart contract panicked: Token `token_5` does not exist"]
+async fn transfer_fail_token_dne_171() {
+    transfer_fail_token_dne(WASM_171_ONLY).await;
+}
+
+async fn transfer_fail_token_dne(wasm: &[u8]) {
     let Setup { contract, accounts } =
-        setup_balances(WASM, 2, |i| vec![format!("token_{i}")]).await;
+        setup_balances(wasm, 2, |i| vec![format!("token_{i}")]).await;
     let alice = &accounts[0];
     let bob = &accounts[1];
 
@@ -306,30 +295,19 @@ async fn transfer_fail_token_dne() {
         .unwrap();
 }
 
-/// For dynamic should_panic messages
-fn expect_execution_error(result: &ExecutionFinalResult, expected_error: impl AsRef<str>) {
-    let failures = result.failures();
-
-    assert_eq!(failures.len(), 1);
-
-    let actual_error_string = failures[0]
-        .clone()
-        .into_result()
-        .unwrap_err()
-        .into_inner()
-        .unwrap()
-        .to_string();
-
-    assert_eq!(
-        format!("Action #0: ExecutionError(\"{}\")", expected_error.as_ref()),
-        actual_error_string
-    );
+#[tokio::test]
+async fn transfer_fail_not_owner_full() {
+    transfer_fail_not_owner(WASM_FULL).await;
 }
 
 #[tokio::test]
-async fn transfer_fail_not_owner() {
+async fn transfer_fail_not_owner_171() {
+    transfer_fail_not_owner(WASM_171_ONLY).await;
+}
+
+async fn transfer_fail_not_owner(wasm: &[u8]) {
     let Setup { contract, accounts } =
-        setup_balances(WASM, 3, |i| vec![format!("token_{i}")]).await;
+        setup_balances(wasm, 3, |i| vec![format!("token_{i}")]).await;
     let alice = &accounts[0];
     let bob = &accounts[1];
     let charlie = &accounts[2];
@@ -356,9 +334,18 @@ async fn transfer_fail_not_owner() {
 }
 
 #[tokio::test]
-async fn transfer_fail_reflexive_transfer() {
+async fn transfer_fail_reflexive_transfer_full() {
+    transfer_fail_reflexive_transfer(WASM_FULL).await;
+}
+
+#[tokio::test]
+async fn transfer_fail_reflexive_transfer_171() {
+    transfer_fail_reflexive_transfer(WASM_171_ONLY).await;
+}
+
+async fn transfer_fail_reflexive_transfer(wasm: &[u8]) {
     let Setup { contract, accounts } =
-        setup_balances(WASM, 2, |i| vec![format!("token_{i}")]).await;
+        setup_balances(wasm, 2, |i| vec![format!("token_{i}")]).await;
     let alice = &accounts[0];
 
     let result = alice
@@ -378,7 +365,7 @@ async fn transfer_fail_reflexive_transfer() {
 #[tokio::test]
 async fn transfer_call_success() {
     let Setup { contract, accounts } =
-        setup_balances(WASM, 2, |i| vec![format!("token_{i}")]).await;
+        setup_balances(WASM_171_ONLY, 2, |i| vec![format!("token_{i}")]).await;
     let alice = &accounts[0];
     let bob = &accounts[1];
 
@@ -437,7 +424,7 @@ async fn transfer_call_success() {
 #[tokio::test]
 async fn transfer_call_return_success() {
     let Setup { contract, accounts } =
-        setup_balances(WASM, 2, |i| vec![format!("token_{i}")]).await;
+        setup_balances(WASM_171_ONLY, 2, |i| vec![format!("token_{i}")]).await;
     let alice = &accounts[0];
     let bob = &accounts[1];
 
@@ -506,7 +493,7 @@ async fn transfer_call_return_success() {
 #[tokio::test]
 async fn transfer_call_receiver_panic() {
     let Setup { contract, accounts } =
-        setup_balances(WASM, 2, |i| vec![format!("token_{i}")]).await;
+        setup_balances(WASM_171_ONLY, 2, |i| vec![format!("token_{i}")]).await;
     let alice = &accounts[0];
     let bob = &accounts[1];
 
@@ -575,7 +562,7 @@ async fn transfer_call_receiver_panic() {
 #[tokio::test]
 async fn transfer_call_receiver_send_return() {
     let Setup { contract, accounts } =
-        setup_balances(WASM, 3, |i| vec![format!("token_{i}")]).await;
+        setup_balances(WASM_171_ONLY, 3, |i| vec![format!("token_{i}")]).await;
     let alice = &accounts[0];
     let bob = &accounts[1];
     let charlie = &accounts[2];

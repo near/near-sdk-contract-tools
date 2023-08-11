@@ -51,7 +51,7 @@ impl<C: Nep178Controller> LoadTokenMetadata<C> for TokenApprovals {
     }
 }
 
-impl<C: Nep178Controller> Nep171Hook<C, ()> for TokenApprovals {
+impl<C: Nep178Controller> Nep171Hook<(), C> for TokenApprovals {
     fn before_nft_transfer(contract: &C, transfer: &Nep171Transfer) -> () {
         todo!()
     }

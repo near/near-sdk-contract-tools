@@ -224,7 +224,7 @@ impl<T: Nep171Controller> CheckExternalTransfer<T> for DefaultCheckExternalTrans
 /// `T` is an optional value for passing state between different lifecycle
 /// hooks. This may be useful for charging callers for storage usage, for
 /// example.
-pub trait Nep171Hook<C = Self, S = ()> {
+pub trait Nep171Hook<S = (), C = Self> {
     // TODO: Switch order of C, S generics
     /// Executed before a token transfer is conducted.
     ///
@@ -242,16 +242,16 @@ pub trait Nep171Hook<C = Self, S = ()> {
     fn after_nft_transfer(contract: &mut C, transfer: &Nep171Transfer, state: S);
 }
 
-impl<C> Nep171Hook<C, ()> for () {
+impl<C> Nep171Hook<(), C> for () {
     fn before_nft_transfer(_contract: &C, _transfer: &Nep171Transfer) {}
 
     fn after_nft_transfer(_contract: &mut C, _transfer: &Nep171Transfer, _state: ()) {}
 }
 
-impl<Cont, Stat0, Stat1, Handl0, Handl1> Nep171Hook<Cont, (Stat0, Stat1)> for (Handl0, Handl1)
+impl<Cont, Stat0, Stat1, Handl0, Handl1> Nep171Hook<(Stat0, Stat1), Cont> for (Handl0, Handl1)
 where
-    Handl0: Nep171Hook<Cont, Stat0>,
-    Handl1: Nep171Hook<Cont, Stat1>,
+    Handl0: Nep171Hook<Stat0, Cont>,
+    Handl1: Nep171Hook<Stat1, Cont>,
 {
     fn before_nft_transfer(contract: &Cont, transfer: &Nep171Transfer) -> (Stat0, Stat1) {
         (
