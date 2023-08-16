@@ -97,6 +97,8 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
 
     Ok(quote! {
         impl #imp #me::standard::nep171::Nep171ControllerInternal for #ident #ty #wher {
+            type CheckTransfer = #check_external_transfer;
+
             #root
         }
 
@@ -110,6 +112,8 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
                 token_id: #me::standard::nep171::TokenId,
                 approved_account_ids: Option<std::collections::HashMap<#near_sdk::AccountId, u64>>,
             ) -> bool {
+                use #me::standard::nep171::*;
+
                 let _ = approved_account_ids; // #[near_bindgen] cares about parameter names
 
                 #near_sdk::require!(
@@ -128,26 +132,19 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
                 if should_revert {
                     let token_ids = [token_id];
 
-                    let check_result = #me::standard::nep171::Nep171Controller::check_transfer(
-                        self,
-                        &token_ids,
-                        &receiver_id,
-                        &receiver_id,
-                        &previous_owner_id,
-                    );
+                    let transfer = Nep171Transfer {
+                        token_id: &token_ids[0],
+                        authorization: Nep171TransferAuthorization::Owner,
+                        sender_id: &receiver_id,
+                        receiver_id: &previous_owner_id,
+                        memo: None,
+                        msg: None,
+                    };
+
+                    let check_result = <Self as Nep171Controller>::CheckTransfer::check_external_transfer(self, &transfer);
 
                     match check_result {
-                        Ok(()) => {
-                            let transfer = #me::standard::nep171::Nep171Transfer {
-                                token_id: &token_ids[0],
-                                owner_id: &receiver_id,
-                                sender_id: &receiver_id,
-                                receiver_id: &previous_owner_id,
-                                approval_id: None,
-                                memo: None,
-                                msg: None,
-                            };
-
+                        Ok(_) => {
                             #before_nft_transfer
 
                             #me::standard::nep171::Nep171Controller::transfer_unchecked(
@@ -189,19 +186,18 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
 
                 let token_ids = [token_id];
 
-                let transfer = #me::standard::nep171::Nep171Transfer {
+                let transfer = Nep171Transfer {
                     token_id: &token_ids[0],
-                    owner_id: &sender_id,
+                    authorization: approval_id.map(Nep171TransferAuthorization::ApprovalId).unwrap_or(Nep171TransferAuthorization::Owner),
                     sender_id: &sender_id,
                     receiver_id: &receiver_id,
-                    approval_id: approval_id.clone(),
                     memo: memo.as_deref(),
                     msg: None,
                 };
 
                 #before_nft_transfer
 
-                Nep171Controller::external_transfer::<#check_external_transfer>(self, &transfer)
+                <Self as Nep171Controller>::external_transfer(self, &transfer)
                     .unwrap_or_else(|e| #near_sdk::env::panic_str(&e.to_string()));
 
                 #after_nft_transfer
@@ -229,19 +225,18 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
 
                 let token_ids = [token_id];
 
-                let transfer = #me::standard::nep171::Nep171Transfer {
+                let transfer = Nep171Transfer {
                     token_id: &token_ids[0],
-                    owner_id: &sender_id,
+                    authorization: approval_id.map(Nep171TransferAuthorization::ApprovalId).unwrap_or(Nep171TransferAuthorization::Owner),
                     sender_id: &sender_id,
                     receiver_id: &receiver_id,
-                    approval_id: approval_id.clone(),
                     memo: memo.as_deref(),
                     msg: Some(&msg),
                 };
 
                 #before_nft_transfer
 
-                Nep171Controller::external_transfer::<#check_external_transfer>(self, &transfer)
+                <Self as Nep171Controller>::external_transfer(self, &transfer)
                     .unwrap_or_else(|e| #near_sdk::env::panic_str(&e.to_string()));
 
                 #after_nft_transfer
@@ -268,7 +263,7 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
                 &self,
                 token_id: #me::standard::nep171::TokenId,
             ) -> Option<#me::standard::nep171::Token> {
-                #me::standard::nep171::Nep171Controller::load_token::<#token_type>(self, &token_id)
+                <Self as #me::standard::nep171::Nep171Controller>::load_token::<#token_type>(self, &token_id)
             }
         }
     })

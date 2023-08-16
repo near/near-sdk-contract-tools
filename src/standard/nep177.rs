@@ -7,6 +7,7 @@ use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
     env,
     json_types::U64,
+    log,
     serde::*,
     AccountId, BorshStorageKey,
 };

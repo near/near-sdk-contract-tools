@@ -2,7 +2,14 @@ use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
     env, near_bindgen, store, AccountId,
 };
-use near_sdk_contract_tools::{standard::nep171::*, Nep171};
+use near_sdk_contract_tools::{
+    standard::{
+        nep171::*,
+        nep177::{Nep177Controller, TokenMetadata},
+    },
+    Nep171,
+};
+use near_sdk_contract_tools_macros::NonFungibleToken;
 
 #[derive(BorshDeserialize, BorshSerialize, Debug, Clone, PartialEq, PartialOrd)]
 struct TokenRecord {
@@ -19,12 +26,46 @@ impl From<Token> for TokenRecord {
     }
 }
 
-#[derive(Nep171, BorshDeserialize, BorshSerialize)]
-#[nep171(no_hooks)]
+#[derive(NonFungibleToken, BorshDeserialize, BorshSerialize)]
+// #[nep171(no_hooks, token_type = "()")]
+#[non_fungible_token(no_core_hooks, no_approval_hooks)]
 #[near_bindgen]
 struct NonFungibleTokenNoHooks {
     pub before_nft_transfer_balance_record: store::Vector<Option<TokenRecord>>,
     pub after_nft_transfer_balance_record: store::Vector<Option<TokenRecord>>,
+}
+
+#[test]
+fn t() {
+    let mut n = NonFungibleTokenNoHooks {
+        before_nft_transfer_balance_record: store::Vector::new(b"a"),
+        after_nft_transfer_balance_record: store::Vector::new(b"b"),
+    };
+
+    let token_id = "token1".to_string();
+
+    n.mint_with_metadata(
+        token_id.clone(),
+        "alice".parse().unwrap(),
+        TokenMetadata {
+            title: Some("Title".to_string()),
+            description: None,
+            media: None,
+            media_hash: None,
+            copies: None,
+            issued_at: None,
+            expires_at: None,
+            starts_at: None,
+            updated_at: None,
+            extra: None,
+            reference: None,
+            reference_hash: None,
+        },
+    )
+    .unwrap();
+
+    let nft_tok = n.nft_token(token_id);
+    dbg!(nft_tok);
 }
 
 #[derive(Nep171, BorshDeserialize, BorshSerialize)]

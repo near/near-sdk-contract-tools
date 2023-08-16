@@ -99,6 +99,10 @@ pub enum Nep171TransferError {
 
 /// Internal (storage location) methods for implementors of [`Nep171Controller`].
 pub trait Nep171ControllerInternal {
+    type CheckTransfer: CheckExternalTransfer<Self>
+    where
+        Self: Sized;
+
     /// Root storage slot.
     fn root() -> Slot<()> {
         Slot::root(DefaultStorageKey::Nep171)
@@ -112,22 +116,23 @@ pub trait Nep171ControllerInternal {
 
 /// Non-public controller interface for NEP-171 implementations.
 pub trait Nep171Controller {
-    /// Transfer a token from `sender_id` to `receiver_id`. Checks that the transfer is valid using [`Nep171Controller::check_transfer`] before performing the transfer.
-    fn external_transfer<Check: CheckExternalTransfer<Self>>(
-        &mut self,
-        transfer: &Nep171Transfer,
-    ) -> Result<(), Nep171TransferError>
+    type CheckTransfer: CheckExternalTransfer<Self>
     where
         Self: Sized;
 
-    /// Check if a token transfer is valid without actually performing it.
-    fn check_transfer(
-        &self,
-        token_ids: &[TokenId],
-        current_owner_id: &AccountId,
-        sender_id: &AccountId,
-        receiver_id: &AccountId,
-    ) -> Result<(), Nep171TransferError>;
+    /// Transfer a token from `sender_id` to `receiver_id`. Checks that the transfer is valid using [`Nep171Controller::check_transfer`] before performing the transfer.
+    fn external_transfer(&mut self, transfer: &Nep171Transfer) -> Result<(), Nep171TransferError>
+    where
+        Self: Sized;
+
+    // /// Check if a token transfer is valid without actually performing it. Returns the account ID of the current owner of the token.
+    // fn check_transfer(
+    //     &self,
+    //     token_ids: &[TokenId],
+    //     authorization: Nep171TransferAuthorization,
+    //     sender_id: &AccountId,
+    //     receiver_id: &AccountId,
+    // ) -> Result<AccountId, Nep171TransferError>;
 
     /// Performs a token transfer without running [`Nep171Controller::check_transfer`].
     ///
@@ -178,14 +183,12 @@ pub trait Nep171Controller {
 /// `nft_transfer_call`).
 #[derive(Serialize, BorshSerialize, PartialEq, Eq, Clone, Debug, Hash)]
 pub struct Nep171Transfer<'a> {
-    /// Current owner account ID.
-    pub owner_id: &'a AccountId,
+    /// Why is this sender allowed to perform this transfer?
+    pub authorization: Nep171TransferAuthorization,
     /// Sending account ID.
     pub sender_id: &'a AccountId,
     /// Receiving account ID.
     pub receiver_id: &'a AccountId,
-    /// Optional approval ID.
-    pub approval_id: Option<u32>,
     /// Token ID.
     pub token_id: &'a TokenId,
     /// Optional memo string.
@@ -194,13 +197,19 @@ pub struct Nep171Transfer<'a> {
     pub msg: Option<&'a str>,
 }
 
+#[derive(Serialize, BorshSerialize, PartialEq, Eq, Clone, Debug, Hash)]
+pub enum Nep171TransferAuthorization {
+    Owner,
+    ApprovalId(u32),
+}
+
 /// Different ways of checking if a transfer is valid.
 pub trait CheckExternalTransfer<C> {
-    /// Checks if a transfer is valid.
+    /// Checks if a transfer is valid. Returns the account ID of the current owner of the token.
     fn check_external_transfer(
         contract: &C,
         transfer: &Nep171Transfer,
-    ) -> Result<(), Nep171TransferError>;
+    ) -> Result<AccountId, Nep171TransferError>;
 }
 
 pub struct DefaultCheckExternalTransfer;
@@ -209,13 +218,43 @@ impl<T: Nep171Controller> CheckExternalTransfer<T> for DefaultCheckExternalTrans
     fn check_external_transfer(
         contract: &T,
         transfer: &Nep171Transfer,
-    ) -> Result<(), Nep171TransferError> {
-        contract.check_transfer(
-            &[transfer.token_id.to_string()],
-            transfer.owner_id,
-            transfer.sender_id,
-            transfer.receiver_id,
-        )
+    ) -> Result<AccountId, Nep171TransferError> {
+        let owner_id = contract.token_owner(transfer.token_id).ok_or_else(|| {
+            error::TokenDoesNotExistError {
+                token_id: transfer.token_id.clone(),
+            }
+        })?;
+
+        match transfer.authorization {
+            Nep171TransferAuthorization::Owner => {
+                if transfer.sender_id != &owner_id {
+                    return Err(error::TokenNotOwnedByExpectedOwnerError {
+                        expected_owner_id: transfer.sender_id.clone(),
+                        owner_id,
+                        token_id: transfer.token_id.clone(),
+                    }
+                    .into());
+                }
+            }
+            Nep171TransferAuthorization::ApprovalId(_) => {
+                return Err(error::SenderNotApprovedError {
+                    owner_id,
+                    sender_id: transfer.sender_id.clone(),
+                    token_id: transfer.token_id.clone(),
+                }
+                .into())
+            }
+        }
+
+        if transfer.receiver_id == &owner_id {
+            return Err(error::TokenReceiverIsCurrentOwnerError {
+                owner_id,
+                token_id: transfer.token_id.clone(),
+            }
+            .into());
+        }
+
+        Ok(owner_id)
     }
 }
 
@@ -225,7 +264,6 @@ impl<T: Nep171Controller> CheckExternalTransfer<T> for DefaultCheckExternalTrans
 /// hooks. This may be useful for charging callers for storage usage, for
 /// example.
 pub trait Nep171Hook<S = (), C = Self> {
-    // TODO: Switch order of C, S generics
     /// Executed before a token transfer is conducted.
     ///
     /// May return an optional state value which will be passed along to the
@@ -267,68 +305,68 @@ where
 }
 
 impl<T: Nep171ControllerInternal> Nep171Controller for T {
-    fn external_transfer<Check: CheckExternalTransfer<T>>(
-        &mut self,
-        transfer: &Nep171Transfer,
-    ) -> Result<(), Nep171TransferError> {
-        match Check::check_external_transfer(self, transfer) {
-            Ok(()) => {
+    type CheckTransfer = <Self as Nep171ControllerInternal>::CheckTransfer;
+
+    fn external_transfer(&mut self, transfer: &Nep171Transfer) -> Result<(), Nep171TransferError> {
+        match Self::CheckTransfer::check_external_transfer(self, transfer) {
+            Ok(current_owner_id) => {
                 self.transfer_unchecked(
                     &[transfer.token_id.to_string()],
-                    transfer.owner_id.clone(),
+                    current_owner_id,
                     transfer.sender_id.clone(),
                     transfer.receiver_id.clone(),
                     transfer.memo.map(ToString::to_string),
                 );
                 Ok(())
             }
-            e => e,
+            Err(e) => Err(e),
         }
     }
 
-    fn check_transfer(
-        &self,
-        token_ids: &[TokenId],
-        current_owner_id: &AccountId,
-        sender_id: &AccountId,
-        receiver_id: &AccountId,
-    ) -> Result<(), Nep171TransferError> {
-        for token_id in token_ids {
-            let slot = Self::slot_token_owner(token_id);
+    // fn check_transfer(
+    //     &self,
+    //     token_ids: &[TokenId],
+    //     authorization: Nep171TransferAuthorization,
+    //     sender_id: &AccountId,
+    //     receiver_id: &AccountId,
+    // ) -> Result<AccountId, Nep171TransferError> {
+    //     for token_id in token_ids {
+    //         let slot = Self::slot_token_owner(token_id);
 
-            let actual_current_owner_id =
-                slot.read().ok_or_else(|| error::TokenDoesNotExistError {
-                    token_id: token_id.clone(),
-                })?;
+    //         let owner_id = slot.read().ok_or_else(|| error::TokenDoesNotExistError {
+    //             token_id: token_id.clone(),
+    //         })?;
 
-            if current_owner_id != &actual_current_owner_id {
-                return Err(error::TokenNotOwnedByExpectedOwnerError {
-                    expected_owner_id: current_owner_id.clone(),
-                    actual_owner_id: actual_current_owner_id,
-                    token_id: token_id.clone(),
-                }
-                .into());
-            }
+    //         match authorization {
+    //             Nep171TransferAuthorization::Owner => {
+    //                 if sender_id != &owner_id {
+    //                     return Err(error::TokenNotOwnedByExpectedOwnerError {
+    //                         expected_owner_id: sender_id.clone(),
+    //                         actual_owner_id: owner_id,
+    //                         token_id: token_id.clone(),
+    //                     }
+    //                     .into());
+    //                 }
+    //             }
+    //             Nep171TransferAuthorization::ApprovalId(_) => {
+    //                 return Err(error::SenderNotApprovedError {
+    //                     sender_id: sender_id.clone(),
+    //                     token_id: token_id.clone(),
+    //                 }
+    //                 .into())
+    //             }
+    //         }
 
-            // This version doesn't implement approval management
-            if sender_id != current_owner_id {
-                return Err(error::SenderNotApprovedError {
-                    sender_id: sender_id.clone(),
-                    token_id: token_id.clone(),
-                }
-                .into());
-            }
-
-            if receiver_id == current_owner_id {
-                return Err(error::TokenReceiverIsCurrentOwnerError {
-                    current_owner_id: current_owner_id.clone(),
-                    token_id: token_id.clone(),
-                }
-                .into());
-            }
-        }
-        Ok(())
-    }
+    //         if receiver_id == &owner_id {
+    //             return Err(error::TokenReceiverIsCurrentOwnerError {
+    //                 current_owner_id: owner_id,
+    //                 token_id: token_id.clone(),
+    //             }
+    //             .into());
+    //         }
+    //     }
+    //     Ok(())
+    // }
 
     fn transfer_unchecked(
         &mut self,
@@ -405,7 +443,7 @@ impl<T: Nep171ControllerInternal> Nep171Controller for T {
                 if &actual_owner_id != current_owner_id {
                     return Err(error::TokenNotOwnedByExpectedOwnerError {
                         expected_owner_id: current_owner_id.clone(),
-                        actual_owner_id,
+                        owner_id: actual_owner_id,
                         token_id: (*token_id).clone(),
                     }
                     .into());
@@ -484,17 +522,6 @@ impl<C> LoadTokenMetadata<C> for () {
         _token_id: &TokenId,
         _metadata: &mut std::collections::HashMap<String, near_sdk::serde_json::Value>,
     ) -> Result<(), Box<dyn Error>> {
-        Ok(())
-    }
-}
-
-impl<C, T: LoadTokenMetadata<C>> LoadTokenMetadata<C> for (T,) {
-    fn load(
-        contract: &C,
-        token_id: &TokenId,
-        metadata: &mut std::collections::HashMap<String, near_sdk::serde_json::Value>,
-    ) -> Result<(), Box<dyn Error>> {
-        T::load(contract, token_id, metadata)?;
         Ok(())
     }
 }

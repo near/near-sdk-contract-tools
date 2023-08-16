@@ -171,6 +171,11 @@ pub fn derive_nep177(input: TokenStream) -> TokenStream {
     make_derive(input, standard::nep177::expand)
 }
 
+#[proc_macro_derive(Nep178, attributes(nep178))]
+pub fn derive_nep178(input: TokenStream) -> TokenStream {
+    make_derive(input, standard::nep178::expand)
+}
+
 /// Implements all NFT functionality at once, like `#[derive(Nep171, Nep177)]`.
 #[proc_macro_derive(NonFungibleToken, attributes(non_fungible_token))]
 pub fn derive_non_fungible_token(input: TokenStream) -> TokenStream {

@@ -4,6 +4,7 @@ use near_sdk::serde_json::json;
 use near_sdk_contract_tools::standard::{
     nep171::{event::NftTransferLog, Nep171Event, Token},
     nep177::{self, TokenMetadata},
+    nep178,
     nep297::Event,
 };
 use workspaces::operations::Function;
@@ -17,6 +18,24 @@ const WASM_FULL: &[u8] =
 
 const RECEIVER_WASM: &[u8] =
     include_bytes!("../../target/wasm32-unknown-unknown/release/non_fungible_token_receiver.wasm");
+
+fn token_meta(id: String) -> near_sdk::serde_json::Value {
+    near_sdk::serde_json::to_value(TokenMetadata {
+        title: Some(id),
+        description: Some("description".to_string()),
+        media: None,
+        media_hash: None,
+        copies: None,
+        issued_at: None,
+        expires_at: None,
+        starts_at: None,
+        updated_at: None,
+        extra: None,
+        reference: None,
+        reference_hash: None,
+    })
+    .unwrap()
+}
 
 async fn setup_balances(
     wasm: &[u8],
@@ -116,24 +135,6 @@ async fn create_and_mint_with_metadata() {
         nft_token(&contract, "token_2"),
         nft_token(&contract, "token_3"),
     );
-
-    fn token_meta(id: String) -> near_sdk::serde_json::Value {
-        near_sdk::serde_json::to_value(TokenMetadata {
-            title: Some(id),
-            description: Some("description".to_string()),
-            media: None,
-            media_hash: None,
-            copies: None,
-            issued_at: None,
-            expires_at: None,
-            starts_at: None,
-            updated_at: None,
-            extra: None,
-            reference: None,
-            reference_hash: None,
-        })
-        .unwrap()
-    }
 
     // Verify minted tokens
     assert_eq!(
@@ -629,6 +630,126 @@ async fn transfer_call_receiver_send_return() {
             token_id: "token_0".to_string(),
             owner_id: charlie.id().parse().unwrap(),
             extensions_metadata: Default::default(),
+        }),
+    );
+}
+
+#[tokio::test]
+async fn panic_on_new() {
+    let Setup { contract, accounts } =
+        setup_balances(WASM_FULL, 3, |i| vec![format!("token_{i}")]).await;
+
+    contract
+        .call("dummy_insert")
+        .transact()
+        .await
+        .unwrap()
+        .unwrap();
+    contract
+        .call("dummy_insert")
+        .transact()
+        .await
+        .unwrap()
+        .unwrap();
+    contract
+        .call("dummy_clear")
+        .transact()
+        .await
+        .unwrap()
+        .unwrap();
+
+    let x = contract
+        .view("dummy_iter")
+        .await
+        .unwrap()
+        .json::<Vec<(String, String)>>()
+        .unwrap();
+
+    dbg!(x);
+}
+
+#[tokio::test]
+async fn transfer_approval_success() {
+    let Setup { contract, accounts } =
+        setup_balances(WASM_FULL, 3, |i| vec![format!("token_{i}")]).await;
+    let alice = &accounts[0];
+    let bob = &accounts[1];
+    let charlie = &accounts[2];
+
+    alice
+        .call(contract.id(), "nft_approve")
+        .args_json(json!({
+            "token_id": "token_0",
+            "account_id": bob.id(),
+        }))
+        .deposit(1)
+        .transact()
+        .await
+        .unwrap()
+        .unwrap();
+
+    let view_token = contract
+        .view("nft_token")
+        .args_json(json!({
+            "token_id": "token_0",
+        }))
+        .await
+        .unwrap()
+        .json::<Token>()
+        .unwrap();
+
+    let expected_view_token = Token {
+        token_id: "token_0".into(),
+        owner_id: alice.id().parse().unwrap(),
+        extensions_metadata: [
+            ("metadata".to_string(), token_meta("token_0".to_string())),
+            (
+                "approved_account_ids".to_string(),
+                json!({
+                    bob.id().to_string(): 0,
+                }),
+            ),
+        ]
+        .into(),
+    };
+
+    // assert_eq!(view_token, expected_view_token);
+
+    let is_approved = contract
+        .view("nft_is_approved")
+        .args_json(json!({
+            "token_id": "token_0",
+            "approved_account_id": bob.id().to_string(),
+        }))
+        .await
+        .unwrap()
+        .json::<bool>()
+        .unwrap();
+
+    assert!(is_approved);
+
+    bob.call(contract.id(), "nft_transfer")
+        .args_json(json!({
+            "token_id": "token_0",
+            "approval_id": 0,
+            "receiver_id": charlie.id().to_string(),
+        }))
+        .deposit(1)
+        .transact()
+        .await
+        .unwrap()
+        .unwrap();
+
+    assert_eq!(
+        nft_token(&contract, "token_0").await,
+        Some(Token {
+            token_id: "token_0".to_string(),
+            owner_id: charlie.id().parse().unwrap(),
+            extensions_metadata: [
+                ("metadata".to_string(), token_meta("token_0".to_string())),
+                ("approved_account_ids".to_string(), json!({}))
+            ]
+            .into(),
         }),
     );
 }
