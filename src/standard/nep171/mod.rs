@@ -99,7 +99,8 @@ pub enum Nep171TransferError {
 
 /// Internal (storage location) methods for implementors of [`Nep171Controller`].
 pub trait Nep171ControllerInternal {
-    type CheckTransfer: CheckExternalTransfer<Self>
+    /// Invoked during an external transfer.
+    type CheckExternalTransfer: CheckExternalTransfer<Self>
     where
         Self: Sized;
 
@@ -116,7 +117,8 @@ pub trait Nep171ControllerInternal {
 
 /// Non-public controller interface for NEP-171 implementations.
 pub trait Nep171Controller {
-    type CheckTransfer: CheckExternalTransfer<Self>
+    /// Invoked during an external transfer.
+    type CheckExternalTransfer: CheckExternalTransfer<Self>
     where
         Self: Sized;
 
@@ -197,9 +199,12 @@ pub struct Nep171Transfer<'a> {
     pub msg: Option<&'a str>,
 }
 
+/// Authorization for a transfer.
 #[derive(Serialize, BorshSerialize, PartialEq, Eq, Clone, Debug, Hash)]
 pub enum Nep171TransferAuthorization {
+    /// The sender is the owner of the token.
     Owner,
+    /// The sender holds a valid approval ID for the token.
     ApprovalId(u32),
 }
 
@@ -212,6 +217,8 @@ pub trait CheckExternalTransfer<C> {
     ) -> Result<AccountId, Nep171TransferError>;
 }
 
+/// Default external transfer checker. Only allows transfers by the owner of a
+/// token. Does not support approval IDs.
 pub struct DefaultCheckExternalTransfer;
 
 impl<T: Nep171Controller> CheckExternalTransfer<T> for DefaultCheckExternalTransfer {
@@ -305,10 +312,10 @@ where
 }
 
 impl<T: Nep171ControllerInternal> Nep171Controller for T {
-    type CheckTransfer = <Self as Nep171ControllerInternal>::CheckTransfer;
+    type CheckExternalTransfer = <Self as Nep171ControllerInternal>::CheckExternalTransfer;
 
     fn external_transfer(&mut self, transfer: &Nep171Transfer) -> Result<(), Nep171TransferError> {
-        match Self::CheckTransfer::check_external_transfer(self, transfer) {
+        match Self::CheckExternalTransfer::check_external_transfer(self, transfer) {
             Ok(current_owner_id) => {
                 self.transfer_unchecked(
                     &[transfer.token_id.to_string()],

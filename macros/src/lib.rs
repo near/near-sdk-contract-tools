@@ -171,6 +171,10 @@ pub fn derive_nep177(input: TokenStream) -> TokenStream {
     make_derive(input, standard::nep177::expand)
 }
 
+/// Adds NEP-178 non-fungible token approvals functionality to a contract.
+///
+/// The storage key prefix for the fields can be optionally specified (default:
+/// `"~$178"`) using `#[nep178(storage_key = "<expression>")]`.
 #[proc_macro_derive(Nep178, attributes(nep178))]
 pub fn derive_nep178(input: TokenStream) -> TokenStream {
     make_derive(input, standard::nep178::expand)

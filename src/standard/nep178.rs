@@ -14,12 +14,15 @@ use crate::{slot::Slot, standard::nep171::*, DefaultStorageKey};
 
 pub use ext::*;
 
+/// Type for approval IDs.
 pub type ApprovalId = u32;
+/// Maximum number of approvals per token.
 pub const MAX_APPROVALS: ApprovalId = 32;
 
 /// Non-fungible token metadata.
 #[derive(BorshSerialize, BorshDeserialize, Debug)]
 pub struct TokenApprovals {
+    /// The next approval ID to use. Only incremented.
     pub next_approval_id: ApprovalId,
 
     /// The list of approved accounts.
@@ -102,44 +105,66 @@ pub trait Nep178ControllerInternal {
     }
 }
 
+/// Errors that can occur when managing non-fungible token approvals.
 #[derive(Error, Debug)]
 pub enum Nep178ApproveError {
+    /// The account is not authorized to approve the token.
     #[error("Account `{account_id}` is cannot create approvals for token `{token_id}`.")]
     Unauthorized {
+        /// The token ID.
         token_id: TokenId,
+        /// The unauthorized account ID.
         account_id: AccountId,
     },
+    /// The account is already approved for the token.
     #[error("Account {account_id} is already approved for token {token_id}.")]
     AccountAlreadyApproved {
+        /// The token ID.
         token_id: TokenId,
+        /// The account ID that has already been approved.
         account_id: AccountId,
     },
+    /// The token has too many approvals.
     #[error(
         "Too many approvals for token {token_id}, maximum is {}.",
         MAX_APPROVALS
     )]
-    TooManyApprovals { token_id: TokenId },
+    TooManyApprovals {
+        /// The token ID.
+        token_id: TokenId,
+    },
 }
 
+/// Errors that can occur when revoking non-fungible token approvals.
 #[derive(Error, Debug)]
 pub enum Nep178RevokeError {
+    /// The account is not authorized to revoke approvals for the token.
     #[error("Account `{account_id}` is cannot revoke approvals for token `{token_id}`.")]
     Unauthorized {
+        /// The token ID.
         token_id: TokenId,
+        /// The unauthorized account ID.
         account_id: AccountId,
     },
+    /// The account is not approved for the token.
     #[error("Account {account_id} is not approved for token {token_id}")]
     AccountNotApproved {
+        /// The token ID.
         token_id: TokenId,
+        /// The account ID that is not approved.
         account_id: AccountId,
     },
 }
 
+/// Errors that can occur when revoking all approvals for a non-fungible token.
 #[derive(Error, Debug)]
 pub enum Nep178RevokeAllError {
+    /// The account is not authorized to revoke approvals for the token.
     #[error("Account `{account_id}` is cannot revoke approvals for token `{token_id}`.")]
     Unauthorized {
+        /// The token ID.
         token_id: TokenId,
+        /// The unauthorized account ID.
         account_id: AccountId,
     },
 }
@@ -352,9 +377,12 @@ impl<T: Nep178ControllerInternal + Nep171Controller> Nep178Controller for T {
     }
 }
 
+/// Hooks for NEP-178.
 pub trait Nep178Hook<AState = (), RState = (), RAState = ()> {
+    /// Called before a token is approved for transfer.
     fn before_nft_approve(&self, token_id: &TokenId, account_id: &AccountId) -> AState;
 
+    /// Called after a token is approved for transfer.
     fn after_nft_approve(
         &mut self,
         token_id: &TokenId,
@@ -363,12 +391,16 @@ pub trait Nep178Hook<AState = (), RState = (), RAState = ()> {
         state: AState,
     );
 
+    /// Called before a token approval is revoked.
     fn before_nft_revoke(&self, token_id: &TokenId, account_id: &AccountId) -> RState;
 
+    /// Called after a token approval is revoked.
     fn after_nft_revoke(&mut self, token_id: &TokenId, account_id: &AccountId, state: RState);
 
+    /// Called before all approvals for a token are revoked.
     fn before_nft_revoke_all(&self, token_id: &TokenId) -> RAState;
 
+    /// Called after all approvals for a token are revoked.
     fn after_nft_revoke_all(&mut self, token_id: &TokenId, state: RAState);
 }
 
@@ -380,6 +412,9 @@ mod ext {
 
     use super::*;
 
+    /// NEP-178 external interface.
+    ///
+    /// See <https://github.com/near/NEPs/blob/master/neps/nep-0178.md#interface> for more details.
     #[near_sdk::ext_contract(ext_nep178)]
     pub trait Nep178 {
         fn nft_approve(
@@ -401,6 +436,11 @@ mod ext {
         ) -> bool;
     }
 
+    /// NEP-178 receiver interface.
+    ///
+    /// Respond to notification that contract has been granted approval for a token.
+    ///
+    /// See <https://github.com/near/NEPs/blob/master/neps/nep-0178.md#approved-account-contract-interface> for more details.
     #[near_sdk::ext_contract(ext_nep178_receiver)]
     pub trait Nep178Receiver {
         fn nft_on_approve(

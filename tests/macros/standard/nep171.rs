@@ -27,7 +27,6 @@ impl From<Token> for TokenRecord {
 }
 
 #[derive(NonFungibleToken, BorshDeserialize, BorshSerialize)]
-// #[nep171(no_hooks, token_type = "()")]
 #[non_fungible_token(no_core_hooks, no_approval_hooks)]
 #[near_bindgen]
 struct NonFungibleTokenNoHooks {

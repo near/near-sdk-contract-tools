@@ -143,10 +143,7 @@ async fn create_and_mint_with_metadata() {
             owner_id: alice.id().parse().unwrap(),
             extensions_metadata: [
                 ("metadata".to_string(), token_meta("token_0".to_string())),
-                (
-                    "approved_account_ids".to_string(),
-                    near_sdk::serde_json::json!({}),
-                )
+                ("approved_account_ids".to_string(), json!({}),)
             ]
             .into(),
         }),
@@ -158,10 +155,7 @@ async fn create_and_mint_with_metadata() {
             owner_id: bob.id().parse().unwrap(),
             extensions_metadata: [
                 ("metadata".to_string(), token_meta("token_1".to_string())),
-                (
-                    "approved_account_ids".to_string(),
-                    near_sdk::serde_json::json!({}),
-                )
+                ("approved_account_ids".to_string(), json!({}),)
             ]
             .into(),
         }),
@@ -173,10 +167,7 @@ async fn create_and_mint_with_metadata() {
             owner_id: charlie.id().parse().unwrap(),
             extensions_metadata: [
                 ("metadata".to_string(), token_meta("token_2".to_string())),
-                (
-                    "approved_account_ids".to_string(),
-                    near_sdk::serde_json::json!({}),
-                )
+                ("approved_account_ids".to_string(), json!({}),)
             ]
             .into(),
         }),

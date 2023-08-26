@@ -97,7 +97,7 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
 
     Ok(quote! {
         impl #imp #me::standard::nep171::Nep171ControllerInternal for #ident #ty #wher {
-            type CheckTransfer = #check_external_transfer;
+            type CheckExternalTransfer = #check_external_transfer;
 
             #root
         }
@@ -141,7 +141,7 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
                         msg: None,
                     };
 
-                    let check_result = <Self as Nep171Controller>::CheckTransfer::check_external_transfer(self, &transfer);
+                    let check_result = <Self as Nep171Controller>::CheckExternalTransfer::check_external_transfer(self, &transfer);
 
                     match check_result {
                         Ok(_) => {
