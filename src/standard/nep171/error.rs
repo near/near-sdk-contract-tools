@@ -3,6 +3,8 @@
 use near_sdk::AccountId;
 use thiserror::Error;
 
+use crate::standard::nep178::ApprovalId;
+
 use super::TokenId;
 
 /// Occurs when trying to create a token ID that already exists.
@@ -38,7 +40,7 @@ pub struct TokenNotOwnedByExpectedOwnerError {
 
 /// Occurs when a particular account is not allowed to transfer a token (e.g. on behalf of another user). See: NEP-178.
 #[derive(Error, Clone, Debug)]
-#[error("Sender `{sender_id}` does not have permission to transfer token `{token_id}`, owned by `{owner_id}`")]
+#[error("Sender `{sender_id}` does not have permission to transfer token `{token_id}`, owned by `{owner_id}`, with approval ID {approval_id}")]
 pub struct SenderNotApprovedError {
     /// The unapproved sender.
     pub sender_id: AccountId,
@@ -46,6 +48,8 @@ pub struct SenderNotApprovedError {
     pub owner_id: AccountId,
     /// The ID of the token in question.
     pub token_id: TokenId,
+    /// The approval ID that the sender tried to use to transfer the token.
+    pub approval_id: ApprovalId,
 }
 
 /// Occurs when attempting to perform a transfer of a token from one

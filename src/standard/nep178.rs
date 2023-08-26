@@ -109,7 +109,7 @@ pub trait Nep178ControllerInternal {
 #[derive(Error, Debug)]
 pub enum Nep178ApproveError {
     /// The account is not authorized to approve the token.
-    #[error("Account `{account_id}` is cannot create approvals for token `{token_id}`.")]
+    #[error("Account `{account_id}` cannot create approvals for token `{token_id}`.")]
     Unauthorized {
         /// The token ID.
         token_id: TokenId,

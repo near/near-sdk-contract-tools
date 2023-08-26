@@ -1,6 +1,45 @@
 //! NEP-171 non-fungible token core implementation.
 //!
 //! Reference: <https://github.com/near/NEPs/blob/master/neps/nep-0171.md>
+//!
+//! # Usage
+//!
+//! It is recommended to use the [`near_sdk_contract_tools::Nep171`] derive macro or the [`near_sdk_contract_tools::NonFungibleToken`] macro to implement NEP-171 with this crate.
+//!
+//! ## Basic implementation with no transfer hooks
+//!
+//! ```rust
+//! use near_sdk_contract_tools::{Nep171, standard::nep171::*};
+//! use near_sdk::{*, borsh::{self, *}};
+//!
+//! #[derive(BorshSerialize, BorshDeserialize, PanicOnDefault, Nep171)]
+//! #[nep171(no_hooks)]
+//! #[near_bindgen]
+//! pub struct Contract {}
+//! ```
+//!
+//! ## Basic implementation with transfer hooks
+//!
+//! ```rust
+//! use near_sdk_contract_tools::{Nep171, standard::nep171::*};
+//! use near_sdk::{*, borsh::{self, *}};
+//!
+//! #[derive(BorshSerialize, BorshDeserialize, PanicOnDefault, Nep171)]
+//! #[near_bindgen]
+//! pub struct Contract {
+//!     transfers: u32,
+//! }
+//!
+//! impl Nep171Hook for Contract {
+//!     fn before_nft_transfer(_contract: &Self, transfer: &Nep171Transfer) {
+//!         log!("{} is transferring {} to {}", transfer.sender_id, transfer.token_id, transfer.receiver_id);
+//!     }
+//!
+//!     fn after_nft_transfer(contract: &mut Self, _transfer: &Nep171Transfer, _: ()) {
+//!         contract.transfers += 1;
+//!     }
+//! }
+//! ```
 
 use std::error::Error;
 
@@ -104,6 +143,10 @@ pub trait Nep171ControllerInternal {
     where
         Self: Sized;
 
+    type LoadTokenMetadata: LoadTokenMetadata<Self>
+    where
+        Self: Sized;
+
     /// Root storage slot.
     fn root() -> Slot<()> {
         Slot::root(DefaultStorageKey::Nep171)
@@ -119,6 +162,10 @@ pub trait Nep171ControllerInternal {
 pub trait Nep171Controller {
     /// Invoked during an external transfer.
     type CheckExternalTransfer: CheckExternalTransfer<Self>
+    where
+        Self: Sized;
+
+    type LoadTokenMetadata: LoadTokenMetadata<Self>
     where
         Self: Sized;
 
@@ -176,9 +223,7 @@ pub trait Nep171Controller {
     fn token_owner(&self, token_id: &TokenId) -> Option<AccountId>;
 
     /// Loads the metadata associated with a token.
-    fn load_token<T: LoadTokenMetadata<Self>>(&self, token_id: &TokenId) -> Option<Token>
-    where
-        Self: Sized;
+    fn load_token(&self, token_id: &TokenId) -> Option<Token>;
 }
 
 /// Transfer metadata generic over both types of transfer (`nft_transfer` and
@@ -243,11 +288,12 @@ impl<T: Nep171Controller> CheckExternalTransfer<T> for DefaultCheckExternalTrans
                     .into());
                 }
             }
-            Nep171TransferAuthorization::ApprovalId(_) => {
+            Nep171TransferAuthorization::ApprovalId(approval_id) => {
                 return Err(error::SenderNotApprovedError {
                     owner_id,
                     sender_id: transfer.sender_id.clone(),
                     token_id: transfer.token_id.clone(),
+                    approval_id,
                 }
                 .into())
             }
@@ -313,6 +359,7 @@ where
 
 impl<T: Nep171ControllerInternal> Nep171Controller for T {
     type CheckExternalTransfer = <Self as Nep171ControllerInternal>::CheckExternalTransfer;
+    type LoadTokenMetadata = <Self as Nep171ControllerInternal>::LoadTokenMetadata;
 
     fn external_transfer(&mut self, transfer: &Nep171Transfer) -> Result<(), Nep171TransferError> {
         match Self::CheckExternalTransfer::check_external_transfer(self, transfer) {
@@ -329,51 +376,6 @@ impl<T: Nep171ControllerInternal> Nep171Controller for T {
             Err(e) => Err(e),
         }
     }
-
-    // fn check_transfer(
-    //     &self,
-    //     token_ids: &[TokenId],
-    //     authorization: Nep171TransferAuthorization,
-    //     sender_id: &AccountId,
-    //     receiver_id: &AccountId,
-    // ) -> Result<AccountId, Nep171TransferError> {
-    //     for token_id in token_ids {
-    //         let slot = Self::slot_token_owner(token_id);
-
-    //         let owner_id = slot.read().ok_or_else(|| error::TokenDoesNotExistError {
-    //             token_id: token_id.clone(),
-    //         })?;
-
-    //         match authorization {
-    //             Nep171TransferAuthorization::Owner => {
-    //                 if sender_id != &owner_id {
-    //                     return Err(error::TokenNotOwnedByExpectedOwnerError {
-    //                         expected_owner_id: sender_id.clone(),
-    //                         actual_owner_id: owner_id,
-    //                         token_id: token_id.clone(),
-    //                     }
-    //                     .into());
-    //                 }
-    //             }
-    //             Nep171TransferAuthorization::ApprovalId(_) => {
-    //                 return Err(error::SenderNotApprovedError {
-    //                     sender_id: sender_id.clone(),
-    //                     token_id: token_id.clone(),
-    //                 }
-    //                 .into())
-    //             }
-    //         }
-
-    //         if receiver_id == &owner_id {
-    //             return Err(error::TokenReceiverIsCurrentOwnerError {
-    //                 current_owner_id: owner_id,
-    //                 token_id: token_id.clone(),
-    //             }
-    //             .into());
-    //         }
-    //     }
-    //     Ok(())
-    // }
 
     fn transfer_unchecked(
         &mut self,
@@ -490,9 +492,9 @@ impl<T: Nep171ControllerInternal> Nep171Controller for T {
         Self::slot_token_owner(token_id).read()
     }
 
-    fn load_token<L: LoadTokenMetadata<Self>>(&self, token_id: &TokenId) -> Option<Token> {
+    fn load_token(&self, token_id: &TokenId) -> Option<Token> {
         let mut metadata = std::collections::HashMap::new();
-        L::load(self, token_id, &mut metadata).ok()?;
+        Self::LoadTokenMetadata::load(self, token_id, &mut metadata).ok()?;
         Some(Token {
             token_id: token_id.clone(),
             owner_id: self.token_owner(token_id)?,

@@ -98,6 +98,7 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
     Ok(quote! {
         impl #imp #me::standard::nep171::Nep171ControllerInternal for #ident #ty #wher {
             type CheckExternalTransfer = #check_external_transfer;
+            type LoadTokenMetadata = #token_type;
 
             #root
         }
@@ -263,7 +264,7 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
                 &self,
                 token_id: #me::standard::nep171::TokenId,
             ) -> Option<#me::standard::nep171::Token> {
-                <Self as #me::standard::nep171::Nep171Controller>::load_token::<#token_type>(self, &token_id)
+                <Self as #me::standard::nep171::Nep171Controller>::load_token(self, &token_id)
             }
         }
     })

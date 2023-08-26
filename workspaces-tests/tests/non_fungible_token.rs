@@ -2,10 +2,12 @@
 
 use near_sdk::serde_json::json;
 use near_sdk_contract_tools::standard::{
-    nep171::{event::NftTransferLog, Nep171Event, Token},
+    nep171::{self, event::NftTransferLog, Nep171Event, Token},
     nep177::{self, TokenMetadata},
+    nep178,
     nep297::Event,
 };
+use tokio::task::JoinSet;
 use workspaces::operations::Function;
 use workspaces_tests_utils::{expect_execution_error, nft_token, setup, Setup};
 
@@ -718,4 +720,248 @@ async fn transfer_approval_success() {
             .into(),
         }),
     );
+}
+
+#[tokio::test]
+async fn transfer_approval_unapproved_fail() {
+    let Setup { contract, accounts } =
+        setup_balances(WASM_FULL, 4, |i| vec![format!("token_{i}")]).await;
+    let alice = &accounts[0];
+    let bob = &accounts[1];
+    let charlie = &accounts[2];
+    let debbie = &accounts[3];
+
+    alice
+        .call(contract.id(), "nft_approve")
+        .args_json(json!({
+            "token_id": "token_0",
+            "account_id": debbie.id(),
+        }))
+        .deposit(1)
+        .transact()
+        .await
+        .unwrap()
+        .unwrap();
+
+    let is_approved = contract
+        .view("nft_is_approved")
+        .args_json(json!({
+            "token_id": "token_0",
+            "approved_account_id": bob.id().to_string(),
+        }))
+        .await
+        .unwrap()
+        .json::<bool>()
+        .unwrap();
+
+    assert!(!is_approved);
+
+    let result = bob
+        .call(contract.id(), "nft_transfer")
+        .args_json(json!({
+            "token_id": "token_0",
+            "approval_id": 0,
+            "receiver_id": charlie.id().to_string(),
+        }))
+        .deposit(1)
+        .transact()
+        .await
+        .unwrap();
+
+    let expected_error_message = format!(
+        "Smart contract panicked: {}",
+        nep171::error::SenderNotApprovedError {
+            owner_id: alice.id().parse().unwrap(),
+            sender_id: bob.id().parse().unwrap(),
+            token_id: "token_0".to_string(),
+            approval_id: 0,
+        }
+    );
+
+    expect_execution_error(&result, expected_error_message);
+}
+
+#[tokio::test]
+#[should_panic = "Attached deposit must be greater than zero"]
+async fn transfer_approval_no_deposit_fail() {
+    let Setup { contract, accounts } =
+        setup_balances(WASM_FULL, 2, |i| vec![format!("token_{i}")]).await;
+    let alice = &accounts[0];
+    let bob = &accounts[1];
+
+    alice
+        .call(contract.id(), "nft_approve")
+        .args_json(json!({
+            "token_id": "token_0",
+            "account_id": bob.id(),
+        }))
+        .transact()
+        .await
+        .unwrap()
+        .unwrap();
+}
+
+#[tokio::test]
+async fn transfer_approval_double_approval_fail() {
+    let Setup { contract, accounts } =
+        setup_balances(WASM_FULL, 2, |i| vec![format!("token_{i}")]).await;
+    let alice = &accounts[0];
+    let bob = &accounts[1];
+
+    alice
+        .call(contract.id(), "nft_approve")
+        .args_json(json!({
+            "token_id": "token_0",
+            "account_id": bob.id(),
+        }))
+        .deposit(1)
+        .transact()
+        .await
+        .unwrap()
+        .unwrap();
+
+    let result = alice
+        .call(contract.id(), "nft_approve")
+        .args_json(json!({
+            "token_id": "token_0",
+            "account_id": bob.id(),
+        }))
+        .deposit(1)
+        .transact()
+        .await
+        .unwrap();
+
+    let expected_error = format!(
+        "Smart contract panicked: {}",
+        nep178::Nep178ApproveError::AccountAlreadyApproved {
+            account_id: bob.id().parse().unwrap(),
+            token_id: "token_0".to_string(),
+        },
+    );
+
+    expect_execution_error(&result, expected_error);
+}
+
+#[tokio::test]
+async fn transfer_approval_unauthorized_approval_fail() {
+    let Setup { contract, accounts } =
+        setup_balances(WASM_FULL, 2, |i| vec![format!("token_{i}")]).await;
+    let _alice = &accounts[0];
+    let bob = &accounts[1];
+
+    let result = bob
+        .call(contract.id(), "nft_approve")
+        .args_json(json!({
+            "token_id": "token_0",
+            "account_id": bob.id(),
+        }))
+        .deposit(1)
+        .transact()
+        .await
+        .unwrap();
+
+    let expected_error = format!(
+        "Smart contract panicked: {}",
+        nep178::Nep178ApproveError::Unauthorized {
+            account_id: bob.id().parse().unwrap(),
+            token_id: "token_0".to_string(),
+        },
+    );
+
+    expect_execution_error(&result, expected_error);
+}
+
+#[tokio::test]
+async fn transfer_approval_too_many_approvals_fail() {
+    let Setup { contract, accounts } =
+        setup_balances(WASM_FULL, 2, |i| vec![format!("token_{i}")]).await;
+    let alice = &accounts[0];
+    let bob = &accounts[1];
+
+    let mut set = JoinSet::new();
+
+    for i in 0..32 {
+        let contract = contract.clone();
+        let alice = alice.clone();
+        set.spawn(async move {
+            alice
+                .call(contract.id(), "nft_approve")
+                .args_json(json!({
+                    "token_id": "token_0",
+                    "account_id": format!("account_{}", i),
+                }))
+                .deposit(1)
+                .transact()
+                .await
+                .unwrap()
+                .unwrap();
+        });
+    }
+
+    while (set.join_next().await).is_some() {}
+
+    let result = alice
+        .call(contract.id(), "nft_approve")
+        .args_json(json!({
+            "token_id": "token_0",
+            "account_id": bob.id(),
+        }))
+        .deposit(1)
+        .transact()
+        .await
+        .unwrap();
+
+    let expected_error = format!(
+        "Smart contract panicked: {}",
+        nep178::Nep178ApproveError::TooManyApprovals {
+            token_id: "token_0".to_string(),
+        },
+    );
+
+    expect_execution_error(&result, expected_error);
+}
+
+#[tokio::test]
+async fn transfer_approval_approved_but_wrong_approval_id_fail() {
+    let Setup { contract, accounts } =
+        setup_balances(WASM_FULL, 3, |i| vec![format!("token_{i}")]).await;
+    let alice = &accounts[0];
+    let bob = &accounts[1];
+    let charlie = &accounts[2];
+
+    alice
+        .call(contract.id(), "nft_approve")
+        .args_json(json!({
+            "token_id": "token_0",
+            "account_id": bob.id(),
+        }))
+        .deposit(1)
+        .transact()
+        .await
+        .unwrap()
+        .unwrap();
+
+    let result = bob
+        .call(contract.id(), "nft_transfer")
+        .args_json(json!({
+            "token_id": "token_0",
+            "approval_id": 1,
+            "receiver_id": charlie.id().to_string(),
+        }))
+        .deposit(1)
+        .transact()
+        .await
+        .unwrap();
+
+    let expected_error = format!(
+        "Smart contract panicked: {}",
+        nep171::Nep171TransferError::SenderNotApproved(nep171::error::SenderNotApprovedError {
+            sender_id: bob.id().parse().unwrap(),
+            owner_id: alice.id().parse().unwrap(),
+            token_id: "token_0".to_string(),
+            approval_id: 1,
+        }),
+    );
+
+    expect_execution_error(&result, expected_error);
 }
