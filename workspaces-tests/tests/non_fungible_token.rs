@@ -4,7 +4,6 @@ use near_sdk::serde_json::json;
 use near_sdk_contract_tools::standard::{
     nep171::{event::NftTransferLog, Nep171Event, Token},
     nep177::{self, TokenMetadata},
-    nep178,
     nep297::Event,
 };
 use workspaces::operations::Function;
@@ -142,8 +141,14 @@ async fn create_and_mint_with_metadata() {
         Some(Token {
             token_id: "token_0".to_string(),
             owner_id: alice.id().parse().unwrap(),
-            extensions_metadata: [("metadata".to_string(), token_meta("token_0".to_string()))]
-                .into(),
+            extensions_metadata: [
+                ("metadata".to_string(), token_meta("token_0".to_string())),
+                (
+                    "approved_account_ids".to_string(),
+                    near_sdk::serde_json::json!({}),
+                )
+            ]
+            .into(),
         }),
     );
     assert_eq!(
@@ -151,8 +156,14 @@ async fn create_and_mint_with_metadata() {
         Some(Token {
             token_id: "token_1".to_string(),
             owner_id: bob.id().parse().unwrap(),
-            extensions_metadata: [("metadata".to_string(), token_meta("token_1".to_string()))]
-                .into(),
+            extensions_metadata: [
+                ("metadata".to_string(), token_meta("token_1".to_string())),
+                (
+                    "approved_account_ids".to_string(),
+                    near_sdk::serde_json::json!({}),
+                )
+            ]
+            .into(),
         }),
     );
     assert_eq!(
@@ -160,8 +171,14 @@ async fn create_and_mint_with_metadata() {
         Some(Token {
             token_id: "token_2".to_string(),
             owner_id: charlie.id().parse().unwrap(),
-            extensions_metadata: [("metadata".to_string(), token_meta("token_2".to_string()))]
-                .into(),
+            extensions_metadata: [
+                ("metadata".to_string(), token_meta("token_2".to_string())),
+                (
+                    "approved_account_ids".to_string(),
+                    near_sdk::serde_json::json!({}),
+                )
+            ]
+            .into(),
         }),
     );
     assert_eq!(token_3, None::<Token>);
@@ -635,40 +652,6 @@ async fn transfer_call_receiver_send_return() {
 }
 
 #[tokio::test]
-async fn panic_on_new() {
-    let Setup { contract, accounts } =
-        setup_balances(WASM_FULL, 3, |i| vec![format!("token_{i}")]).await;
-
-    contract
-        .call("dummy_insert")
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
-    contract
-        .call("dummy_insert")
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
-    contract
-        .call("dummy_clear")
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
-
-    let x = contract
-        .view("dummy_iter")
-        .await
-        .unwrap()
-        .json::<Vec<(String, String)>>()
-        .unwrap();
-
-    dbg!(x);
-}
-
-#[tokio::test]
 async fn transfer_approval_success() {
     let Setup { contract, accounts } =
         setup_balances(WASM_FULL, 3, |i| vec![format!("token_{i}")]).await;
@@ -688,15 +671,7 @@ async fn transfer_approval_success() {
         .unwrap()
         .unwrap();
 
-    let view_token = contract
-        .view("nft_token")
-        .args_json(json!({
-            "token_id": "token_0",
-        }))
-        .await
-        .unwrap()
-        .json::<Token>()
-        .unwrap();
+    let view_token = nft_token::<Token>(&contract, "token_0").await;
 
     let expected_view_token = Token {
         token_id: "token_0".into(),
@@ -713,7 +688,7 @@ async fn transfer_approval_success() {
         .into(),
     };
 
-    // assert_eq!(view_token, expected_view_token);
+    assert_eq!(view_token, Some(expected_view_token));
 
     let is_approved = contract
         .view("nft_is_approved")

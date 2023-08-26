@@ -5,8 +5,6 @@ use std::{collections::HashMap, error::Error};
 
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
-    log,
-    serde::*,
     store::UnorderedMap,
     AccountId, BorshStorageKey,
 };
@@ -20,22 +18,12 @@ pub type ApprovalId = u32;
 pub const MAX_APPROVALS: ApprovalId = 32;
 
 /// Non-fungible token metadata.
-#[derive(Serialize, BorshSerialize, BorshDeserialize, Debug)]
-#[serde(crate = "near_sdk::serde")]
+#[derive(BorshSerialize, BorshDeserialize, Debug)]
 pub struct TokenApprovals {
-    #[serde(skip)]
     pub next_approval_id: ApprovalId,
 
-    #[serde(flatten, serialize_with = "to_map")]
     /// The list of approved accounts.
     pub accounts: UnorderedMap<AccountId, ApprovalId>,
-}
-
-fn to_map<S: Serializer>(
-    accounts: &UnorderedMap<AccountId, ApprovalId>,
-    s: S,
-) -> Result<S::Ok, S::Error> {
-    s.collect_map(accounts.iter())
 }
 
 impl<C: Nep178Controller> LoadTokenMetadata<C> for TokenApprovals {
@@ -326,13 +314,16 @@ impl<T: Nep178ControllerInternal + Nep171Controller> Nep178Controller for T {
     }
 
     fn revoke_all_unchecked(&mut self, token_id: &TokenId) {
-        let slot = Self::slot_token_approvals(token_id);
+        let mut slot = Self::slot_token_approvals(token_id);
         let mut approvals = match slot.read() {
             Some(approvals) => approvals,
             None => return,
         };
 
-        approvals.accounts.clear();
+        if !approvals.accounts.is_empty() {
+            approvals.accounts.clear();
+            slot.write(&approvals);
+        }
     }
 
     fn get_approval_id_for(
@@ -341,10 +332,7 @@ impl<T: Nep178ControllerInternal + Nep171Controller> Nep178Controller for T {
         account_id: &AccountId,
     ) -> Option<ApprovalId> {
         let slot = Self::slot_token_approvals(token_id);
-        let approvals = match slot.read() {
-            Some(approvals) => approvals,
-            None => return None,
-        };
+        let approvals = slot.read()?;
 
         approvals.accounts.get(account_id).copied()
     }
@@ -356,17 +344,11 @@ impl<T: Nep178ControllerInternal + Nep171Controller> Nep178Controller for T {
             None => return HashMap::default(),
         };
 
-        // FIX: "Index out of bounds" error. This _should be_ correct...
-        // approvals
-        //     .accounts
-        //     .into_iter()
-        //     .map(|(k, v)| (k.clone(), *v))
-        //     .collect()
-
-        // This just compiles, but is incorrect.
-        let _ = approvals;
-
-        Default::default()
+        approvals
+            .accounts
+            .into_iter()
+            .map(|(k, v)| (k.clone(), *v))
+            .collect()
     }
 }
 

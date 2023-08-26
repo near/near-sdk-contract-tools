@@ -5,7 +5,7 @@ pub fn main() {}
 
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
-    env, log, near_bindgen, store, AccountId, PanicOnDefault,
+    env, log, near_bindgen, AccountId, PanicOnDefault,
 };
 use near_sdk_contract_tools::{
     standard::{nep171::*, nep177::*, nep178::*},
@@ -14,9 +14,7 @@ use near_sdk_contract_tools::{
 
 #[derive(PanicOnDefault, BorshSerialize, BorshDeserialize, NonFungibleToken)]
 #[near_bindgen]
-pub struct Contract {
-    dummy: store::UnorderedMap<String, String>,
-}
+pub struct Contract {}
 
 impl Nep178Hook for Contract {
     fn before_nft_approve(&self, token_id: &TokenId, _account_id: &AccountId) {
@@ -64,9 +62,7 @@ impl Nep171Hook for Contract {
 impl Contract {
     #[init]
     pub fn new() -> Self {
-        let mut contract = Self {
-            dummy: store::UnorderedMap::new(b"z"),
-        };
+        let mut contract = Self {};
 
         contract.set_contract_metadata(ContractMetadata::new(
             "My NFT Smart Contract".to_string(),
@@ -75,20 +71,6 @@ impl Contract {
         ));
 
         contract
-    }
-
-    // TODO: Remove
-    pub fn dummy_insert(&mut self) {
-        let i = self.dummy.len();
-        self.dummy.insert(i.to_string(), format!("value {}", i));
-    }
-
-    pub fn dummy_clear(&mut self) {
-        self.dummy.clear();
-    }
-
-    pub fn dummy_iter(&self) -> Vec<(&String, &String)> {
-        self.dummy.into_iter().collect()
     }
 
     pub fn mint(&mut self, token_ids: Vec<TokenId>) {
