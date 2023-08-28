@@ -4,41 +4,37 @@
 //!
 //! # Usage
 //!
-//! It is recommended to use the [`near_sdk_contract_tools::Nep171`] derive macro or the [`near_sdk_contract_tools::NonFungibleToken`] macro to implement NEP-171 with this crate.
+//! It is recommended to use the [`near_sdk_contract_tools_macros::Nep171`]
+//! derive macro or the [`near_sdk_contract_tools_macros::NonFungibleToken`]
+//! macro to implement NEP-171 with this crate.
 //!
 //! ## Basic implementation with no transfer hooks
 //!
 //! ```rust
-//! use near_sdk_contract_tools::{Nep171, standard::nep171::*};
-//! use near_sdk::{*, borsh::{self, *}};
-//!
-//! #[derive(BorshSerialize, BorshDeserialize, PanicOnDefault, Nep171)]
-//! #[nep171(no_hooks)]
-//! #[near_bindgen]
-//! pub struct Contract {}
+#![doc = include_str!("../../../tests/macros/standard/nep171/no_hooks.rs")]
 //! ```
 //!
 //! ## Basic implementation with transfer hooks
 //!
 //! ```rust
-//! use near_sdk_contract_tools::{Nep171, standard::nep171::*};
-//! use near_sdk::{*, borsh::{self, *}};
+#![doc = include_str!("../../../tests/macros/standard/nep171/hooks.rs")]
+//! ```
 //!
-//! #[derive(BorshSerialize, BorshDeserialize, PanicOnDefault, Nep171)]
-//! #[near_bindgen]
-//! pub struct Contract {
-//!     transfers: u32,
-//! }
+//! ## Using the `NonFungibleToken` derive macro for partially-automatic integration with other utilities
 //!
-//! impl Nep171Hook for Contract {
-//!     fn before_nft_transfer(_contract: &Self, transfer: &Nep171Transfer) {
-//!         log!("{} is transferring {} to {}", transfer.sender_id, transfer.token_id, transfer.receiver_id);
-//!     }
+//! The `NonFungibleToken` derive macro automatically wires up all of the NFT-related standards' implementations (NEP-171, NEP-177, NEP-178) for you.
 //!
-//!     fn after_nft_transfer(contract: &mut Self, _transfer: &Nep171Transfer, _: ()) {
-//!         contract.transfers += 1;
-//!     }
-//! }
+//! ```rust
+#![doc = include_str!("../../../tests/macros/standard/nep171/non_fungible_token.rs")]
+//! ```
+//!
+//! ## Manual integration with other utilities
+//!
+//! Note: NFT-related utilities are automatically integrated with each other
+//! when using the [`near_sdk_contract_tools_macros::NonFungibleToken`] derive
+//! macro.
+//! ```rust
+#![doc = include_str!("../../../tests/macros/standard/nep171/manual_integration.rs")]
 //! ```
 
 use std::error::Error;
@@ -143,6 +139,7 @@ pub trait Nep171ControllerInternal {
     where
         Self: Sized;
 
+    /// Load additional token data into [`Token::extensions_metadata`].
     type LoadTokenMetadata: LoadTokenMetadata<Self>
     where
         Self: Sized;
@@ -165,25 +162,17 @@ pub trait Nep171Controller {
     where
         Self: Sized;
 
+    /// Load additional token data into [`Token::extensions_metadata`].
     type LoadTokenMetadata: LoadTokenMetadata<Self>
     where
         Self: Sized;
 
-    /// Transfer a token from `sender_id` to `receiver_id`. Checks that the transfer is valid using [`Nep171Controller::check_transfer`] before performing the transfer.
+    /// Transfer a token from `sender_id` to `receiver_id`. Checks that the transfer is valid using [`CheckExternalTransfer::check_external_transfer`] before performing the transfer.
     fn external_transfer(&mut self, transfer: &Nep171Transfer) -> Result<(), Nep171TransferError>
     where
         Self: Sized;
 
-    // /// Check if a token transfer is valid without actually performing it. Returns the account ID of the current owner of the token.
-    // fn check_transfer(
-    //     &self,
-    //     token_ids: &[TokenId],
-    //     authorization: Nep171TransferAuthorization,
-    //     sender_id: &AccountId,
-    //     receiver_id: &AccountId,
-    // ) -> Result<AccountId, Nep171TransferError>;
-
-    /// Performs a token transfer without running [`Nep171Controller::check_transfer`].
+    /// Performs a token transfer without running [`CheckExternalTransfer::check_external_transfer`].
     ///
     /// # Warning
     ///

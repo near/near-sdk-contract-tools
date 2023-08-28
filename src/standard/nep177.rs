@@ -92,6 +92,7 @@ impl ContractMetadata {
     Eq,
     PartialOrd,
     Ord,
+    Default,
 )]
 #[serde(crate = "near_sdk::serde")]
 pub struct TokenMetadata {
@@ -119,6 +120,86 @@ pub struct TokenMetadata {
     pub reference: Option<String>,
     /// Base-64-encoded SHA-256 hash of the referenced JSON file. Required if `reference` is present.
     pub reference_hash: Option<String>,
+}
+
+// Builder pattern for TokenMetadata.
+impl TokenMetadata {
+    /// Create a new `TokenMetadata` with all fields set to `None`.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Set the title.
+    pub fn title(mut self, title: impl Into<String>) -> Self {
+        self.title = Some(title.into());
+        self
+    }
+
+    /// Set the description.
+    pub fn description(mut self, description: impl Into<String>) -> Self {
+        self.description = Some(description.into());
+        self
+    }
+
+    /// Set the media.
+    pub fn media(mut self, media: impl Into<String>) -> Self {
+        self.media = Some(media.into());
+        self
+    }
+
+    /// Set the media hash.
+    pub fn media_hash(mut self, media_hash: impl Into<String>) -> Self {
+        self.media_hash = Some(media_hash.into());
+        self
+    }
+
+    /// Set the copies.
+    pub fn copies(mut self, copies: impl Into<U64>) -> Self {
+        self.copies = Some(copies.into());
+        self
+    }
+
+    /// Set the time the token was issued.
+    pub fn issued_at(mut self, issued_at: impl Into<U64>) -> Self {
+        self.issued_at = Some(issued_at.into());
+        self
+    }
+
+    /// Set the time the token expires.
+    pub fn expires_at(mut self, expires_at: impl Into<U64>) -> Self {
+        self.expires_at = Some(expires_at.into());
+        self
+    }
+
+    /// Set the time the token starts being valid.
+    pub fn starts_at(mut self, starts_at: impl Into<U64>) -> Self {
+        self.starts_at = Some(starts_at.into());
+        self
+    }
+
+    /// Set the time the token was last updated.
+    pub fn updated_at(mut self, updated_at: impl Into<U64>) -> Self {
+        self.updated_at = Some(updated_at.into());
+        self
+    }
+
+    /// Set the extra data.
+    pub fn extra(mut self, extra: impl Into<String>) -> Self {
+        self.extra = Some(extra.into());
+        self
+    }
+
+    /// Set the reference.
+    pub fn reference(mut self, reference: impl Into<String>) -> Self {
+        self.reference = Some(reference.into());
+        self
+    }
+
+    /// Set the reference hash.
+    pub fn reference_hash(mut self, reference_hash: impl Into<String>) -> Self {
+        self.reference_hash = Some(reference_hash.into());
+        self
+    }
 }
 
 /// Error returned when trying to load token metadata that does not exist.

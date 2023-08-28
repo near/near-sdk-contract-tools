@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
     env, near_bindgen, store, AccountId,
@@ -7,9 +9,13 @@ use near_sdk_contract_tools::{
         nep171::*,
         nep177::{Nep177Controller, TokenMetadata},
     },
-    Nep171,
+    Nep171, NonFungibleToken,
 };
-use near_sdk_contract_tools_macros::NonFungibleToken;
+
+mod hooks;
+mod manual_integration;
+mod no_hooks;
+mod non_fungible_token;
 
 #[derive(BorshDeserialize, BorshSerialize, Debug, Clone, PartialEq, PartialOrd)]
 struct TokenRecord {

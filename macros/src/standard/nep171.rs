@@ -12,7 +12,7 @@ pub struct Nep171Meta {
     pub no_hooks: Flag,
     pub extension_hooks: Option<syn::Type>,
     pub check_external_transfer: Option<syn::Type>,
-    pub token_type: Option<syn::Type>,
+    pub token_data: Option<syn::Type>,
 
     pub generics: syn::Generics,
     pub ident: syn::Ident,
@@ -30,7 +30,7 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
         no_hooks,
         extension_hooks,
         check_external_transfer,
-        token_type,
+        token_data,
 
         generics,
         ident,
@@ -41,8 +41,8 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
 
     let (imp, ty, wher) = generics.split_for_impl();
 
-    let token_type = token_type
-        .map(|token_type| quote! { #token_type })
+    let token_data = token_data
+        .map(|token_data| quote! { #token_data })
         .unwrap_or_else(|| {
             quote! { () }
         });
@@ -98,7 +98,7 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
     Ok(quote! {
         impl #imp #me::standard::nep171::Nep171ControllerInternal for #ident #ty #wher {
             type CheckExternalTransfer = #check_external_transfer;
-            type LoadTokenMetadata = #token_type;
+            type LoadTokenMetadata = #token_data;
 
             #root
         }

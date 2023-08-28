@@ -35,7 +35,9 @@ near-sdk = { workspace = true, default-features = false, features = [
 [features]
 unstable = ["near-sdk/unstable"]
 
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
 [workspace]
-members = [".", "macros", "workspaces-tests", 
-"workspaces-tests-utils"
-]
+members = [".", "macros", "workspaces-tests", "workspaces-tests-utils"]

@@ -1,4 +1,5 @@
 #![doc = include_str!("../README.md")]
+#![cfg_attr(docsrs, feature(doc_auto_cfg))]
 
 use near_sdk::IntoStorageKey;
 pub use near_sdk_contract_tools_macros::*;
@@ -6,21 +7,21 @@ pub use near_sdk_contract_tools_macros::*;
 /// Default storage keys used by various traits' `root()` functions.
 #[derive(Clone, Debug)]
 pub enum DefaultStorageKey {
-    /// Default storage key for [`approval::ApprovalManager::root`]
+    /// Default storage key for [`approval::ApprovalManagerInternal::root`].
     ApprovalManager,
-    /// Default storage key for [`standard::nep141::Nep141Controller::root`]
+    /// Default storage key for [`standard::nep141::Nep141ControllerInternal::root`].
     Nep141,
-    /// Default storage key for [`standard::nep171::Nep171Controller::root`]
+    /// Default storage key for [`standard::nep171::Nep171ControllerInternal::root`].
     Nep171,
-    /// Default storage key for [`standard::nep177::Nep177Controller::root`]
+    /// Default storage key for [`standard::nep177::Nep177ControllerInternal::root`].
     Nep177,
-    /// Default storage key for [`standard::nep178::Nep177Controller::root`]
+    /// Default storage key for [`standard::nep178::Nep178ControllerInternal::root`].
     Nep178,
-    /// Default storage key for [`owner::Owner::root`]
+    /// Default storage key for [`owner::OwnerInternal::root`].
     Owner,
-    /// Default storage key for [`pause::Pause::root`]
+    /// Default storage key for [`pause::PauseInternal::root`].
     Pause,
-    /// Default storage key for [`rbac::Rbac::root`]
+    /// Default storage key for [`rbac::RbacInternal::root`].
     Rbac,
 }
 

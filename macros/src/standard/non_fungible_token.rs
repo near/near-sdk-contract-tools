@@ -53,7 +53,7 @@ pub fn expand(meta: NonFungibleTokenMeta) -> Result<TokenStream, darling::Error>
         extension_hooks: Some(syn::parse_quote! { #me::standard::nep178::TokenApprovals }),
         check_external_transfer: Some(syn::parse_quote! { #me::standard::nep178::TokenApprovals }),
 
-        token_type: Some(
+        token_data: Some(
             syn::parse_quote! { (#me::standard::nep177::TokenMetadata, #me::standard::nep178::TokenApprovals) },
         ),
 

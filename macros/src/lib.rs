@@ -110,7 +110,7 @@ pub fn derive_rbac(input: TokenStream) -> TokenStream {
 
 /// Adds NEP-141 fungible token core functionality to a contract. Exposes
 /// `ft_*` functions to the public blockchain, implements internal controller
-/// and receiver functionality (see: [`near_sdk_contract_tools::standard::nep141`]).
+/// and receiver functionality.
 ///
 /// The storage key prefix for the fields can be optionally specified (default:
 /// `"~$141"`) using `#[nep141(storage_key = "<expression>")]`.
@@ -149,14 +149,16 @@ pub fn derive_fungible_token(input: TokenStream) -> TokenStream {
 
 /// Adds NEP-171 non-fungible token core functionality to a contract. Exposes
 /// `nft_*` functions to the public blockchain, implements internal controller
-/// and receiver functionality (see: [`near_sdk_contract_tools::standard::nep171`]).
+/// and receiver functionality.
 ///
 /// The storage key prefix for the fields can be optionally specified (default:
 /// `"~$171"`) using `#[nep171(storage_key = "<expression>")]`.
 ///
 /// Fields:
-/// - `no_hooks`: Flag. Removes the requirement for the contract to implement [`near_sdk_contract_tools::standard::nep171::Nep171Hooks`].
-/// - `token_type`: specify the token metadata loading extensions invoked by `nft_token`.
+/// - `no_hooks`: Flag. Removes the requirement for the contract to implement
+/// transfer hooks.
+/// - `token_data`: specify the token metadata loading extensions invoked by
+/// `nft_token`.
 #[proc_macro_derive(Nep171, attributes(nep171))]
 pub fn derive_nep171(input: TokenStream) -> TokenStream {
     make_derive(input, standard::nep171::expand)
@@ -180,7 +182,7 @@ pub fn derive_nep178(input: TokenStream) -> TokenStream {
     make_derive(input, standard::nep178::expand)
 }
 
-/// Implements all NFT functionality at once, like `#[derive(Nep171, Nep177)]`.
+/// Implements all NFT functionality at once, like `#[derive(Nep171, Nep177, Nep178)]`.
 #[proc_macro_derive(NonFungibleToken, attributes(non_fungible_token))]
 pub fn derive_non_fungible_token(input: TokenStream) -> TokenStream {
     make_derive(input, standard::non_fungible_token::expand)

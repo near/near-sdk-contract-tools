@@ -14,7 +14,10 @@
 //! migrated. This behaviour can be changed by providing a
 //! custom [`PostUpgrade`].
 //!
-//! The [`raw`] module is included mostly for legacy / compatibility reasons,
+//! The
+#![cfg_attr(feature = "unstable", doc = "[`raw`]")]
+#![cfg_attr(not(feature = "unstable"), doc = "`raw` (feature: `unstable`)")]
+//! module is included mostly for legacy / compatibility reasons,
 //! and for the niche efficiency use-case, since it allows for the most
 //! efficient binary serialization (though only by a little). However, it is
 //! more difficult to use and has more sharp edges.
