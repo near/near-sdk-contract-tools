@@ -17,6 +17,8 @@ pub enum DefaultStorageKey {
     Nep177,
     /// Default storage key for [`standard::nep178::Nep178ControllerInternal::root`].
     Nep178,
+    /// Default storage key for [`standard::nep181::Nep181ControllerInternal::root`].
+    Nep181,
     /// Default storage key for [`owner::OwnerInternal::root`].
     Owner,
     /// Default storage key for [`pause::PauseInternal::root`].
@@ -33,6 +35,7 @@ impl IntoStorageKey for DefaultStorageKey {
             DefaultStorageKey::Nep171 => b"~$171".to_vec(),
             DefaultStorageKey::Nep177 => b"~$177".to_vec(),
             DefaultStorageKey::Nep178 => b"~$178".to_vec(),
+            DefaultStorageKey::Nep181 => b"~$181".to_vec(),
             DefaultStorageKey::Owner => b"~o".to_vec(),
             DefaultStorageKey::Pause => b"~p".to_vec(),
             DefaultStorageKey::Rbac => b"~r".to_vec(),

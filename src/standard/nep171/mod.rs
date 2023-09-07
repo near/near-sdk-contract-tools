@@ -134,6 +134,10 @@ pub enum Nep171TransferError {
 
 /// Internal (storage location) methods for implementors of [`Nep171Controller`].
 pub trait Nep171ControllerInternal {
+    type Hook: Nep171Hook<Self>
+    where
+        Self: Sized;
+
     /// Invoked during an external transfer.
     type CheckExternalTransfer: CheckExternalTransfer<Self>
     where
@@ -157,6 +161,10 @@ pub trait Nep171ControllerInternal {
 
 /// Non-public controller interface for NEP-171 implementations.
 pub trait Nep171Controller {
+    type Hook: Nep171Hook<Self>
+    where
+        Self: Sized;
+
     /// Invoked during an external transfer.
     type CheckExternalTransfer: CheckExternalTransfer<Self>
     where
@@ -197,6 +205,13 @@ pub trait Nep171Controller {
         memo: Option<String>,
     ) -> Result<(), Nep171MintError>;
 
+    fn mint_unchecked(
+        &mut self,
+        token_ids: &[TokenId],
+        new_owner_id: &AccountId,
+        memo: Option<String>,
+    );
+
     /// Burns tokens `token_ids` owned by `current_owner_id`.
     fn burn(
         &mut self,
@@ -221,8 +236,8 @@ pub trait Nep171Controller {
 pub struct Nep171Transfer<'a> {
     /// Why is this sender allowed to perform this transfer?
     pub authorization: Nep171TransferAuthorization,
-    /// Sending account ID.
-    pub sender_id: &'a AccountId,
+    /// Sending account ID. `None` when minting.
+    pub sender_id: Option<&'a AccountId>,
     /// Receiving account ID.
     pub receiver_id: &'a AccountId,
     /// Token ID.
@@ -231,6 +246,8 @@ pub struct Nep171Transfer<'a> {
     pub memo: Option<&'a str>,
     /// Message passed to contract located at `receiver_id` in the case of `nft_transfer_call`.
     pub msg: Option<&'a str>,
+    /// `true` if the transfer is a revert for a `nft_transfer_call`.
+    pub revert: bool,
 }
 
 /// Authorization for a transfer.
@@ -266,25 +283,28 @@ impl<T: Nep171Controller> CheckExternalTransfer<T> for DefaultCheckExternalTrans
             }
         })?;
 
-        match transfer.authorization {
-            Nep171TransferAuthorization::Owner => {
-                if transfer.sender_id != &owner_id {
-                    return Err(error::TokenNotOwnedByExpectedOwnerError {
-                        expected_owner_id: transfer.sender_id.clone(),
-                        owner_id,
-                        token_id: transfer.token_id.clone(),
+        if let Some(sender_id) = transfer.sender_id {
+            // authorizations are only relevent when not minting
+            match transfer.authorization {
+                Nep171TransferAuthorization::Owner => {
+                    if transfer.sender_id != Some(&owner_id) {
+                        return Err(error::TokenNotOwnedByExpectedOwnerError {
+                            expected_owner_id: sender_id.clone(),
+                            owner_id,
+                            token_id: transfer.token_id.clone(),
+                        }
+                        .into());
                     }
-                    .into());
                 }
-            }
-            Nep171TransferAuthorization::ApprovalId(approval_id) => {
-                return Err(error::SenderNotApprovedError {
-                    owner_id,
-                    sender_id: transfer.sender_id.clone(),
-                    token_id: transfer.token_id.clone(),
-                    approval_id,
+                Nep171TransferAuthorization::ApprovalId(approval_id) => {
+                    return Err(error::SenderNotApprovedError {
+                        owner_id,
+                        sender_id: sender_id.clone(),
+                        token_id: transfer.token_id.clone(),
+                        approval_id,
+                    }
+                    .into())
                 }
-                .into())
             }
         }
 
@@ -305,61 +325,100 @@ impl<T: Nep171Controller> CheckExternalTransfer<T> for DefaultCheckExternalTrans
 /// `T` is an optional value for passing state between different lifecycle
 /// hooks. This may be useful for charging callers for storage usage, for
 /// example.
-pub trait Nep171Hook<S = (), C = Self> {
+pub trait Nep171Hook<C = Self> {
+    type NftTransferState;
+
     /// Executed before a token transfer is conducted.
     ///
     /// May return an optional state value which will be passed along to the
     /// following `after_transfer`.
     ///
-    /// MUST NOT PANIC.
-    fn before_nft_transfer(contract: &C, transfer: &Nep171Transfer) -> S;
+    /// MUST NOT PANIC if the transfer is a revert.
+    fn before_nft_transfer(contract: &C, transfer: &Nep171Transfer) -> Self::NftTransferState;
 
     /// Executed after a token transfer is conducted.
     ///
     /// Receives the state value returned by `before_transfer`.
     ///
-    /// MUST NOT PANIC.
-    fn after_nft_transfer(contract: &mut C, transfer: &Nep171Transfer, state: S);
+    /// MUST NOT PANIC if the transfer is a revert.
+    fn after_nft_transfer(
+        contract: &mut C,
+        transfer: &Nep171Transfer,
+        state: Self::NftTransferState,
+    );
+
+    //     fn before_mint(contract: &C,
+    //         token_ids: &[TokenId],
+    //         new_owner_id: &AccountId,
+    //         memo: Option<String>,
+    // ) {}
 }
 
-impl<C> Nep171Hook<(), C> for () {
+impl<C> Nep171Hook<C> for () {
+    type NftTransferState = ();
+
     fn before_nft_transfer(_contract: &C, _transfer: &Nep171Transfer) {}
 
     fn after_nft_transfer(_contract: &mut C, _transfer: &Nep171Transfer, _state: ()) {}
 }
 
-impl<Cont, Stat0, Stat1, Handl0, Handl1> Nep171Hook<(Stat0, Stat1), Cont> for (Handl0, Handl1)
+impl<Cont, Handl0, Handl1> Nep171Hook<Cont> for (Handl0, Handl1)
 where
-    Handl0: Nep171Hook<Stat0, Cont>,
-    Handl1: Nep171Hook<Stat1, Cont>,
+    Handl0: Nep171Hook<Cont>,
+    Handl1: Nep171Hook<Cont>,
 {
-    fn before_nft_transfer(contract: &Cont, transfer: &Nep171Transfer) -> (Stat0, Stat1) {
+    type NftTransferState = (Handl0::NftTransferState, Handl1::NftTransferState);
+
+    fn before_nft_transfer(
+        contract: &Cont,
+        transfer: &Nep171Transfer,
+    ) -> (Handl0::NftTransferState, Handl1::NftTransferState) {
         (
             Handl0::before_nft_transfer(contract, transfer),
             Handl1::before_nft_transfer(contract, transfer),
         )
     }
 
-    fn after_nft_transfer(contract: &mut Cont, transfer: &Nep171Transfer, state: (Stat0, Stat1)) {
+    fn after_nft_transfer(
+        contract: &mut Cont,
+        transfer: &Nep171Transfer,
+        state: (Handl0::NftTransferState, Handl1::NftTransferState),
+    ) {
         Handl0::after_nft_transfer(contract, transfer, state.0);
         Handl1::after_nft_transfer(contract, transfer, state.1);
     }
 }
 
 impl<T: Nep171ControllerInternal> Nep171Controller for T {
+    type Hook = <Self as Nep171ControllerInternal>::Hook;
     type CheckExternalTransfer = <Self as Nep171ControllerInternal>::CheckExternalTransfer;
     type LoadTokenMetadata = <Self as Nep171ControllerInternal>::LoadTokenMetadata;
 
     fn external_transfer(&mut self, transfer: &Nep171Transfer) -> Result<(), Nep171TransferError> {
         match Self::CheckExternalTransfer::check_external_transfer(self, transfer) {
             Ok(current_owner_id) => {
-                self.transfer_unchecked(
-                    &[transfer.token_id.to_string()],
-                    current_owner_id,
-                    transfer.sender_id.clone(),
-                    transfer.receiver_id.clone(),
-                    transfer.memo.map(ToString::to_string),
-                );
+                let state = <Self as Nep171Controller>::Hook::before_nft_transfer(self, transfer);
+
+                if let Some(sender_id) = transfer.sender_id {
+                    // transfer
+                    self.transfer_unchecked(
+                        &[transfer.token_id.to_string()],
+                        current_owner_id,
+                        sender_id.clone(),
+                        transfer.receiver_id.clone(),
+                        transfer.memo.map(ToString::to_string),
+                    );
+                } else {
+                    // mint
+                    self.mint_unchecked(
+                        &[transfer.token_id.to_string()],
+                        transfer.receiver_id,
+                        transfer.memo.map(ToString::to_string),
+                    )
+                }
+
+                <Self as Nep171Controller>::Hook::after_nft_transfer(self, transfer, state);
+
                 Ok(())
             }
             Err(e) => Err(e),
@@ -391,24 +450,14 @@ impl<T: Nep171ControllerInternal> Nep171Controller for T {
         }
     }
 
-    fn mint(
+    fn mint_unchecked(
         &mut self,
         token_ids: &[TokenId],
         new_owner_id: &AccountId,
         memo: Option<String>,
-    ) -> Result<(), Nep171MintError> {
+    ) {
         if token_ids.is_empty() {
-            return Ok(());
-        }
-
-        for token_id in token_ids {
-            let slot = Self::slot_token_owner(token_id);
-            if slot.exists() {
-                return Err(error::TokenAlreadyExistsError {
-                    token_id: token_id.to_string(),
-                }
-                .into());
-            }
+            return;
         }
 
         Nep171Event::NftMint(vec![event::NftMintLog {
@@ -422,6 +471,25 @@ impl<T: Nep171ControllerInternal> Nep171Controller for T {
             let mut slot = Self::slot_token_owner(token_id);
             slot.write(new_owner_id);
         });
+    }
+
+    fn mint(
+        &mut self,
+        token_ids: &[TokenId],
+        new_owner_id: &AccountId,
+        memo: Option<String>,
+    ) -> Result<(), Nep171MintError> {
+        for token_id in token_ids {
+            let slot = Self::slot_token_owner(token_id);
+            if slot.exists() {
+                return Err(error::TokenAlreadyExistsError {
+                    token_id: token_id.to_string(),
+                }
+                .into());
+            }
+        }
+
+        self.mint_unchecked(token_ids, new_owner_id, memo);
 
         Ok(())
     }

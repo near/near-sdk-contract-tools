@@ -14,6 +14,8 @@ use near_sdk_contract_tools::{standard::nep171::*, Nep171};
 pub struct Contract {}
 
 impl Nep171Hook for Contract {
+    type NftTransferState = ();
+
     fn before_nft_transfer(_contract: &Self, transfer: &Nep171Transfer) {
         log!("before_nft_transfer({})", transfer.token_id);
     }

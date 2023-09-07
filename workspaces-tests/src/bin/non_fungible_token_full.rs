@@ -49,6 +49,8 @@ impl Nep178Hook for Contract {
 }
 
 impl Nep171Hook for Contract {
+    type NftTransferState = ();
+
     fn before_nft_transfer(_contract: &Self, transfer: &Nep171Transfer) {
         log!("before_nft_transfer({})", transfer.token_id);
     }

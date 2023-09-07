@@ -11,9 +11,11 @@ pub struct Contract {
 }
 
 impl Nep171Hook for Contract {
+    type NftTransferState = ();
+
     fn before_nft_transfer(_contract: &Self, transfer: &Nep171Transfer) {
         log!(
-            "{} is transferring {} to {}",
+            "{:?} is transferring {} to {}",
             transfer.sender_id,
             transfer.token_id,
             transfer.receiver_id,

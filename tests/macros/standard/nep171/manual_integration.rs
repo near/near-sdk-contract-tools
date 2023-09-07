@@ -28,6 +28,8 @@ pub struct Contract {
 }
 
 impl Nep171Hook for Contract {
+    type NftTransferState = ();
+
     fn before_nft_transfer(_contract: &Self, _transfer: &Nep171Transfer) {
         Self::require_unpaused();
     }

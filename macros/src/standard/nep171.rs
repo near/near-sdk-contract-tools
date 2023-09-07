@@ -83,20 +83,9 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
 
     let hooks_type = quote! { (#self_hooks_type, #extension_hooks_type) };
 
-    let before_nft_transfer = no_hooks.is_present().not().then(|| {
-        quote! {
-            let hook_state = <#hooks_type as #me::standard::nep171::Nep171Hook::<_, _>>::before_nft_transfer(&self, &transfer);
-        }
-    });
-
-    let after_nft_transfer = no_hooks.is_present().not().then(|| {
-        quote! {
-            <#hooks_type as #me::standard::nep171::Nep171Hook::<_, _>>::after_nft_transfer(self, &transfer, hook_state);
-        }
-    });
-
     Ok(quote! {
         impl #imp #me::standard::nep171::Nep171ControllerInternal for #ident #ty #wher {
+            type Hook = #hooks_type;
             type CheckExternalTransfer = #check_external_transfer;
             type LoadTokenMetadata = #token_data;
 
@@ -136,33 +125,15 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
                     let transfer = Nep171Transfer {
                         token_id: &token_ids[0],
                         authorization: Nep171TransferAuthorization::Owner,
-                        sender_id: &receiver_id,
+                        sender_id: Some(&receiver_id),
                         receiver_id: &previous_owner_id,
                         memo: None,
                         msg: None,
+                        revert: true,
                     };
 
-                    let check_result = <Self as Nep171Controller>::CheckExternalTransfer::check_external_transfer(self, &transfer);
-
-                    match check_result {
-                        Ok(_) => {
-                            #before_nft_transfer
-
-                            #me::standard::nep171::Nep171Controller::transfer_unchecked(
-                                self,
-                                &token_ids,
-                                receiver_id.clone(),
-                                receiver_id.clone(),
-                                previous_owner_id.clone(),
-                                None,
-                            );
-
-                            #after_nft_transfer
-
-                            false
-                        },
-                        Err(_) => true,
-                    }
+                    <Self as Nep171Controller>::external_transfer(self, &transfer)
+                        .is_err()
                 } else {
                     true
                 }
@@ -190,18 +161,15 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
                 let transfer = Nep171Transfer {
                     token_id: &token_ids[0],
                     authorization: approval_id.map(Nep171TransferAuthorization::ApprovalId).unwrap_or(Nep171TransferAuthorization::Owner),
-                    sender_id: &sender_id,
+                    sender_id: Some(&sender_id),
                     receiver_id: &receiver_id,
                     memo: memo.as_deref(),
                     msg: None,
+                    revert: false,
                 };
-
-                #before_nft_transfer
 
                 <Self as Nep171Controller>::external_transfer(self, &transfer)
                     .unwrap_or_else(|e| #near_sdk::env::panic_str(&e.to_string()));
-
-                #after_nft_transfer
             }
 
             #[payable]
@@ -229,18 +197,15 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
                 let transfer = Nep171Transfer {
                     token_id: &token_ids[0],
                     authorization: approval_id.map(Nep171TransferAuthorization::ApprovalId).unwrap_or(Nep171TransferAuthorization::Owner),
-                    sender_id: &sender_id,
+                    sender_id: Some(&sender_id),
                     receiver_id: &receiver_id,
                     memo: memo.as_deref(),
                     msg: Some(&msg),
+                    revert: false,
                 };
-
-                #before_nft_transfer
 
                 <Self as Nep171Controller>::external_transfer(self, &transfer)
                     .unwrap_or_else(|e| #near_sdk::env::panic_str(&e.to_string()));
-
-                #after_nft_transfer
 
                 let [token_id] = token_ids;
 
