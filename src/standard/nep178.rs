@@ -48,9 +48,9 @@ impl<C: Nep178Controller> Nep171Hook<C> for TokenApprovals {
     type NftTransferState = ();
     type BurnState = ();
 
-    fn before_mint(_contract: &C, _token_id: &TokenId, owner_id: &AccountId) {}
+    fn before_mint(_contract: &C, _token_ids: &[TokenId], _owner_id: &AccountId) {}
 
-    fn after_mint(_contract: &mut C, _token_id: &TokenId, owner_id: &AccountId, _: ()) {}
+    fn after_mint(_contract: &mut C, _token_ids: &[TokenId], _owner_id: &AccountId, _: ()) {}
 
     fn before_nft_transfer(_contract: &C, _transfer: &Nep171Transfer) {}
 
@@ -58,15 +58,12 @@ impl<C: Nep178Controller> Nep171Hook<C> for TokenApprovals {
         contract.revoke_all_unchecked(transfer.token_id);
     }
 
-    fn before_burn(contract: &C, token_id: &TokenId, owner_id: &AccountId) {}
+    fn before_burn(_contract: &C, _token_ids: &[TokenId], _owner_id: &AccountId) {}
 
-    fn after_burn(
-        contract: &mut C,
-        token_id: &TokenId,
-        owner_id: &AccountId,
-        state: Self::BurnState,
-    ) {
-        contract.revoke_all_unchecked(token_id);
+    fn after_burn(contract: &mut C, token_ids: &[TokenId], _owner_id: &AccountId, _: ()) {
+        for token_id in token_ids {
+            contract.revoke_all_unchecked(token_id);
+        }
     }
 }
 

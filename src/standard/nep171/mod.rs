@@ -346,18 +346,18 @@ pub trait Nep171Hook<C = Self> {
         state: Self::NftTransferState,
     );
 
-    fn before_mint(contract: &C, token_id: &TokenId, owner_id: &AccountId) -> Self::MintState;
+    fn before_mint(contract: &C, token_ids: &[TokenId], owner_id: &AccountId) -> Self::MintState;
     fn after_mint(
         contract: &mut C,
-        token_id: &TokenId,
+        token_ids: &[TokenId],
         owner_id: &AccountId,
         state: Self::MintState,
     );
 
-    fn before_burn(contract: &C, token_id: &TokenId, owner_id: &AccountId) -> Self::BurnState;
+    fn before_burn(contract: &C, token_ids: &[TokenId], owner_id: &AccountId) -> Self::BurnState;
     fn after_burn(
         contract: &mut C,
-        token_id: &TokenId,
+        token_ids: &[TokenId],
         owner_id: &AccountId,
         state: Self::BurnState,
     );
@@ -372,21 +372,31 @@ impl<C> Nep171Hook<C> for () {
 
     fn after_nft_transfer(_contract: &mut C, _transfer: &Nep171Transfer, _state: ()) {}
 
-    fn before_mint(_contract: &C, _token_id: &TokenId, _owner_id: &AccountId) -> Self::MintState {}
+    fn before_mint(
+        _contract: &C,
+        _token_ids: &[TokenId],
+        _owner_id: &AccountId,
+    ) -> Self::MintState {
+    }
 
     fn after_mint(
         _contract: &mut C,
-        _token_id: &TokenId,
+        _token_ids: &[TokenId],
         _owner_id: &AccountId,
         _state: Self::MintState,
     ) {
     }
 
-    fn before_burn(_contract: &C, _token_id: &TokenId, _owner_id: &AccountId) -> Self::BurnState {}
+    fn before_burn(
+        _contract: &C,
+        _token_ids: &[TokenId],
+        _owner_id: &AccountId,
+    ) -> Self::BurnState {
+    }
 
     fn after_burn(
         _contract: &mut C,
-        _token_id: &TokenId,
+        _token_ids: &[TokenId],
         _owner_id: &AccountId,
         _state: Self::BurnState,
     ) {
@@ -402,21 +412,25 @@ where
     type NftTransferState = (Handl0::NftTransferState, Handl1::NftTransferState);
     type BurnState = (Handl0::BurnState, Handl1::BurnState);
 
-    fn before_mint(contract: &Cont, token_id: &TokenId, owner_id: &AccountId) -> Self::MintState {
+    fn before_mint(
+        contract: &Cont,
+        token_ids: &[TokenId],
+        owner_id: &AccountId,
+    ) -> Self::MintState {
         (
-            Handl0::before_mint(contract, token_id, owner_id),
-            Handl1::before_mint(contract, token_id, owner_id),
+            Handl0::before_mint(contract, token_ids, owner_id),
+            Handl1::before_mint(contract, token_ids, owner_id),
         )
     }
 
     fn after_mint(
         contract: &mut Cont,
-        token_id: &TokenId,
+        token_ids: &[TokenId],
         owner_id: &AccountId,
         state: Self::MintState,
     ) {
-        Handl0::after_mint(contract, token_id, owner_id, state.0);
-        Handl1::after_mint(contract, token_id, owner_id, state.1);
+        Handl0::after_mint(contract, token_ids, owner_id, state.0);
+        Handl1::after_mint(contract, token_ids, owner_id, state.1);
     }
 
     fn before_nft_transfer(
@@ -438,31 +452,35 @@ where
         Handl1::after_nft_transfer(contract, transfer, state.1);
     }
 
-    fn before_burn(contract: &Cont, token_id: &TokenId, owner_id: &AccountId) -> Self::BurnState {
+    fn before_burn(
+        contract: &Cont,
+        token_ids: &[TokenId],
+        owner_id: &AccountId,
+    ) -> Self::BurnState {
         (
-            Handl0::before_burn(contract, token_id, owner_id),
-            Handl1::before_burn(contract, token_id, owner_id),
+            Handl0::before_burn(contract, token_ids, owner_id),
+            Handl1::before_burn(contract, token_ids, owner_id),
         )
     }
 
     fn after_burn(
         contract: &mut Cont,
-        token_id: &TokenId,
+        token_ids: &[TokenId],
         owner_id: &AccountId,
         state: Self::BurnState,
     ) {
-        Handl0::after_burn(contract, token_id, owner_id, state.0);
-        Handl1::after_burn(contract, token_id, owner_id, state.1);
+        Handl0::after_burn(contract, token_ids, owner_id, state.0);
+        Handl1::after_burn(contract, token_ids, owner_id, state.1);
     }
 }
 
 pub trait SimpleNep171Hook {
-    fn before_mint(&self, _token_id: &TokenId, _owner_id: &AccountId) {}
-    fn after_mint(&mut self, _token_id: &TokenId, _owner_id: &AccountId) {}
+    fn before_mint(&self, _token_ids: &[TokenId], _owner_id: &AccountId) {}
+    fn after_mint(&mut self, _token_ids: &[TokenId], _owner_id: &AccountId) {}
     fn before_nft_transfer(&self, _transfer: &Nep171Transfer) {}
     fn after_nft_transfer(&mut self, _transfer: &Nep171Transfer) {}
-    fn before_burn(&self, _token_id: &TokenId, _owner_id: &AccountId) {}
-    fn after_burn(&mut self, _token_id: &TokenId, _owner_id: &AccountId) {}
+    fn before_burn(&self, _token_ids: &[TokenId], _owner_id: &AccountId) {}
+    fn after_burn(&mut self, _token_ids: &[TokenId], _owner_id: &AccountId) {}
 }
 
 impl<T: SimpleNep171Hook> Nep171Hook<T> for T {
@@ -470,12 +488,12 @@ impl<T: SimpleNep171Hook> Nep171Hook<T> for T {
     type NftTransferState = ();
     type BurnState = ();
 
-    fn before_mint(contract: &Self, token_id: &TokenId, owner_id: &AccountId) {
-        SimpleNep171Hook::before_mint(contract, token_id, owner_id);
+    fn before_mint(contract: &Self, token_ids: &[TokenId], owner_id: &AccountId) {
+        SimpleNep171Hook::before_mint(contract, token_ids, owner_id);
     }
 
-    fn after_mint(contract: &mut Self, token_id: &TokenId, owner_id: &AccountId, _: ()) {
-        SimpleNep171Hook::after_burn(contract, token_id, owner_id);
+    fn after_mint(contract: &mut Self, token_ids: &[TokenId], owner_id: &AccountId, _: ()) {
+        SimpleNep171Hook::after_burn(contract, token_ids, owner_id);
     }
 
     fn before_nft_transfer(contract: &T, transfer: &Nep171Transfer) {
@@ -486,12 +504,12 @@ impl<T: SimpleNep171Hook> Nep171Hook<T> for T {
         SimpleNep171Hook::after_nft_transfer(contract, transfer);
     }
 
-    fn before_burn(contract: &T, token_id: &TokenId, owner_id: &AccountId) {
-        SimpleNep171Hook::before_burn(contract, token_id, owner_id);
+    fn before_burn(contract: &T, token_ids: &[TokenId], owner_id: &AccountId) {
+        SimpleNep171Hook::before_burn(contract, token_ids, owner_id);
     }
 
-    fn after_burn(contract: &mut T, token_id: &TokenId, owner_id: &AccountId, _: ()) {
-        SimpleNep171Hook::after_burn(contract, token_id, owner_id);
+    fn after_burn(contract: &mut T, token_ids: &[TokenId], owner_id: &AccountId, _: ()) {
+        SimpleNep171Hook::after_burn(contract, token_ids, owner_id);
     }
 }
 
@@ -585,7 +603,11 @@ impl<T: Nep171ControllerInternal> Nep171Controller for T {
             }
         }
 
+        let state = Self::Hook::before_mint(self, token_ids, new_owner_id);
+
         self.mint_unchecked(token_ids, new_owner_id, memo);
+
+        Self::Hook::after_mint(self, token_ids, new_owner_id, state);
 
         Ok(())
     }
@@ -618,7 +640,11 @@ impl<T: Nep171ControllerInternal> Nep171Controller for T {
             }
         }
 
+        let state = Self::Hook::before_burn(self, token_ids, current_owner_id);
+
         self.burn_unchecked(token_ids);
+
+        Self::Hook::after_burn(self, token_ids, current_owner_id, state);
 
         Nep171Event::NftBurn(vec![event::NftBurnLog {
             token_ids: token_ids.iter().map(ToString::to_string).collect(),

@@ -103,15 +103,16 @@ impl Nep171Hook for NonFungibleToken {
     }
 
     type MintState = ();
+
+    fn before_mint(_contract: &Self, _token_ids: &[TokenId], _owner_id: &AccountId) {}
+
+    fn after_mint(_contract: &mut Self, _token_ids: &[TokenId], _owner_id: &AccountId, _: ()) {}
+
     type BurnState = ();
 
-    fn before_mint(contract: &Self, token_id: &TokenId, owner_id: &AccountId) {}
+    fn before_burn(_contract: &Self, _token_ids: &[TokenId], _owner_id: &AccountId) {}
 
-    fn after_mint(contract: &mut Self, token_id: &TokenId, owner_id: &AccountId, _: ()) {}
-
-    fn before_burn(contract: &Self, token_id: &TokenId, owner_id: &AccountId) {}
-
-    fn after_burn(contract: &mut Self, token_id: &TokenId, owner_id: &AccountId, _: ()) {}
+    fn after_burn(_contract: &mut Self, _token_ids: &[TokenId], _owner_id: &AccountId, _: ()) {}
 }
 
 #[near_bindgen]

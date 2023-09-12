@@ -14,17 +14,19 @@ use crate::{slot::Slot, standard::nep171::*, DefaultStorageKey};
 
 pub use ext::*;
 
-pub struct TokenEnumeration {}
+pub struct TokenEnumeration;
 
 impl<C: Nep171Controller + Nep181Controller> Nep171Hook<C> for TokenEnumeration {
     type MintState = ();
     type NftTransferState = ();
     type BurnState = ();
 
-    fn before_mint(_contract: &C, _token_id: &TokenId, _owner_id: &AccountId) {}
+    fn before_mint(_contract: &C, _token_ids: &[TokenId], _owner_id: &AccountId) {}
 
-    fn after_mint(contract: &mut C, token_id: &TokenId, owner_id: &AccountId, _: ()) {
-        contract.add_token_to_enumeration(token_id.clone(), owner_id);
+    fn after_mint(contract: &mut C, token_ids: &[TokenId], owner_id: &AccountId, _: ()) {
+        for token_id in token_ids {
+            contract.add_token_to_enumeration(token_id.clone(), owner_id);
+        }
     }
 
     fn before_nft_transfer(_contract: &C, _transfer: &Nep171Transfer) {}
@@ -44,10 +46,12 @@ impl<C: Nep171Controller + Nep181Controller> Nep171Hook<C> for TokenEnumeration 
         );
     }
 
-    fn before_burn(_contract: &C, _token_id: &TokenId, _owner_id: &AccountId) {}
+    fn before_burn(_contract: &C, _token_ids: &[TokenId], _owner_id: &AccountId) {}
 
-    fn after_burn(contract: &mut C, token_id: &TokenId, owner_id: &AccountId, _: ()) {
-        contract.remove_token_from_enumeration(token_id, owner_id);
+    fn after_burn(contract: &mut C, token_ids: &[TokenId], owner_id: &AccountId, _: ()) {
+        for token_id in token_ids {
+            contract.remove_token_from_enumeration(token_id, owner_id);
+        }
     }
 }
 
@@ -75,7 +79,7 @@ pub trait Nep181ControllerInternal {
 
 /// Functions for managing non-fungible tokens with attached metadata, NEP-181.
 pub trait Nep181Controller {
-    fn add_token_to_enumeration(&mut self, token_id: TokenId, owner_id: &AccountId);
+    fn add_token_to_enumeration(&mut self, token_id: TokenId, owner_id: &AccountId); // TODO: token_id should be an array of TokenIds, same for other fns
     fn remove_token_from_enumeration(&mut self, token_id: &TokenId, owner_id: &AccountId);
     fn transfer_token_enumeration(
         &mut self,

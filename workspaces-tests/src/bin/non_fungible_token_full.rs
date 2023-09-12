@@ -8,7 +8,7 @@ use near_sdk::{
     env, log, near_bindgen, AccountId, PanicOnDefault,
 };
 use near_sdk_contract_tools::{
-    standard::{nep171::*, nep177::*, nep178::*},
+    standard::{nep171::*, nep177::*, nep178::*, nep181::*},
     NonFungibleToken,
 };
 

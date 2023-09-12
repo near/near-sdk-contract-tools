@@ -3,7 +3,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::Expr;
 
-use super::{nep171, nep177, nep178};
+use super::{nep171, nep177, nep178, nep181};
 
 #[derive(Debug, FromDeriveInput)]
 #[darling(attributes(non_fungible_token), supports(struct_named))]
@@ -18,6 +18,9 @@ pub struct NonFungibleTokenMeta {
     // NEP-178 fields
     pub approval_storage_key: Option<Expr>,
     pub no_approval_hooks: Flag,
+
+    // NEP-181 fields
+    pub enumeration_storage_key: Option<Expr>,
 
     // darling
     pub generics: syn::Generics,
@@ -40,6 +43,8 @@ pub fn expand(meta: NonFungibleTokenMeta) -> Result<TokenStream, darling::Error>
         approval_storage_key,
         no_approval_hooks,
 
+        enumeration_storage_key,
+
         generics,
         ident,
 
@@ -50,7 +55,9 @@ pub fn expand(meta: NonFungibleTokenMeta) -> Result<TokenStream, darling::Error>
     let expand_nep171 = nep171::expand(nep171::Nep171Meta {
         storage_key,
         no_hooks,
-        extension_hooks: Some(syn::parse_quote! { #me::standard::nep178::TokenApprovals }),
+        extension_hooks: Some(
+            syn::parse_quote! { (#me::standard::nep178::TokenApprovals, #me::standard::nep181::TokenEnumeration) },
+        ),
         check_external_transfer: Some(syn::parse_quote! { #me::standard::nep178::TokenApprovals }),
 
         token_data: Some(
@@ -77,6 +84,14 @@ pub fn expand(meta: NonFungibleTokenMeta) -> Result<TokenStream, darling::Error>
     let expand_nep178 = nep178::expand(nep178::Nep178Meta {
         storage_key: approval_storage_key,
         no_hooks: no_approval_hooks,
+        generics: generics.clone(),
+        ident: ident.clone(),
+        me: me.clone(),
+        near_sdk: near_sdk.clone(),
+    });
+
+    let expand_nep181 = nep181::expand(nep181::Nep181Meta {
+        storage_key: enumeration_storage_key,
         generics,
         ident,
         me,
@@ -88,10 +103,12 @@ pub fn expand(meta: NonFungibleTokenMeta) -> Result<TokenStream, darling::Error>
     let nep171 = e.handle(expand_nep171);
     let nep177 = e.handle(expand_nep177);
     let nep178 = e.handle(expand_nep178);
+    let nep181 = e.handle(expand_nep181);
 
     e.finish_with(quote! {
         #nep171
         #nep177
         #nep178
+        #nep181
     })
 }

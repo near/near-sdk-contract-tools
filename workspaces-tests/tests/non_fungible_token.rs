@@ -1,5 +1,7 @@
 #![cfg(not(windows))]
 
+use std::collections::{HashMap, HashSet};
+
 use near_sdk::serde_json::json;
 use near_sdk_contract_tools::standard::{
     nep171::{self, event::NftTransferLog, Nep171Event, Token},
@@ -102,7 +104,7 @@ async fn create_and_mint() {
 }
 
 #[tokio::test]
-async fn create_and_mint_with_metadata() {
+async fn create_and_mint_with_metadata_and_enumeration() {
     let Setup { contract, accounts } =
         setup_balances(WASM_FULL, 3, |i| vec![format!("token_{i}")]).await;
     let alice = &accounts[0];
@@ -175,6 +177,31 @@ async fn create_and_mint_with_metadata() {
         }),
     );
     assert_eq!(token_3, None::<Token>);
+
+    // indeterminate order, so hashmap for equality instead of vec
+    let all_tokens_enumeration = contract
+        .view("nft_tokens")
+        // .args_json(json!({ "from_index": 0, "limit": 100 }))
+        .args_json(json!({}))
+        .await
+        .unwrap()
+        .json::<Vec<Token>>()
+        .unwrap()
+        .into_iter()
+        .map(|token| (token.token_id.clone(), token))
+        .collect::<HashMap<_, _>>();
+
+    assert_eq!(
+        all_tokens_enumeration,
+        [
+            token_0.clone().unwrap(),
+            token_1.clone().unwrap(),
+            token_2.clone().unwrap(),
+        ]
+        .into_iter()
+        .map(|token| (token.token_id.clone(), token))
+        .collect::<HashMap<_, _>>(),
+    );
 }
 
 #[tokio::test]
