@@ -8,16 +8,16 @@ use near_sdk_contract_tools::{
     standard::{
         nep171::*,
         nep177::{self, Nep177Controller},
-        nep178,
+        nep178, nep181,
     },
-    Nep171, Nep177, Nep178, Owner, Pause,
+    Nep171, Nep177, Nep178, Nep181, Owner, Pause,
 };
 
 #[derive(
-    BorshSerialize, BorshDeserialize, PanicOnDefault, Nep171, Nep177, Nep178, Pause, Owner,
+    BorshSerialize, BorshDeserialize, PanicOnDefault, Nep171, Nep177, Nep178, Nep181, Pause, Owner,
 )]
 #[nep171(
-    extension_hooks = "nep178::TokenApprovals",
+    extension_hooks = "(nep178::TokenApprovals, nep181::TokenEnumeration)",
     check_external_transfer = "nep178::TokenApprovals",
     token_data = "(nep177::TokenMetadata, nep178::TokenApprovals)"
 )]

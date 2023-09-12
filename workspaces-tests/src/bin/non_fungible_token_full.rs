@@ -7,10 +7,7 @@ use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
     env, log, near_bindgen, AccountId, PanicOnDefault,
 };
-use near_sdk_contract_tools::{
-    standard::{nep171::*, nep177::*, nep178::*, nep181::*},
-    NonFungibleToken,
-};
+use near_sdk_contract_tools::{nft::*, NonFungibleToken};
 
 #[derive(PanicOnDefault, BorshSerialize, BorshDeserialize, NonFungibleToken)]
 #[near_bindgen]

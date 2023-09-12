@@ -2,12 +2,7 @@ use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
     env, near_bindgen, PanicOnDefault,
 };
-use near_sdk_contract_tools::{
-    owner::Owner,
-    pause::Pause,
-    standard::{nep171::*, nep177::*},
-    NonFungibleToken, Owner, Pause,
-};
+use near_sdk_contract_tools::{nft::*, owner::Owner, pause::Pause, Owner, Pause};
 
 #[derive(BorshSerialize, BorshDeserialize, PanicOnDefault, NonFungibleToken, Pause, Owner)]
 #[non_fungible_token(no_approval_hooks)]

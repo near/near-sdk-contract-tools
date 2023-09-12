@@ -1,6 +1,6 @@
 #![cfg(not(windows))]
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use near_sdk::serde_json::json;
 use near_sdk_contract_tools::standard::{

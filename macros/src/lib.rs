@@ -182,7 +182,16 @@ pub fn derive_nep178(input: TokenStream) -> TokenStream {
     make_derive(input, standard::nep178::expand)
 }
 
-/// Implements all NFT functionality at once, like `#[derive(Nep171, Nep177, Nep178)]`.
+/// Adds NEP-181 non-fungible token enumeration functionality to a contract.
+///
+/// The storage key prefix for the fields can be optionally specified (default:
+/// `"~$181"`) using `#[nep181(storage_key = "<expression>")]`.
+#[proc_macro_derive(Nep181, attributes(nep181))]
+pub fn derive_nep181(input: TokenStream) -> TokenStream {
+    make_derive(input, standard::nep181::expand)
+}
+
+/// Implements all NFT functionality at once, like `#[derive(Nep171, Nep177, Nep178, Nep181)]`.
 #[proc_macro_derive(NonFungibleToken, attributes(non_fungible_token))]
 pub fn derive_non_fungible_token(input: TokenStream) -> TokenStream {
     make_derive(input, standard::non_fungible_token::expand)

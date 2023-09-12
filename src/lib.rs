@@ -53,3 +53,11 @@ pub mod rbac;
 pub mod slot;
 pub mod upgrade;
 pub mod utils;
+
+/// Re-exports of the NFT standard traits.
+pub mod nft {
+    pub use crate::{
+        standard::{nep171::*, nep177::*, nep178::*, nep181::*},
+        Nep171, Nep177, Nep178, Nep181, NonFungibleToken,
+    };
+}
