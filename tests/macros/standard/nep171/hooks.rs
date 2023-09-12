@@ -10,10 +10,8 @@ pub struct Contract {
     transfer_count: u32,
 }
 
-impl Nep171Hook for Contract {
-    type NftTransferState = ();
-
-    fn before_nft_transfer(_contract: &Self, transfer: &Nep171Transfer) {
+impl SimpleNep171Hook for Contract {
+    fn before_nft_transfer(&self, transfer: &Nep171Transfer) {
         log!(
             "{:?} is transferring {} to {}",
             transfer.sender_id,
@@ -22,7 +20,7 @@ impl Nep171Hook for Contract {
         );
     }
 
-    fn after_nft_transfer(contract: &mut Self, _transfer: &Nep171Transfer, _: ()) {
-        contract.transfer_count += 1;
+    fn after_nft_transfer(&mut self, _transfer: &Nep171Transfer) {
+        self.transfer_count += 1;
     }
 }

@@ -27,14 +27,10 @@ pub struct Contract {
     next_token_id: u32,
 }
 
-impl Nep171Hook for Contract {
-    type NftTransferState = ();
-
-    fn before_nft_transfer(_contract: &Self, _transfer: &Nep171Transfer) {
+impl SimpleNep171Hook for Contract {
+    fn before_nft_transfer(&self, _transfer: &Nep171Transfer) {
         Self::require_unpaused();
     }
-
-    fn after_nft_transfer(_contract: &mut Self, _transfer: &Nep171Transfer, _: ()) {}
 }
 
 #[near_bindgen]

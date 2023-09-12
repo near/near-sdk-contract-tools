@@ -125,7 +125,7 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
                     let transfer = Nep171Transfer {
                         token_id: &token_ids[0],
                         authorization: Nep171TransferAuthorization::Owner,
-                        sender_id: Some(&receiver_id),
+                        sender_id: &receiver_id,
                         receiver_id: &previous_owner_id,
                         memo: None,
                         msg: None,
@@ -161,7 +161,7 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
                 let transfer = Nep171Transfer {
                     token_id: &token_ids[0],
                     authorization: approval_id.map(Nep171TransferAuthorization::ApprovalId).unwrap_or(Nep171TransferAuthorization::Owner),
-                    sender_id: Some(&sender_id),
+                    sender_id: &sender_id,
                     receiver_id: &receiver_id,
                     memo: memo.as_deref(),
                     msg: None,
@@ -197,7 +197,7 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
                 let transfer = Nep171Transfer {
                     token_id: &token_ids[0],
                     authorization: approval_id.map(Nep171TransferAuthorization::ApprovalId).unwrap_or(Nep171TransferAuthorization::Owner),
-                    sender_id: Some(&sender_id),
+                    sender_id: &sender_id,
                     receiver_id: &receiver_id,
                     memo: memo.as_deref(),
                     msg: Some(&msg),

@@ -44,12 +44,29 @@ impl<C: Nep178Controller> LoadTokenMetadata<C> for TokenApprovals {
 }
 
 impl<C: Nep178Controller> Nep171Hook<C> for TokenApprovals {
+    type MintState = ();
     type NftTransferState = ();
+    type BurnState = ();
+
+    fn before_mint(_contract: &C, _token_id: &TokenId, owner_id: &AccountId) {}
+
+    fn after_mint(_contract: &mut C, _token_id: &TokenId, owner_id: &AccountId, _: ()) {}
 
     fn before_nft_transfer(_contract: &C, _transfer: &Nep171Transfer) {}
 
     fn after_nft_transfer(contract: &mut C, transfer: &Nep171Transfer, _: ()) {
         contract.revoke_all_unchecked(transfer.token_id);
+    }
+
+    fn before_burn(contract: &C, token_id: &TokenId, owner_id: &AccountId) {}
+
+    fn after_burn(
+        contract: &mut C,
+        token_id: &TokenId,
+        owner_id: &AccountId,
+        state: Self::BurnState,
+    ) {
+        contract.revoke_all_unchecked(token_id);
     }
 }
 
@@ -61,14 +78,14 @@ impl<C: Nep171Controller + Nep178Controller> CheckExternalTransfer<C> for TokenA
         let normal_check =
             DefaultCheckExternalTransfer::check_external_transfer(contract, transfer);
 
-        match (&transfer.authorization, &transfer.sender_id, normal_check) {
-            (_, _, r @ Ok(_)) => r,
+        match (&transfer.authorization, normal_check) {
+            (_, r @ Ok(_)) => r,
             (
                 Nep171TransferAuthorization::ApprovalId(approval_id),
-                Some(sender_id),
                 Err(Nep171TransferError::SenderNotApproved(s)),
             ) => {
-                let saved_approval = contract.get_approval_id_for(transfer.token_id, sender_id);
+                let saved_approval =
+                    contract.get_approval_id_for(transfer.token_id, transfer.sender_id);
 
                 if saved_approval == Some(*approval_id) {
                     Ok(s.owner_id)
@@ -76,7 +93,7 @@ impl<C: Nep171Controller + Nep178Controller> CheckExternalTransfer<C> for TokenA
                     Err(s.into())
                 }
             }
-            (_, _, e @ Err(_)) => e,
+            (_, e @ Err(_)) => e,
         }
     }
 }

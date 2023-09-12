@@ -101,6 +101,17 @@ impl Nep171Hook for NonFungibleToken {
             .after_nft_transfer_balance_record
             .push(token.map(Into::into));
     }
+
+    type MintState = ();
+    type BurnState = ();
+
+    fn before_mint(contract: &Self, token_id: &TokenId, owner_id: &AccountId) {}
+
+    fn after_mint(contract: &mut Self, token_id: &TokenId, owner_id: &AccountId, _: ()) {}
+
+    fn before_burn(contract: &Self, token_id: &TokenId, owner_id: &AccountId) {}
+
+    fn after_burn(contract: &mut Self, token_id: &TokenId, owner_id: &AccountId, _: ()) {}
 }
 
 #[near_bindgen]
