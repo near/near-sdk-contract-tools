@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use near_sdk::serde_json::json;
+use near_sdk::{json_types::U128, serde_json::json};
 use near_sdk_contract_tools::standard::{
     nep171::{self, event::NftTransferLog, Nep171Event, Token},
     nep177::{self, TokenMetadata},
@@ -179,17 +179,65 @@ async fn create_and_mint_with_metadata_and_enumeration() {
     assert_eq!(token_3, None::<Token>);
 
     // indeterminate order, so hashmap for equality instead of vec
-    let all_tokens_enumeration = contract
-        .view("nft_tokens")
-        // .args_json(json!({ "from_index": 0, "limit": 100 }))
-        .args_json(json!({}))
-        .await
-        .unwrap()
-        .json::<Vec<Token>>()
-        .unwrap()
-        .into_iter()
-        .map(|token| (token.token_id.clone(), token))
-        .collect::<HashMap<_, _>>();
+    let (
+        all_tokens_enumeration,
+        all_tokens_enumeration_limit,
+        alice_supply,
+        alice_tokens_all,
+        alice_tokens_offset,
+    ) = tokio::join!(
+        async {
+            contract
+                .view("nft_tokens")
+                .args_json(json!({}))
+                .await
+                .unwrap()
+                .json::<Vec<Token>>()
+                .unwrap()
+                .into_iter()
+                .map(|token| (token.token_id.clone(), token))
+                .collect::<HashMap<_, _>>()
+        },
+        async {
+            contract
+                .view("nft_tokens")
+                .args_json(json!({ "from_index": "0", "limit": 100 }))
+                .await
+                .unwrap()
+                .json::<Vec<Token>>()
+                .unwrap()
+                .into_iter()
+                .map(|token| (token.token_id.clone(), token))
+                .collect::<HashMap<_, _>>()
+        },
+        async {
+            contract
+                .view("nft_supply_for_owner")
+                .args_json(json!({ "account_id": alice.id() }))
+                .await
+                .unwrap()
+                .json::<U128>()
+                .unwrap()
+        },
+        async {
+            contract
+                .view("nft_tokens_for_owner")
+                .args_json(json!({ "account_id": alice.id(), "limit": 100 }))
+                .await
+                .unwrap()
+                .json::<Vec<Token>>()
+                .unwrap()
+        },
+        async {
+            contract
+                .view("nft_tokens_for_owner")
+                .args_json(json!({ "account_id": alice.id(), "from_index": "1" }))
+                .await
+                .unwrap()
+                .json::<Vec<Token>>()
+                .unwrap()
+        },
+    );
 
     assert_eq!(
         all_tokens_enumeration,
@@ -201,6 +249,28 @@ async fn create_and_mint_with_metadata_and_enumeration() {
         .into_iter()
         .map(|token| (token.token_id.clone(), token))
         .collect::<HashMap<_, _>>(),
+    );
+
+    assert_eq!(
+        all_tokens_enumeration, all_tokens_enumeration_limit,
+        "only 3 tokens in circulation, so limit:100 should be the same as unlimited"
+    );
+
+    assert_eq!(
+        alice_supply.0, 1,
+        "alice has one token, so alice's supply (balance) should be 1"
+    );
+
+    assert_eq!(
+        alice_tokens_all,
+        vec![token_0.clone().unwrap()],
+        "alice has one token, so it should be returned in the list of all of alice's tokens"
+    );
+
+    assert_eq!(
+        alice_tokens_offset,
+        vec![],
+        "alice only has one token so an offset:1 should return empty"
     );
 }
 
