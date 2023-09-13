@@ -185,6 +185,7 @@ async fn create_and_mint_with_metadata_and_enumeration() {
         alice_supply,
         alice_tokens_all,
         alice_tokens_offset,
+        nonexistent_account_tokens,
     ) = tokio::join!(
         async {
             contract
@@ -237,6 +238,15 @@ async fn create_and_mint_with_metadata_and_enumeration() {
                 .json::<Vec<Token>>()
                 .unwrap()
         },
+        async {
+            contract
+                .view("nft_tokens_for_owner")
+                .args_json(json!({ "account_id": "0000000000000000000000000000000000000000000000000000000000000000", "from_index": "1" }))
+                .await
+                .unwrap()
+                .json::<Vec<Token>>()
+                .unwrap()
+        },
     );
 
     assert_eq!(
@@ -271,6 +281,12 @@ async fn create_and_mint_with_metadata_and_enumeration() {
         alice_tokens_offset,
         vec![],
         "alice only has one token so an offset:1 should return empty"
+    );
+
+    assert_eq!(
+        nonexistent_account_tokens,
+        vec![],
+        "nonexistent account should return empty",
     );
 }
 
