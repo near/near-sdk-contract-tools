@@ -5,6 +5,7 @@ use proc_macro::TokenStream;
 use syn::{parse_macro_input, AttributeArgs, DeriveInput, Item};
 
 mod approval;
+mod escrow;
 mod migrate;
 mod owner;
 mod pause;
@@ -263,4 +264,16 @@ pub fn event(attr: TokenStream, item: TokenStream) -> TokenStream {
 #[proc_macro_derive(Upgrade, attributes(upgrade))]
 pub fn derive_upgrade(input: TokenStream) -> TokenStream {
     make_derive(input, upgrade::expand)
+}
+
+/// Creates a managed, lazily-loaded `Escrow` implementation for the targeted
+/// `#[near_bindgen]` struct.
+///
+/// Fields include:
+///  - `id` - the type required for id, must be `borsh::BorshSerialize` & `serde::Serialize`, for events
+///  - `state` - the type required for id, must be `borsh::BorshSerialize` & `borsh::BorshSerialize`
+///  - `storage_key` Storage prefix for escrow data (optional, default: `b"~es"`)
+#[proc_macro_derive(Escrow, attributes(escrow))]
+pub fn derive_escrow(input: TokenStream) -> TokenStream {
+    make_derive(input, escrow::expand)
 }
