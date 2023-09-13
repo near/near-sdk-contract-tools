@@ -21,6 +21,15 @@ name = "fungible_token"
 name = "native_multisig"
 
 [[bin]]
+name = "non_fungible_token_full"
+
+[[bin]]
+name = "non_fungible_token_nep171"
+
+[[bin]]
+name = "non_fungible_token_receiver"
+
+[[bin]]
 name = "rbac"
 
 [[bin]]
@@ -48,11 +57,11 @@ name = "upgrade_old_multisig"
 name = "upgrade_old_raw"
 
 [dependencies]
-near-sdk = {version = "4.1.1", default-features = false}
-near-sdk-contract-tools = {path = "../", features = ["unstable"]}
+near-sdk.workspace = true
+near-sdk-contract-tools = { path = "../", features = ["unstable"] }
 strum = "0.24.1"
 strum_macros = "0.24.3"
-thiserror = "1.0.34"
+thiserror.workspace = true
 
 [dev-dependencies]
 near-crypto = "0.15.0"
@@ -60,3 +69,4 @@ tokio = "1.21.1"
 
 [target.'cfg(not(windows))'.dev-dependencies]
 workspaces = "0.7"
+workspaces-tests-utils = { path = "../workspaces-tests-utils" }
