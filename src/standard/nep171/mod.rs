@@ -134,6 +134,7 @@ pub enum Nep171TransferError {
 
 /// Internal (storage location) methods for implementors of [`Nep171Controller`].
 pub trait Nep171ControllerInternal {
+    /// Various lifecycle hooks for NEP-171 tokens.
     type Hook: Nep171Hook<Self>
     where
         Self: Sized;
@@ -161,6 +162,7 @@ pub trait Nep171ControllerInternal {
 
 /// Non-public controller interface for NEP-171 implementations.
 pub trait Nep171Controller {
+    /// Various lifecycle hooks for NEP-171 tokens.
     type Hook: Nep171Hook<Self>
     where
         Self: Sized;
@@ -175,7 +177,10 @@ pub trait Nep171Controller {
     where
         Self: Sized;
 
-    /// Transfer a token from `sender_id` to `receiver_id`. Checks that the transfer is valid using [`CheckExternalTransfer::check_external_transfer`] before performing the transfer.
+    /// Transfer a token from `sender_id` to `receiver_id`, as for an external
+    /// call to `nft_transfer`. Checks that the transfer is valid using
+    /// [`CheckExternalTransfer::check_external_transfer`] before performing
+    /// the transfer. Runs relevant hooks.
     fn external_transfer(&mut self, transfer: &Nep171Transfer) -> Result<(), Nep171TransferError>
     where
         Self: Sized;
@@ -184,7 +189,10 @@ pub trait Nep171Controller {
     ///
     /// # Warning
     ///
-    /// This function performs _no checks_. It is up to the caller to ensure that the transfer is valid. Possible unintended effects of invalid transfers include:
+    /// This function performs _no checks_. It is up to the caller to ensure
+    /// that the transfer is valid. Possible unintended effects of invalid
+    /// transfers include:
+    ///
     /// - Transferring a token "from" an account that does not own it.
     /// - Creating token IDs that did not previously exist.
     /// - Transferring a token to the account that already owns it.
@@ -197,7 +205,7 @@ pub trait Nep171Controller {
         memo: Option<String>,
     );
 
-    /// Mints a new token `token_id` to `owner_id`.
+    /// Mints a new token `token_id` to `owner_id`. Runs relevant hooks.
     fn mint(
         &mut self,
         token_ids: &[TokenId],
@@ -205,6 +213,8 @@ pub trait Nep171Controller {
         memo: Option<String>,
     ) -> Result<(), Nep171MintError>;
 
+    /// Mints a new token `token_id` to `owner_id` without checking if the
+    /// token already exists. Does not run hooks.
     fn mint_unchecked(
         &mut self,
         token_ids: &[TokenId],
@@ -212,7 +222,7 @@ pub trait Nep171Controller {
         memo: Option<String>,
     );
 
-    /// Burns tokens `token_ids` owned by `current_owner_id`.
+    /// Burns tokens `token_ids` owned by `current_owner_id`. Runs relevant hooks.
     fn burn(
         &mut self,
         token_ids: &[TokenId],
@@ -220,7 +230,7 @@ pub trait Nep171Controller {
         memo: Option<String>,
     ) -> Result<(), Nep171BurnError>;
 
-    /// Burns tokens `token_ids` without checking the owners.
+    /// Burns tokens `token_ids` without checking the owners. Does not run hooks.
     fn burn_unchecked(&mut self, token_ids: &[TokenId]) -> bool;
 
     /// Returns the owner of a token, if it exists.
@@ -261,7 +271,8 @@ pub enum Nep171TransferAuthorization {
 
 /// Different ways of checking if a transfer is valid.
 pub trait CheckExternalTransfer<C> {
-    /// Checks if a transfer is valid. Returns the account ID of the current owner of the token.
+    /// Checks if a transfer is valid. Returns the account ID of the current
+    /// owner of the token.
     fn check_external_transfer(
         contract: &C,
         transfer: &Nep171Transfer,
@@ -323,21 +334,24 @@ impl<T: Nep171Controller> CheckExternalTransfer<T> for DefaultCheckExternalTrans
 /// hooks. This may be useful for charging callers for storage usage, for
 /// example.
 pub trait Nep171Hook<C = Self> {
+    /// State value passed from `before_nft_transfer` to `after_nft_transfer`.
     type NftTransferState;
+    /// State value passed from `before_mint` to `after_mint`.
     type MintState;
+    /// State value passed from `before_burn` to `after_burn`.
     type BurnState;
 
     /// Executed before a token transfer is conducted.
     ///
     /// May return an optional state value which will be passed along to the
-    /// following `after_transfer`.
+    /// following `after_nft_transfer`.
     ///
     /// MUST NOT PANIC if the transfer is a revert.
     fn before_nft_transfer(contract: &C, transfer: &Nep171Transfer) -> Self::NftTransferState;
 
     /// Executed after a token transfer is conducted.
     ///
-    /// Receives the state value returned by `before_transfer`.
+    /// Receives the state value returned by `before_nft_transfer`.
     ///
     /// MUST NOT PANIC if the transfer is a revert.
     fn after_nft_transfer(
@@ -346,7 +360,9 @@ pub trait Nep171Hook<C = Self> {
         state: Self::NftTransferState,
     );
 
+    /// Executed before a token is minted.
     fn before_mint(contract: &C, token_ids: &[TokenId], owner_id: &AccountId) -> Self::MintState;
+    /// Executed after a token is minted.
     fn after_mint(
         contract: &mut C,
         token_ids: &[TokenId],
@@ -354,7 +370,9 @@ pub trait Nep171Hook<C = Self> {
         state: Self::MintState,
     );
 
+    /// Executed before a token is burned.
     fn before_burn(contract: &C, token_ids: &[TokenId], owner_id: &AccountId) -> Self::BurnState;
+    /// Executed after a token is burned.
     fn after_burn(
         contract: &mut C,
         token_ids: &[TokenId],
@@ -474,12 +492,22 @@ where
     }
 }
 
+/// Alternative to [`Nep171Hook`] for implementing NEP-171 hooks. Implementing
+/// the full [`Nep171Hook`] trait is sometimes inconvenient, so this trait
+/// provides a simpler interface. There is a blanket implementation of
+/// [`Nep171Hook`] for all types that implement this trait.
 pub trait SimpleNep171Hook {
+    /// Executed before a token is minted.
     fn before_mint(&self, _token_ids: &[TokenId], _owner_id: &AccountId) {}
+    /// Executed after a token is minted.
     fn after_mint(&mut self, _token_ids: &[TokenId], _owner_id: &AccountId) {}
+    /// Executed before a token transfer is conducted.
     fn before_nft_transfer(&self, _transfer: &Nep171Transfer) {}
+    /// Executed after a token transfer is conducted.
     fn after_nft_transfer(&mut self, _transfer: &Nep171Transfer) {}
+    /// Executed before a token is burned.
     fn before_burn(&self, _token_ids: &[TokenId], _owner_id: &AccountId) {}
+    /// Executed after a token is burned.
     fn after_burn(&mut self, _token_ids: &[TokenId], _owner_id: &AccountId) {}
 }
 

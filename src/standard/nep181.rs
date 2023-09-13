@@ -14,6 +14,7 @@ use crate::{slot::Slot, standard::nep171::*, DefaultStorageKey};
 
 pub use ext::*;
 
+/// Extension hook for [`Nep171Controller`].
 pub struct TokenEnumeration;
 
 impl<C: Nep171Controller + Nep181Controller> Nep171Hook<C> for TokenEnumeration {
@@ -24,9 +25,7 @@ impl<C: Nep171Controller + Nep181Controller> Nep171Hook<C> for TokenEnumeration 
     fn before_mint(_contract: &C, _token_ids: &[TokenId], _owner_id: &AccountId) {}
 
     fn after_mint(contract: &mut C, token_ids: &[TokenId], owner_id: &AccountId, _: ()) {
-        for token_id in token_ids {
-            contract.add_token_to_enumeration(token_id.clone(), owner_id);
-        }
+        contract.add_tokens_to_enumeration(token_ids, owner_id);
     }
 
     fn before_nft_transfer(_contract: &C, _transfer: &Nep171Transfer) {}
@@ -40,7 +39,7 @@ impl<C: Nep171Controller + Nep181Controller> Nep171Hook<C> for TokenEnumeration 
         };
 
         contract.transfer_token_enumeration(
-            transfer.token_id.clone(),
+            std::array::from_ref(transfer.token_id),
             owner_id.as_ref(),
             transfer.receiver_id,
         );
@@ -49,9 +48,7 @@ impl<C: Nep171Controller + Nep181Controller> Nep171Hook<C> for TokenEnumeration 
     fn before_burn(_contract: &C, _token_ids: &[TokenId], _owner_id: &AccountId) {}
 
     fn after_burn(contract: &mut C, token_ids: &[TokenId], owner_id: &AccountId, _: ()) {
-        for token_id in token_ids {
-            contract.remove_token_from_enumeration(token_id, owner_id);
-        }
+        contract.remove_tokens_from_enumeration(token_ids, owner_id);
     }
 }
 
@@ -68,10 +65,12 @@ pub trait Nep181ControllerInternal {
         Slot::root(DefaultStorageKey::Nep181)
     }
 
+    /// Storage slot for all tokens.
     fn slot_tokens() -> Slot<UnorderedSet<TokenId>> {
         Self::root().field(StorageKey::Tokens)
     }
 
+    /// Storage slot for tokens owned by an account.
     fn slot_owner_tokens(owner_id: &AccountId) -> Slot<UnorderedSet<TokenId>> {
         Self::root().field(StorageKey::OwnerTokens(owner_id))
     }
@@ -79,16 +78,45 @@ pub trait Nep181ControllerInternal {
 
 /// Functions for managing non-fungible tokens with attached metadata, NEP-181.
 pub trait Nep181Controller {
-    fn add_token_to_enumeration(&mut self, token_id: TokenId, owner_id: &AccountId); // TODO: token_id should be an array of TokenIds, same for other fns
-    fn remove_token_from_enumeration(&mut self, token_id: &TokenId, owner_id: &AccountId);
+    /// Add tokens to enumeration.
+    ///
+    /// # Warning
+    ///
+    /// Does not perform consistency checks. May cause inconsistent state if
+    /// the same token ID is added to the enumeration multiple times.
+    fn add_tokens_to_enumeration(&mut self, token_ids: &[TokenId], owner_id: &AccountId);
+
+    /// Remove tokens from enumeration.
+    ///
+    /// # Warning
+    ///
+    /// Does not perform consistency checks. May cause inconsistent state if
+    /// any of the token IDs are not currently enumerated (owned) by `owner_id`.
+    fn remove_tokens_from_enumeration(&mut self, token_ids: &[TokenId], owner_id: &AccountId);
+
+    /// Transfer tokens between owners.
+    ///
+    /// # Warning
+    ///
+    /// Does not perform consistency checks. May cause inconsistent state if
+    /// any of the token IDs are not currently enumerated (owned) by
+    /// `from_owner_id`, or have not previously been added to enumeration via
+    /// [`Nep181Controller::add_tokens_to_enumeration`].
     fn transfer_token_enumeration(
         &mut self,
-        token_id: TokenId,
+        token_ids: &[TokenId],
         from_owner_id: &AccountId,
         to_owner_id: &AccountId,
     );
+
+    /// Total number of tokens in enumeration.
     fn total_enumerated_tokens(&self) -> u128;
+
+    /// Execute a function with a reference to the set of all tokens.
     fn with_tokens<T>(&self, f: impl FnOnce(&UnorderedSet<TokenId>) -> T) -> T;
+
+    /// Execute a function with a reference to the set of tokens owned by an
+    /// account.
     fn with_tokens_for_owner<T>(
         &self,
         owner_id: &AccountId,
@@ -97,13 +125,13 @@ pub trait Nep181Controller {
 }
 
 impl<T: Nep181ControllerInternal + Nep171Controller> Nep181Controller for T {
-    fn add_token_to_enumeration(&mut self, token_id: TokenId, owner_id: &AccountId) {
+    fn add_tokens_to_enumeration(&mut self, token_ids: &[TokenId], owner_id: &AccountId) {
         let mut all_tokens_slot = Self::slot_tokens();
         let mut all_tokens = all_tokens_slot
             .read()
             .unwrap_or_else(|| UnorderedSet::new(StorageKey::Tokens));
 
-        all_tokens.insert(token_id.clone());
+        all_tokens.extend(token_ids.iter().cloned());
 
         all_tokens_slot.write(&all_tokens);
 
@@ -112,34 +140,40 @@ impl<T: Nep181ControllerInternal + Nep171Controller> Nep181Controller for T {
             .read()
             .unwrap_or_else(|| UnorderedSet::new(StorageKey::OwnerTokens(owner_id)));
 
-        owner_tokens.insert(token_id);
+        owner_tokens.extend(token_ids.iter().cloned());
 
         owner_tokens_slot.write(&owner_tokens);
     }
 
-    fn remove_token_from_enumeration(&mut self, token_id: &TokenId, owner_id: &AccountId) {
+    fn remove_tokens_from_enumeration(&mut self, token_ids: &[TokenId], owner_id: &AccountId) {
         let mut all_tokens_slot = Self::slot_tokens();
         if let Some(mut all_tokens) = all_tokens_slot.read() {
-            all_tokens.remove(token_id);
+            for token_id in token_ids {
+                all_tokens.remove(token_id);
+            }
             all_tokens_slot.write(&all_tokens);
         }
 
         let mut owner_tokens_slot = Self::slot_owner_tokens(owner_id);
         if let Some(mut owner_tokens) = owner_tokens_slot.read() {
-            owner_tokens.remove(token_id);
+            for token_id in token_ids {
+                owner_tokens.remove(token_id);
+            }
             owner_tokens_slot.write(&owner_tokens);
         }
     }
 
     fn transfer_token_enumeration(
         &mut self,
-        token_id: TokenId,
+        token_ids: &[TokenId],
         from_owner_id: &AccountId,
         to_owner_id: &AccountId,
     ) {
         let mut from_owner_tokens_slot = Self::slot_owner_tokens(from_owner_id);
         if let Some(mut from_owner_tokens) = from_owner_tokens_slot.read() {
-            from_owner_tokens.remove(&token_id);
+            for token_id in token_ids {
+                from_owner_tokens.remove(token_id);
+            }
             from_owner_tokens_slot.write(&from_owner_tokens);
         }
 
@@ -148,7 +182,7 @@ impl<T: Nep181ControllerInternal + Nep171Controller> Nep181Controller for T {
             .read()
             .unwrap_or_else(|| UnorderedSet::new(StorageKey::OwnerTokens(to_owner_id)));
 
-        to_owner_tokens.insert(token_id);
+        to_owner_tokens.extend(token_ids.iter().cloned());
 
         to_owner_tokens_slot.write(&to_owner_tokens);
     }
