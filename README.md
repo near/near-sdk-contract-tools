@@ -10,6 +10,7 @@ This package is a collection of common tools and patterns in NEAR smart contract
 - Pause (derive macro available)
 - Derive macro for [NEP-297 events](https://nomicon.io/Standards/EventsFormat)
 - Derive macro for [NEP-141](https://nomicon.io/Standards/Tokens/FungibleToken/Core) (and [NEP-148](https://nomicon.io/Standards/Tokens/FungibleToken/Metadata)) fungible tokens
+- Derive macro for [NEP-171](https://nomicon.io/Standards/NonFungibleToken/NonFungibleToken) non-fungible tokens, and extensions [NEP-177](https://nomicon.io/Standards/Tokens/NonFungibleToken/Metadata), [NEP-178](https://nomicon.io/Standards/Tokens/NonFungibleToken/ApprovalManagement), and [NEP-181](https://nomicon.io/Standards/Tokens/NonFungibleToken/Enumeration).
 
 Not to be confused with [`near-contract-standards`](https://crates.io/crates/near-contract-standards), which contains official implementations of standardized NEPs. This crate is intended to be a complement to `near-contract-standards`.
 

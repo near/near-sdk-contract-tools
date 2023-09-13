@@ -101,9 +101,6 @@ impl<T: BorshSerialize> Slot<T> {
 
     /// If the given value is `Some(T)`, writes `T` to storage. Otherwise,
     /// removes the key from storage.
-    ///
-    /// Use of this method makes the slot function similarly to
-    /// [`near_sdk::collections::LazyOption`].
     pub fn set(&mut self, value: Option<&T>) -> bool {
         match value {
             Some(value) => self.write(value),
