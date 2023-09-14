@@ -1,2 +1,2 @@
 [toolchain]
-channel = "1.66"
+channel = "1.69" # https://github.com/near/nearcore/issues/9143

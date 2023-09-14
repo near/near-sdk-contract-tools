@@ -5,6 +5,7 @@ use proc_macro::TokenStream;
 use syn::{parse_macro_input, AttributeArgs, DeriveInput, Item};
 
 mod approval;
+mod escrow;
 mod migrate;
 mod owner;
 mod pause;
@@ -110,7 +111,7 @@ pub fn derive_rbac(input: TokenStream) -> TokenStream {
 
 /// Adds NEP-141 fungible token core functionality to a contract. Exposes
 /// `ft_*` functions to the public blockchain, implements internal controller
-/// and receiver functionality (see: [`near_sdk_contract_tools::standard::nep141`]).
+/// and receiver functionality.
 ///
 /// The storage key prefix for the fields can be optionally specified (default:
 /// `"~$141"`) using `#[nep141(storage_key = "<expression>")]`.
@@ -145,6 +146,56 @@ pub fn derive_nep148(input: TokenStream) -> TokenStream {
 #[proc_macro_derive(FungibleToken, attributes(fungible_token))]
 pub fn derive_fungible_token(input: TokenStream) -> TokenStream {
     make_derive(input, standard::fungible_token::expand)
+}
+
+/// Adds NEP-171 non-fungible token core functionality to a contract. Exposes
+/// `nft_*` functions to the public blockchain, implements internal controller
+/// and receiver functionality.
+///
+/// The storage key prefix for the fields can be optionally specified (default:
+/// `"~$171"`) using `#[nep171(storage_key = "<expression>")]`.
+///
+/// Fields:
+/// - `no_hooks`: Flag. Removes the requirement for the contract to implement
+/// transfer hooks.
+/// - `token_data`: specify the token metadata loading extensions invoked by
+/// `nft_token`.
+#[proc_macro_derive(Nep171, attributes(nep171))]
+pub fn derive_nep171(input: TokenStream) -> TokenStream {
+    make_derive(input, standard::nep171::expand)
+}
+
+/// Adds NEP-177 non-fungible token metadata functionality to a contract.
+///
+/// The storage key prefix for the fields can be optionally specified (default:
+/// `"~$177"`) using `#[nep177(storage_key = "<expression>")]`.
+#[proc_macro_derive(Nep177, attributes(nep177))]
+pub fn derive_nep177(input: TokenStream) -> TokenStream {
+    make_derive(input, standard::nep177::expand)
+}
+
+/// Adds NEP-178 non-fungible token approvals functionality to a contract.
+///
+/// The storage key prefix for the fields can be optionally specified (default:
+/// `"~$178"`) using `#[nep178(storage_key = "<expression>")]`.
+#[proc_macro_derive(Nep178, attributes(nep178))]
+pub fn derive_nep178(input: TokenStream) -> TokenStream {
+    make_derive(input, standard::nep178::expand)
+}
+
+/// Adds NEP-181 non-fungible token enumeration functionality to a contract.
+///
+/// The storage key prefix for the fields can be optionally specified (default:
+/// `"~$181"`) using `#[nep181(storage_key = "<expression>")]`.
+#[proc_macro_derive(Nep181, attributes(nep181))]
+pub fn derive_nep181(input: TokenStream) -> TokenStream {
+    make_derive(input, standard::nep181::expand)
+}
+
+/// Implements all NFT functionality at once, like `#[derive(Nep171, Nep177, Nep178, Nep181)]`.
+#[proc_macro_derive(NonFungibleToken, attributes(non_fungible_token))]
+pub fn derive_non_fungible_token(input: TokenStream) -> TokenStream {
+    make_derive(input, standard::non_fungible_token::expand)
 }
 
 /// Migrate a contract's default struct from one schema to another.
@@ -213,4 +264,16 @@ pub fn event(attr: TokenStream, item: TokenStream) -> TokenStream {
 #[proc_macro_derive(Upgrade, attributes(upgrade))]
 pub fn derive_upgrade(input: TokenStream) -> TokenStream {
     make_derive(input, upgrade::expand)
+}
+
+/// Creates a managed, lazily-loaded `Escrow` implementation for the targeted
+/// `#[near_bindgen]` struct.
+///
+/// Fields include:
+///  - `id` - the type required for id, must be `borsh::BorshSerialize` & `serde::Serialize`, for events
+///  - `state` - the type required for id, must be `borsh::BorshSerialize` & `borsh::BorshSerialize`
+///  - `storage_key` Storage prefix for escrow data (optional, default: `b"~es"`)
+#[proc_macro_derive(Escrow, attributes(escrow))]
+pub fn derive_escrow(input: TokenStream) -> TokenStream {
+    make_derive(input, escrow::expand)
 }

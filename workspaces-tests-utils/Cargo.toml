@@ -1,0 +1,9 @@
+[package]
+name = "workspaces-tests-utils"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[target.'cfg(not(windows))'.dependencies]
+near-sdk.workspace = true
+workspaces = "0.7"

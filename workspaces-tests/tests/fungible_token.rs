@@ -13,7 +13,7 @@ async fn balance(contract: &Contract, account: &AccountId) -> u128 {
         .await
         .unwrap()
         .json::<U128>()
-        .map(|i| u128::from(i))
+        .map(u128::from)
         .unwrap()
 }
 
@@ -27,7 +27,7 @@ async fn setup(num_accounts: usize) -> Setup {
     let worker = workspaces::sandbox().await.unwrap();
 
     // Initialize contract
-    let contract = worker.dev_deploy(&WASM.to_vec()).await.unwrap();
+    let contract = worker.dev_deploy(WASM).await.unwrap();
     contract.call("new").transact().await.unwrap().unwrap();
 
     // Initialize user accounts
