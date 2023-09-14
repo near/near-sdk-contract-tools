@@ -1,5 +1,3 @@
-use std::ops::Not;
-
 use darling::{util::Flag, FromDeriveInput};
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -35,6 +33,11 @@ pub fn expand(meta: Nep178Meta) -> Result<TokenStream, darling::Error> {
 
     let (imp, ty, wher) = generics.split_for_impl();
 
+    let hook = no_hooks
+        .is_present()
+        .then(|| quote! { () })
+        .unwrap_or_else(|| quote! { Self });
+
     let root = storage_key.map(|storage_key| {
         quote! {
             fn root() -> #me::slot::Slot<()> {
@@ -43,44 +46,10 @@ pub fn expand(meta: Nep178Meta) -> Result<TokenStream, darling::Error> {
         }
     });
 
-    let before_nft_approve = no_hooks.is_present().not().then(|| {
-        quote! {
-            let hook_state = <Self as #me::standard::nep178::Nep178Hook::<_, _>>::before_nft_approve(&self, &token_id, &account_id);
-        }
-    });
-
-    let after_nft_approve = no_hooks.is_present().not().then(|| {
-        quote! {
-            <Self as #me::standard::nep178::Nep178Hook::<_, _>>::after_nft_approve(self, &token_id, &account_id, &approval_id, hook_state);
-        }
-    });
-
-    let before_nft_revoke = no_hooks.is_present().not().then(|| {
-        quote! {
-            let hook_state = <Self as #me::standard::nep178::Nep178Hook::<_, _>>::before_nft_revoke(&self, &token_id, &account_id);
-        }
-    });
-
-    let after_nft_revoke = no_hooks.is_present().not().then(|| {
-        quote! {
-            <Self as #me::standard::nep178::Nep178Hook::<_, _>>::after_nft_revoke(self, &token_id, &account_id, hook_state);
-        }
-    });
-
-    let before_nft_revoke_all = no_hooks.is_present().not().then(|| {
-        quote! {
-            let hook_state = <Self as #me::standard::nep178::Nep178Hook::<_, _>>::before_nft_revoke_all(&self, &token_id);
-        }
-    });
-
-    let after_nft_revoke_all = no_hooks.is_present().not().then(|| {
-        quote! {
-            <Self as #me::standard::nep178::Nep178Hook::<_, _>>::after_nft_revoke_all(self, &token_id, hook_state);
-        }
-    });
-
     Ok(quote! {
         impl #imp #me::standard::nep178::Nep178ControllerInternal for #ident #ty #wher {
+            type Hook = #hook;
+
             #root
         }
 
@@ -97,8 +66,6 @@ pub fn expand(meta: Nep178Meta) -> Result<TokenStream, darling::Error> {
 
                 let predecessor = #near_sdk::env::predecessor_account_id();
 
-                #before_nft_approve
-
                 let approval_id = #me::standard::nep178::Nep178Controller::approve(
                     self,
                     &token_id,
@@ -106,8 +73,6 @@ pub fn expand(meta: Nep178Meta) -> Result<TokenStream, darling::Error> {
                     &account_id,
                 )
                 .unwrap_or_else(|e| #near_sdk::env::panic_str(&e.to_string()));
-
-                #after_nft_approve
 
                 msg.map_or(#near_sdk::PromiseOrValue::Value(()), |msg| {
                     #me::standard::nep178::ext_nep178_receiver::ext(account_id)
@@ -126,8 +91,6 @@ pub fn expand(meta: Nep178Meta) -> Result<TokenStream, darling::Error> {
 
                 let predecessor = #near_sdk::env::predecessor_account_id();
 
-                #before_nft_revoke
-
                 #me::standard::nep178::Nep178Controller::revoke(
                     self,
                     &token_id,
@@ -135,8 +98,6 @@ pub fn expand(meta: Nep178Meta) -> Result<TokenStream, darling::Error> {
                     &account_id,
                 )
                 .unwrap_or_else(|e| #near_sdk::env::panic_str(&e.to_string()));
-
-                #after_nft_revoke
             }
 
             #[payable]
@@ -145,16 +106,12 @@ pub fn expand(meta: Nep178Meta) -> Result<TokenStream, darling::Error> {
 
                 let predecessor = #near_sdk::env::predecessor_account_id();
 
-                #before_nft_revoke_all
-
                 #me::standard::nep178::Nep178Controller::revoke_all(
                     self,
                     &token_id,
                     &predecessor,
                 )
                 .unwrap_or_else(|e| #near_sdk::env::panic_str(&e.to_string()));
-
-                #after_nft_revoke_all
             }
 
             fn nft_is_approved(
