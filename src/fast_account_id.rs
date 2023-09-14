@@ -5,6 +5,19 @@ use std::{ops::Deref, rc::Rc, str::FromStr};
 
 use near_sdk::borsh::{BorshDeserialize, BorshSerialize};
 
+static ALPHABET: &[u8; 39] = b".abcdefghijklmnopqrstuvwxyz0123456789-_";
+
+const fn char_index(c: u8) -> Option<usize> {
+    match c {
+        b'.' => Some(0),
+        b'a'..=b'z' => Some((1 + c - b'a') as usize),
+        b'0'..=b'9' => Some((27 + c - b'0') as usize),
+        b'-' => Some(37),
+        b'_' => Some(38),
+        _ => None,
+    }
+}
+
 /// An alternative to `near_sdk::AccountId` that is faster to use, and has a
 /// smaller Borsh serialization footprint.
 ///
@@ -88,12 +101,6 @@ impl BorshDeserialize for FastAccountId {
     }
 }
 
-static ALPHABET: &[u8; 39] = b".abcdefghijklmnopqrstuvwxyz0123456789-_";
-
-fn char_index(c: u8) -> Option<usize> {
-    ALPHABET.iter().position(|&x| x == c)
-}
-
 fn append_sub_byte(v: &mut [u8], start_bit: usize, sub_byte: u8, num_bits: usize) {
     assert!(num_bits <= 8);
 
@@ -145,7 +152,7 @@ fn decompress_account_id(compressed: &[u8], len: usize) -> String {
     s
 }
 
-fn compressed_size(len: usize) -> usize {
+const fn compressed_size(len: usize) -> usize {
     len * 3 / 4 + (len * 3 % 4 > 0) as usize
 }
 
@@ -165,6 +172,16 @@ fn compress_account_id(account_id: &str) -> Option<Vec<u8>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_char_index() {
+        // because char_index() is implemented using a match so that it is const
+        for c in ALPHABET {
+            assert_eq!(char_index(*c), ALPHABET.iter().position(|d| d == c));
+        }
+
+        assert!(char_index(b'A').is_none());
+    }
 
     #[test]
     fn test_append_sub_byte() {
@@ -208,5 +225,28 @@ mod tests {
 
         let sdk_serialized = sdk_account_id.try_to_vec().unwrap();
         assert!(sdk_serialized.len() > serialized.len()); // gottem
+    }
+
+    #[test]
+    fn various_serializations() {
+        let tests = [
+            "",
+            "1",
+            "a",
+            "abcdef",
+            "a.b.c.d",
+            "root.near",
+            "system",
+            "near",
+            "a_b-cdefghijklmnopqrstuvwxy.z0123456789",
+            "0000000000000000000000000000000000000000000000000000000000000000",
+        ];
+
+        for test in tests {
+            let account_id = FastAccountId::new_unchecked(test);
+            let serialized = account_id.try_to_vec().unwrap();
+            let deserializalized = FastAccountId::try_from_slice(&serialized).unwrap();
+            assert_eq!(account_id, deserializalized);
+        }
     }
 }
