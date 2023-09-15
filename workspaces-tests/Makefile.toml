@@ -2,7 +2,7 @@
 clear = true
 script = """
 rustup target add wasm32-unknown-unknown
-cargo build --target wasm32-unknown-unknown --release --all
+cargo build --package workspaces-tests --target wasm32-unknown-unknown --release
 """
 
 [tasks.test]

@@ -37,7 +37,7 @@ async fn setup(num_accounts: usize, wasm: &[u8]) -> Setup {
 
     let alice = &accounts[0].clone();
 
-    let contract = alice.deploy(&wasm.to_vec()).await.unwrap().unwrap();
+    let contract = alice.deploy(wasm).await.unwrap().unwrap();
     contract.call("new").transact().await.unwrap().unwrap();
 
     Setup { contract, accounts }
@@ -204,10 +204,10 @@ async fn happy() {
     );
     assert_eq!(
         members_b,
-        [alice_str.clone(), bob_str.clone(), charlie_str.clone()].into(),
+        [alice_str.clone(), bob_str.clone(), charlie_str].into(),
     );
     assert_eq!(members_g, [alice_str.clone(), bob_str.clone()].into());
-    assert_eq!(members_d, [alice_str.clone(), bob_str.clone()].into());
+    assert_eq!(members_d, [alice_str, bob_str].into());
 }
 
 #[tokio::test]

@@ -78,6 +78,14 @@ pub fn apply_storage_fee_and_refund(
     }
 }
 
+/// Asserts that the attached deposit is greater than zero.
+pub fn assert_nonzero_deposit() {
+    require!(
+        env::attached_deposit() > 0,
+        "Attached deposit must be greater than zero"
+    );
+}
+
 #[cfg(test)]
 mod tests {
     use super::prefix_key;

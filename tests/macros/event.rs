@@ -46,6 +46,7 @@ mod test_events {
 
     #[derive(Nep297, Serialize)]
     #[nep297(standard = "enum-event", version = "1.0.0", rename_all = "snake_case")]
+    #[allow(clippy::enum_variant_names)]
     pub enum EnumEventRenameAll {
         VariantOne,
         #[nep297(rename = "lowerCamelCase")]
