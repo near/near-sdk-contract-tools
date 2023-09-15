@@ -3,15 +3,18 @@
 
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
-    env, ext_contract,
+    env,
     json_types::U128,
     serde::{Deserialize, Serialize},
-    AccountId, BorshStorageKey, Promise,
+    AccountId, BorshStorageKey,
 };
-use thiserror::Error;
 
 use crate::{slot::Slot, DefaultStorageKey};
 
+pub mod error;
+use error::*;
+
+mod ext;
 pub use ext::*;
 
 const PANIC_MESSAGE_STORAGE_TOTAL_OVERFLOW: &str = "storage total balance overflow";
@@ -23,8 +26,11 @@ const PANIC_MESSAGE_INCONSISTENT_STATE_AVAILABLE: &str =
 #[derive(Serialize, Deserialize, BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(crate = "near_sdk::serde")]
 pub struct StorageBalance {
-    total: U128,
-    available: U128,
+    /// The total amount of storage balance.
+    pub total: U128,
+
+    /// The amount of storage balance that is available for use.
+    pub available: U128,
 }
 
 impl Default for StorageBalance {
@@ -40,8 +46,11 @@ impl Default for StorageBalance {
 #[derive(Serialize, Deserialize, BorshSerialize, BorshDeserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(crate = "near_sdk::serde")]
 pub struct StorageBalanceBounds {
-    min: U128,
-    max: Option<U128>,
+    /// The minimum storage balance.
+    pub min: U128,
+
+    /// The maximum storage balance.
+    pub max: Option<U128>,
 }
 
 impl Default for StorageBalanceBounds {
@@ -80,117 +89,6 @@ pub trait Nep145ControllerInternal {
     fn slot_account(account_id: &AccountId) -> Slot<StorageBalance> {
         Slot::new(StorageKey::Account(account_id))
     }
-}
-
-/// Occurs when an account has insufficient storage balance to perform an operation.
-#[derive(Debug, Error)]
-#[error(
-    "Account {account_id} has insufficient balance: {} available, but attempted to lock {}", available.0, attempted_to_lock.0
-)]
-pub struct InsufficientBalanceError {
-    account_id: AccountId,
-    available: U128,
-    attempted_to_lock: U128,
-}
-
-/// Occurs when an account is not registered.
-#[derive(Debug, Error)]
-#[error("Account {0} is not registered")]
-pub struct AccountNotRegisteredError(AccountId);
-
-/// Occurs when an account attempts to unlock more tokens than it has deposited.
-#[derive(Debug, Error)]
-#[error("Account {0} cannot unlock more tokens than it has deposited")]
-pub struct ExcessiveUnlockError(AccountId);
-
-/// Occurs when an account attempts to withdraw more tokens than the contract
-/// allows without unregistering.
-#[derive(Debug, Error)]
-#[error("Account {account_id} must cover the minimum balance {}", minimum_balance.0)]
-pub struct MinimumBalanceUnderrunError {
-    account_id: AccountId,
-    minimum_balance: U128,
-}
-
-/// Occurs when an account attempts to deposit more tokens than the contract
-/// allows.
-#[derive(Debug, Error)]
-#[error("Account {account_id} must not exceed the maximum balance {}", maximum_balance.0)]
-pub struct MaximumBalanceOverrunError {
-    account_id: AccountId,
-    maximum_balance: U128,
-}
-
-/// Occurs when an account attempts to unregister with a locked balance.
-#[derive(Debug, Error)]
-#[error("Account {account_id} cannot unregister with locked balance {} > 0", locked_balance.0)]
-pub struct UnregisterWithLockedBalanceError {
-    account_id: AccountId,
-    locked_balance: U128,
-}
-
-/// Errors that can occur when locking storage balance.
-#[derive(Debug, Error)]
-pub enum StorageLockError {
-    /// The account is not registered.
-    #[error(transparent)]
-    AccountNotRegistered(#[from] AccountNotRegisteredError),
-    /// The account has insufficient balance.
-    #[error(transparent)]
-    InsufficientBalance(#[from] InsufficientBalanceError),
-}
-
-/// Errors that can occur when unlocking storage balance.
-#[derive(Debug, Error)]
-pub enum StorageUnlockError {
-    /// The account is not registered.
-    #[error(transparent)]
-    AccountNotRegistered(#[from] AccountNotRegisteredError),
-    /// The account tried to unlock more tokens than it has deposited.
-    #[error(transparent)]
-    ExcessiveUnlock(#[from] ExcessiveUnlockError),
-}
-
-/// Errors that can occur when depositing storage balance.
-#[derive(Debug, Error)]
-pub enum StorageDepositError {
-    /// The deposit does not meet the minimum balance requirement.
-    #[error(transparent)]
-    MinimumBalanceUnderrun(#[from] MinimumBalanceUnderrunError),
-    /// The deposit exceeds the maximum balance limit.
-    #[error(transparent)]
-    MaximumBalanceOverrunError(#[from] MaximumBalanceOverrunError),
-}
-
-/// Errors that can occur when withdrawing storage balance.
-#[derive(Debug, Error)]
-pub enum StorageWithdrawError {
-    /// The account is not registered.
-    #[error(transparent)]
-    AccountNotRegistered(#[from] AccountNotRegisteredError),
-    /// The withdrawal does not meet the minimum balance requirement.
-    #[error(transparent)]
-    MinimumBalanceUnderrun(#[from] MinimumBalanceUnderrunError),
-}
-
-/// Errors that can occur when unregistering storage balance.
-#[derive(Debug, Error)]
-pub enum StorageUnregisterError {
-    /// The account is not registered.
-    #[error(transparent)]
-    AccountNotRegistered(#[from] AccountNotRegisteredError),
-    /// The account has a locked balance (is still using storage somewhere),
-    /// and cannot be unregistered.
-    #[error(transparent)]
-    UnregisterWithLockedBalance(#[from] UnregisterWithLockedBalanceError),
-}
-
-/// Errors that can occur when force unregistering storage balance.
-#[derive(Debug, Error)]
-pub enum StorageForceUnregisterError {
-    /// The account is not registered.
-    #[error(transparent)]
-    AccountNotRegistered(#[from] AccountNotRegisteredError),
 }
 
 /// NEP-145 Storage Management controller interface. These functions are not directly
@@ -248,6 +146,9 @@ pub trait Nep145Controller {
 
     /// Returns the storage balance bounds for the contract.
     fn storage_balance_bounds(&self) -> StorageBalanceBounds;
+
+    /// Sets the storage balance bounds for the contract.
+    fn set_storage_balance_bounds(&mut self, bounds: &StorageBalanceBounds);
 }
 
 impl<T: Nep145ControllerInternal> Nep145Controller for T {
@@ -353,6 +254,8 @@ impl<T: Nep145ControllerInternal> Nep145Controller for T {
             new_total
         };
 
+        balance.available.0 += amount.0;
+
         account_slot.write(&balance);
 
         Ok(balance)
@@ -433,6 +336,10 @@ impl<T: Nep145ControllerInternal> Nep145Controller for T {
     fn storage_balance_bounds(&self) -> StorageBalanceBounds {
         Self::slot_balance_bounds().read().unwrap_or_default()
     }
+
+    fn set_storage_balance_bounds(&mut self, bounds: &StorageBalanceBounds) {
+        Self::slot_balance_bounds().write(bounds);
+    }
 }
 
 /// NEP-145 lifecycle hook.
@@ -459,144 +366,5 @@ where
     fn after_force_unregister(contract: &mut C, account_id: &AccountId, balance: &StorageBalance) {
         T::after_force_unregister(contract, account_id, balance);
         U::after_force_unregister(contract, account_id, balance);
-    }
-}
-
-// #[near_sdk::near_bindgen]
-struct Contract {}
-
-impl Nep145ControllerInternal for Contract {
-    type Hook = Self;
-}
-
-impl Nep145Hook for Contract {
-    fn after_force_unregister(
-        contract: &mut Self,
-        account_id: &AccountId,
-        balance: &StorageBalance,
-    ) {
-        near_sdk::log!("Force unregister");
-    }
-}
-
-// #[near_sdk::near_bindgen]
-impl Nep145 for Contract {
-    // #[payable]
-    fn storage_deposit(
-        &mut self,
-        account_id: Option<AccountId>,
-        registration_only: Option<bool>,
-    ) -> StorageBalance {
-        let bounds = Nep145Controller::storage_balance_bounds(self);
-
-        let attached = env::attached_deposit();
-        let amount = if registration_only.unwrap_or(false) {
-            bounds.min.0
-        } else if let Some(U128(max)) = bounds.max {
-            u128::min(max, attached)
-        } else {
-            attached
-        };
-        let refund = attached.checked_sub(amount).unwrap_or_else(|| {
-            env::panic_str(&format!(
-                "Attached deposit {} is less than required {}",
-                attached, amount
-            ))
-        });
-        let predecessor = env::predecessor_account_id();
-
-        let storage_balance = Nep145Controller::storage_deposit(
-            self,
-            &account_id.unwrap_or_else(|| predecessor.clone()),
-            U128(amount),
-        )
-        .unwrap_or_else(|e| env::panic_str(&format!("Storage deposit error: {e}")));
-
-        if refund > 0 {
-            Promise::new(predecessor).transfer(amount);
-        }
-
-        storage_balance
-    }
-
-    // #[payable]
-    fn storage_withdraw(&mut self, amount: Option<U128>) -> StorageBalance {
-        near_sdk::assert_one_yocto();
-
-        let predecessor = env::predecessor_account_id();
-
-        let balance = Nep145Controller::storage_balance(self, &predecessor)
-            .unwrap_or_else(|| env::panic_str("Account is not registered"));
-
-        let amount = amount.unwrap_or(balance.available);
-
-        if amount.0 == 0 {
-            return balance;
-        }
-
-        let new_balance = Nep145Controller::storage_withdraw(self, &predecessor, amount)
-            .unwrap_or_else(|e| env::panic_str(&format!("Storage withdraw error: {e}")));
-
-        Promise::new(predecessor).transfer(amount.0);
-
-        new_balance
-    }
-
-    fn storage_unregister(&mut self, force: Option<bool>) -> bool {
-        near_sdk::assert_one_yocto();
-
-        let predecessor = env::predecessor_account_id();
-
-        let refund = if force.unwrap_or(false) {
-            match Nep145Controller::storage_force_unregister(self, &predecessor) {
-                Ok(refund) => refund,
-                Err(StorageForceUnregisterError::AccountNotRegistered(_)) => return false,
-            }
-        } else {
-            match Nep145Controller::storage_unregister(self, &predecessor) {
-                Ok(refund) => refund,
-                Err(StorageUnregisterError::UnregisterWithLockedBalance(e)) => {
-                    env::panic_str(&format!(
-                        "Attempt to unregister from storage with locked balance: {e}"
-                    ));
-                }
-                Err(StorageUnregisterError::AccountNotRegistered(_)) => return false,
-            }
-        };
-
-        Promise::new(predecessor).transfer(refund.0);
-        true
-    }
-
-    fn storage_balance_of(&self, account_id: AccountId) -> Option<StorageBalance> {
-        Nep145Controller::storage_balance(self, &account_id)
-    }
-
-    fn storage_balance_bounds(&self) -> StorageBalanceBounds {
-        Nep145Controller::storage_balance_bounds(self)
-    }
-}
-
-mod ext {
-    #![allow(missing_docs)] // ext_contract doesn't play nice with #![warn(missing_docs)]
-
-    use super::{StorageBalance, StorageBalanceBounds};
-    use near_sdk::{ext_contract, json_types::U128, AccountId};
-
-    #[ext_contract(ext_nep145)]
-    pub trait Nep145 {
-        fn storage_deposit(
-            &mut self,
-            account_id: Option<AccountId>,
-            registration_only: Option<bool>,
-        ) -> StorageBalance;
-
-        fn storage_withdraw(&mut self, amount: Option<U128>) -> StorageBalance;
-
-        fn storage_unregister(&mut self, force: Option<bool>) -> bool;
-
-        fn storage_balance_of(&self, account_id: AccountId) -> Option<StorageBalance>;
-
-        fn storage_balance_bounds(&self) -> StorageBalanceBounds;
     }
 }

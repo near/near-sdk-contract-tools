@@ -1,5 +1,3 @@
-use std::ops::Not;
-
 use darling::{util::Flag, FromDeriveInput};
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -41,119 +39,122 @@ pub fn expand(meta: Nep145Meta) -> Result<TokenStream, darling::Error> {
         }
     });
 
-    let before_transfer = no_hooks.is_present().not().then(|| {
-        quote! {
-            <Self as #me::standard::nep145::Nep145Hook>::on_force_unregister(self, &account_id, &storage_balance);
-        }
-    });
+    let hook = no_hooks
+        .is_present()
+        .then(|| quote! { () })
+        .unwrap_or_else(|| quote! { Self });
 
     Ok(quote! {
         impl #imp #me::standard::nep145::Nep145ControllerInternal for #ident #ty #wher {
+            type Hook = #hook;
+
             #root
         }
 
         #[#near_sdk::near_bindgen]
         impl #imp #me::standard::nep145::Nep145 for #ident #ty #wher {
             #[payable]
-            fn ft_transfer(
+            fn storage_deposit(
                 &mut self,
-                receiver_id: #near_sdk::AccountId,
-                amount: #near_sdk::json_types::U128,
-                memo: Option<String>,
-            ) {
-                use #me::{
-                    standard::{
-                        nep145::{Nep145Controller, event},
-                        nep297::Event,
-                    },
+                account_id: Option<#near_sdk::AccountId>,
+                registration_only: Option<bool>,
+            ) -> #me::standard::nep145::StorageBalance {
+                use #me::standard::nep145::*;
+                use #near_sdk::{env, json_types::U128, Promise};
+
+                let bounds = Nep145Controller::storage_balance_bounds(self);
+
+                let attached = env::attached_deposit();
+                let amount = if registration_only.unwrap_or(false) {
+                    bounds.min.0
+                } else if let Some(U128(max)) = bounds.max {
+                    u128::min(max, attached)
+                } else {
+                    attached
                 };
+                let refund = attached.checked_sub(amount).unwrap_or_else(|| {
+                    env::panic_str(&format!(
+                        "Attached deposit {} is less than required {}",
+                        attached, amount,
+                    ))
+                });
+                let predecessor = env::predecessor_account_id();
 
-                #near_sdk::assert_one_yocto();
-                let sender_id = #near_sdk::env::predecessor_account_id();
-                let amount: u128 = amount.into();
-
-                let transfer = #me::standard::nep145::Nep145Transfer {
-                    sender_id: sender_id.clone(),
-                    receiver_id: receiver_id.clone(),
-                    amount,
-                    memo: memo.clone(),
-                    msg: None,
-                };
-
-                #before_transfer
-
-                Nep145Controller::transfer(
+                let storage_balance = Nep145Controller::storage_deposit(
                     self,
-                    sender_id.clone(),
-                    receiver_id.clone(),
-                    amount,
-                    memo,
-                );
+                    &account_id.unwrap_or_else(|| predecessor.clone()),
+                    U128(amount),
+                )
+                .unwrap_or_else(|e| env::panic_str(&format!("Storage deposit error: {}", e)));
 
-                #after_transfer
+                if refund > 0 {
+                    Promise::new(predecessor).transfer(amount);
+                }
+
+                storage_balance
             }
 
             #[payable]
-            fn ft_transfer_call(
-                &mut self,
-                receiver_id: #near_sdk::AccountId,
-                amount: #near_sdk::json_types::U128,
-                memo: Option<String>,
-                msg: String,
-            ) -> #near_sdk::Promise {
-                #near_sdk::assert_one_yocto();
-                let sender_id = #near_sdk::env::predecessor_account_id();
-                let amount: u128 = amount.into();
+            fn storage_withdraw(&mut self, amount: Option<#near_sdk::json_types::U128>) -> #me::standard::nep145::StorageBalance {
+                use #me::standard::nep145::*;
+                use #near_sdk::{env, json_types::U128, Promise};
 
-                let transfer = #me::standard::nep145::Nep145Transfer {
-                    sender_id: sender_id.clone(),
-                    receiver_id: receiver_id.clone(),
-                    amount,
-                    memo: memo.clone(),
-                    msg: None,
+                near_sdk::assert_one_yocto();
+
+                let predecessor = env::predecessor_account_id();
+
+                let balance = Nep145Controller::storage_balance(self, &predecessor)
+                    .unwrap_or_else(|| env::panic_str("Account is not registered"));
+
+                let amount = amount.unwrap_or(balance.available);
+
+                if amount.0 == 0 {
+                    return balance;
+                }
+
+                let new_balance = Nep145Controller::storage_withdraw(self, &predecessor, amount)
+                    .unwrap_or_else(|e| env::panic_str(&format!("Storage withdraw error: {}", e)));
+
+                Promise::new(predecessor).transfer(amount.0);
+
+                new_balance
+            }
+
+            fn storage_unregister(&mut self, force: Option<bool>) -> bool {
+                use #me::standard::nep145::*;
+                use #near_sdk::{env, Promise};
+
+                near_sdk::assert_one_yocto();
+
+                let predecessor = env::predecessor_account_id();
+
+                let refund = if force.unwrap_or(false) {
+                    match Nep145Controller::storage_force_unregister(self, &predecessor) {
+                        Ok(refund) => refund,
+                        Err(error::StorageForceUnregisterError::AccountNotRegistered(_)) => return false,
+                    }
+                } else {
+                    match Nep145Controller::storage_unregister(self, &predecessor) {
+                        Ok(refund) => refund,
+                        Err(error::StorageUnregisterError::UnregisterWithLockedBalance(e)) => {
+                            env::panic_str(&format!(
+                                "Attempt to unregister from storage with locked balance: {}", e
+                            ));
+                        }
+                        Err(error::StorageUnregisterError::AccountNotRegistered(_)) => return false,
+                    }
                 };
 
-                #before_transfer
-
-                let r = #me::standard::nep145::Nep145Controller::transfer_call(
-                    self,
-                    sender_id.clone(),
-                    receiver_id.clone(),
-                    amount,
-                    memo,
-                    msg.clone(),
-                    #near_sdk::env::prepaid_gas(),
-                );
-
-                #after_transfer
-
-                r
+                Promise::new(predecessor).transfer(refund.0);
+                true
             }
 
-            fn ft_total_supply(&self) -> #near_sdk::json_types::U128 {
-                <Self as #me::standard::nep145::Nep145Controller>::total_supply().into()
+            fn storage_balance_of(&self, account_id: #near_sdk::AccountId) -> Option<#me::standard::nep145::StorageBalance> {
+                #me::standard::nep145::Nep145Controller::storage_balance(self, &account_id)
             }
 
-            fn ft_balance_of(&self, account_id: #near_sdk::AccountId) -> #near_sdk::json_types::U128 {
-                <Self as #me::standard::nep145::Nep145Controller>::balance_of(&account_id).into()
-            }
-        }
-
-        #[#near_sdk::near_bindgen]
-        impl #imp #me::standard::nep145::Nep145Resolver for #ident #ty #wher {
-            #[private]
-            fn ft_resolve_transfer(
-                &mut self,
-                sender_id: #near_sdk::AccountId,
-                receiver_id: #near_sdk::AccountId,
-                amount: #near_sdk::json_types::U128,
-            ) -> #near_sdk::json_types::U128 {
-                #me::standard::nep145::Nep145Controller::resolve_transfer(
-                    self,
-                    sender_id,
-                    receiver_id,
-                    amount.into(),
-                ).into()
+            fn storage_balance_bounds(&self) -> #me::standard::nep145::StorageBalanceBounds {
+                #me::standard::nep145::Nep145Controller::storage_balance_bounds(self)
             }
         }
     })
