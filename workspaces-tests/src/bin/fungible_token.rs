@@ -12,7 +12,7 @@ use near_sdk::{
 use near_sdk_contract_tools::{standard::nep141::*, FungibleToken};
 
 #[derive(PanicOnDefault, BorshSerialize, BorshDeserialize, FungibleToken)]
-#[fungible_token(name = "My Fungible Token", symbol = "MYFT", decimals = 18, no_hooks)]
+#[fungible_token(name = "My Fungible Token", symbol = "MYFT", decimals = 24, no_hooks)]
 #[near_bindgen]
 pub struct Contract {}
 

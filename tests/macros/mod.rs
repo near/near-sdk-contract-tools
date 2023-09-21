@@ -412,19 +412,31 @@ mod pausable_fungible_token {
         pub storage_usage_start: u64,
     }
 
-    impl Nep141Hook<HookState> for Contract {
-        fn before_transfer(&mut self, _transfer: &Nep141Transfer) -> HookState {
+    impl Nep141Hook for Contract {
+        type MintState = ();
+        type TransferState = HookState;
+        type BurnState = ();
+
+        fn before_mint(_contract: &Self, _amount: u128, _account_id: &AccountId) {}
+
+        fn after_mint(_contract: &mut Self, _amount: u128, _account_id: &AccountId, _: ()) {}
+
+        fn before_burn(_contract: &Self, _amount: u128, _account_id: &AccountId) {}
+
+        fn after_burn(_contract: &mut Self, _amount: u128, _account_id: &AccountId, _: ()) {}
+
+        fn before_transfer(_contract: &Self, _transfer: &Nep141Transfer) -> HookState {
             Contract::require_unpaused();
             HookState {
                 storage_usage_start: env::storage_usage(),
             }
         }
 
-        fn after_transfer(&mut self, _transfer: &Nep141Transfer, state: HookState) {
+        fn after_transfer(contract: &mut Self, _transfer: &Nep141Transfer, state: HookState) {
             let storage_delta = env::storage_usage() - state.storage_usage_start;
-            println!("Storage delta: {storage_delta}",);
+            println!("Storage delta: {storage_delta}");
 
-            self.storage_usage = storage_delta;
+            contract.storage_usage = storage_delta;
         }
     }
 

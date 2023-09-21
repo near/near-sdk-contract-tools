@@ -21,18 +21,28 @@ struct HookState {
     pub storage_usage_start: u64,
 }
 
-impl Nep141Hook<HookState> for FungibleToken {
-    fn before_transfer(&mut self, transfer: &Nep141Transfer) -> HookState {
-        self.transfers.push(transfer);
-        self.hooks.push(&"before_transfer".to_string());
+impl Nep141Hook for FungibleToken {
+    type MintState = ();
+    type TransferState = HookState;
+    type BurnState = ();
 
+    fn before_mint(_contract: &Self, _amount: u128, _account_id: &AccountId) {}
+
+    fn after_mint(_contract: &mut Self, _amount: u128, _account_id: &AccountId, _: ()) {}
+
+    fn before_burn(_contract: &Self, _amount: u128, _account_id: &AccountId) {}
+
+    fn after_burn(_contract: &mut Self, _amount: u128, _account_id: &AccountId, _: ()) {}
+
+    fn before_transfer(_: &Self, _transfer: &Nep141Transfer) -> HookState {
         HookState {
             storage_usage_start: env::storage_usage(),
         }
     }
 
-    fn after_transfer(&mut self, _transfer: &Nep141Transfer, state: HookState) {
-        self.hooks.push(&"after_transfer".to_string());
+    fn after_transfer(contract: &mut Self, transfer: &Nep141Transfer, state: HookState) {
+        contract.hooks.push(&"after_transfer".to_string());
+        contract.transfers.push(transfer);
         println!(
             "Storage delta: {}",
             env::storage_usage() - state.storage_usage_start
@@ -105,10 +115,11 @@ fn nep141_transfer() {
             amount: 50,
             memo: None,
             msg: None,
+            revert: false,
         })
     );
 
-    let expected_hook_execution_order = vec!["before_transfer", "after_transfer"];
+    let expected_hook_execution_order = vec!["after_transfer"];
     let actual_hook_execution_order = ft.hooks.to_vec();
     assert_eq!(expected_hook_execution_order, actual_hook_execution_order);
 
