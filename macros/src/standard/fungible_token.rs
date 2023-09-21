@@ -42,6 +42,7 @@ pub fn expand(meta: FungibleTokenMeta) -> Result<TokenStream, darling::Error> {
     let expand_nep141 = nep141::expand(nep141::Nep141Meta {
         storage_key: core_storage_key,
         no_hooks,
+        extension_hooks: None,
 
         generics: generics.clone(),
         ident: ident.clone(),

@@ -8,6 +8,7 @@ use syn::Expr;
 pub struct Nep141Meta {
     pub storage_key: Option<Expr>,
     pub no_hooks: Flag,
+    pub extension_hooks: Option<syn::Type>,
     pub generics: syn::Generics,
     pub ident: syn::Ident,
 
@@ -22,6 +23,7 @@ pub fn expand(meta: Nep141Meta) -> Result<TokenStream, darling::Error> {
     let Nep141Meta {
         storage_key,
         no_hooks,
+        extension_hooks,
         generics,
         ident,
 
@@ -39,10 +41,16 @@ pub fn expand(meta: Nep141Meta) -> Result<TokenStream, darling::Error> {
         }
     });
 
-    let hook = if no_hooks.is_present() {
+    let self_hook = if no_hooks.is_present() {
         quote! { () }
     } else {
         quote! { Self }
+    };
+
+    let hook = if let Some(extension_hooks) = extension_hooks {
+        quote! { (#self_hook, #extension_hooks) }
+    } else {
+        self_hook
     };
 
     Ok(quote! {
