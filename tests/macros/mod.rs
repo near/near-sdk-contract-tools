@@ -4,8 +4,8 @@ use near_sdk::{
     test_utils::VMContextBuilder,
     testing_env, AccountId, BorshStorageKey,
 };
-use near_sdk_contract_tools::escrow::Escrow;
 use near_sdk_contract_tools::{
+    escrow::Escrow,
     migrate::{MigrateExternal, MigrateHook},
     owner::Owner,
     pause::Pause,
@@ -396,15 +396,30 @@ mod pausable_fungible_token {
     };
     use near_sdk_contract_tools::{
         pause::Pause,
-        standard::nep141::{Nep141, Nep141Controller, Nep141Hook, Nep141Transfer},
+        standard::{nep141::*, nep148::*},
         FungibleToken, Pause,
     };
 
     #[derive(FungibleToken, Pause, BorshDeserialize, BorshSerialize)]
-    #[fungible_token(name = "Pausable Fungible Token", symbol = "PFT", decimals = 18)]
     #[near_bindgen]
     struct Contract {
         pub storage_usage: u64,
+    }
+
+    #[near_bindgen]
+    impl Contract {
+        #[init]
+        pub fn new() -> Self {
+            let mut contract = Self { storage_usage: 0 };
+
+            contract.set_metadata(&FungibleTokenMetadata::new(
+                "Pausable Fungible Token".into(),
+                "PFT".into(),
+                18,
+            ));
+
+            contract
+        }
     }
 
     #[derive(Default)]
@@ -445,7 +460,7 @@ mod pausable_fungible_token {
         let alice: AccountId = "alice".parse().unwrap();
         let bob: AccountId = "bob_account".parse().unwrap();
 
-        let mut c = Contract { storage_usage: 0 };
+        let mut c = Contract::new();
 
         c.deposit_unchecked(&alice, 100).unwrap();
 
@@ -467,7 +482,7 @@ mod pausable_fungible_token {
         let alice: AccountId = "alice".parse().unwrap();
         let bob: AccountId = "bob_account".parse().unwrap();
 
-        let mut c = Contract { storage_usage: 0 };
+        let mut c = Contract::new();
 
         c.deposit_unchecked(&alice, 100).unwrap();
 

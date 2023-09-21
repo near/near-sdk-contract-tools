@@ -1,16 +1,22 @@
 //! NEP-148 fungible token metadata implementation
 //! <https://github.com/near/NEPs/blob/master/neps/nep-0148.md>
-#![allow(missing_docs)] // ext_contract doesn't play nice with #![warn(missing_docs)]
 
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
-    ext_contract,
+    env,
     json_types::Base64VecU8,
+    BorshStorageKey,
 };
 use serde::{Deserialize, Serialize};
 
-/// Version of the NEP-148 metadata spec
+use crate::{slot::Slot, DefaultStorageKey};
+
+pub use ext::*;
+
+/// Version of the NEP-148 metadata spec.
 pub const FT_METADATA_SPEC: &str = "ft-1.0.0";
+/// Error message for unset metadata.
+pub const ERR_METADATA_UNSET: &str = "NEP-148 metadata is not set";
 
 /// NEP-148-compatible metadata struct
 #[derive(BorshDeserialize, BorshSerialize, Deserialize, Serialize, Eq, PartialEq, Clone, Debug)]
@@ -30,49 +36,121 @@ pub struct FungibleTokenMetadata {
     /// For tamper protection.
     pub reference_hash: Option<Base64VecU8>,
     /// Cosmetic. Number of base-10 decimal places to shift the floating point.
-    /// 18 is a common value.
+    /// 24 is a common value.
     pub decimals: u8,
 }
 
-/// Contract that supports the NEP-148 metadata standard
-#[ext_contract(ext_nep148)]
-pub trait Nep148 {
-    /// Returns the metadata struct for this contract.
-    fn ft_metadata(&self) -> FungibleTokenMetadata;
+impl FungibleTokenMetadata {
+    /// Creates a new metadata struct.
+    pub fn new(name: String, symbol: String, decimals: u8) -> Self {
+        Self {
+            spec: FT_METADATA_SPEC.into(),
+            name,
+            symbol,
+            icon: None,
+            reference: None,
+            reference_hash: None,
+            decimals,
+        }
+    }
+
+    /// Sets the spec field.
+    pub fn spec(mut self, spec: String) -> Self {
+        self.spec = spec;
+        self
+    }
+
+    /// Sets the name field.
+    pub fn name(mut self, name: String) -> Self {
+        self.name = name;
+        self
+    }
+
+    /// Sets the symbol field.
+    pub fn symbol(mut self, symbol: String) -> Self {
+        self.symbol = symbol;
+        self
+    }
+
+    /// Sets the icon field.
+    pub fn icon(mut self, icon: String) -> Self {
+        self.icon = Some(icon);
+        self
+    }
+
+    /// Sets the reference field.
+    pub fn reference(mut self, reference: String) -> Self {
+        self.reference = Some(reference);
+        self
+    }
+
+    /// Sets the reference_hash field.
+    pub fn reference_hash(mut self, reference_hash: Base64VecU8) -> Self {
+        self.reference_hash = Some(reference_hash);
+        self
+    }
+
+    /// Sets the decimals field.
+    pub fn decimals(mut self, decimals: u8) -> Self {
+        self.decimals = decimals;
+        self
+    }
 }
 
-#[cfg(test)]
-mod tests {
-    use crate::standard::nep148::FungibleTokenMetadata;
-    use near_sdk::borsh::BorshSerialize;
+#[derive(BorshSerialize, BorshStorageKey)]
+enum StorageKey {
+    Metadata,
+}
 
-    #[test]
-    fn borsh_serialization_ignores_cow() {
-        let m1 = FungibleTokenMetadata {
-            spec: "spec".into(),
-            name: "name".into(),
-            symbol: "symbol".into(),
-            icon: Some("icon".into()),
-            reference: Some("reference".into()),
-            reference_hash: Some(b"reference_hash".to_vec().into()),
-            decimals: 18,
-        };
+/// Internal functions for [`Nep148Controller`].
+pub trait Nep148ControllerInternal {
+    /// Returns the root storage slot for NEP-148.
+    fn root() -> Slot<()> {
+        Slot::new(DefaultStorageKey::Nep148)
+    }
 
-        let m2 = FungibleTokenMetadata {
-            spec: "spec".to_owned(),
-            name: "name".to_owned(),
-            symbol: "symbol".to_owned(),
-            icon: Some("icon".to_owned()),
-            reference: Some("reference".to_owned()),
-            reference_hash: Some(b"reference_hash".to_vec().into()),
-            decimals: 18,
-        };
+    /// Returns the storage slot for NEP-148 metadata.
+    fn metadata() -> Slot<FungibleTokenMetadata> {
+        Self::root().field(StorageKey::Metadata)
+    }
+}
 
-        assert_eq!(m1, m2);
+/// Management functions for NEP-148.
+pub trait Nep148Controller {
+    /// Returns the metadata struct for this contract.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the metadata has not been set.
+    fn get_metadata(&self) -> FungibleTokenMetadata;
 
-        let m1_serialized = m1.try_to_vec().unwrap();
-        let m2_serialized = m2.try_to_vec().unwrap();
+    /// Sets the metadata struct for this contract.
+    fn set_metadata(&mut self, metadata: &FungibleTokenMetadata);
+}
 
-        assert_eq!(m1_serialized, m2_serialized);
+impl<T: Nep148ControllerInternal> Nep148Controller for T {
+    fn get_metadata(&self) -> FungibleTokenMetadata {
+        Self::metadata()
+            .read()
+            .unwrap_or_else(|| env::panic_str(ERR_METADATA_UNSET))
+    }
+
+    fn set_metadata(&mut self, metadata: &FungibleTokenMetadata) {
+        Self::metadata().set(Some(metadata));
+    }
+}
+
+mod ext {
+    #![allow(missing_docs)] // ext_contract doesn't play well
+
+    use near_sdk::ext_contract;
+
+    use super::FungibleTokenMetadata;
+
+    /// Contract that supports the NEP-148 metadata standard
+    #[ext_contract(ext_nep148)]
+    pub trait Nep148 {
+        /// Returns the metadata struct for this contract.
+        fn ft_metadata(&self) -> FungibleTokenMetadata;
     }
 }

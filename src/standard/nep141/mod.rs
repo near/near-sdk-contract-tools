@@ -9,13 +9,13 @@ use serde::{Deserialize, Serialize};
 
 use crate::{slot::Slot, standard::nep297::*, DefaultStorageKey};
 
-pub mod error;
+mod error;
 pub use error::*;
-pub mod event;
+mod event;
 pub use event::*;
-pub mod ext;
+mod ext;
 pub use ext::*;
-pub mod hook;
+mod hook;
 pub use hook::*;
 
 /// Gas value required for ft_resolve_transfer calls

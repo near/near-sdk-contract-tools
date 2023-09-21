@@ -2,26 +2,35 @@ use near_sdk::{
     json_types::Base64VecU8, near_bindgen, test_utils::VMContextBuilder, testing_env, AccountId,
 };
 use near_sdk_contract_tools::{
-    standard::nep141::{Nep141, Nep141Controller},
+    standard::{nep141::*, nep148::*},
     FungibleToken,
 };
 
 #[derive(FungibleToken)]
-#[fungible_token(
-    name = "My Fungible Token",
-    symbol = "MYFT",
-    decimals = 18,
-    icon = "https://example.com/icon.png",
-    reference = "https://example.com/metadata.json",
-    reference_hash = "YXNkZg==",
-    no_hooks
-)]
+#[fungible_token(no_hooks)]
 #[near_bindgen]
 struct MyFungibleTokenContract {}
 
+#[near_bindgen]
+impl MyFungibleTokenContract {
+    #[init]
+    pub fn new() -> Self {
+        let mut contract = Self {};
+
+        contract.set_metadata(
+            &FungibleTokenMetadata::new("My Fungible Token".into(), "MYFT".into(), 18)
+                .icon("https://example.com/icon.png".into())
+                .reference("https://example.com/metadata.json".into())
+                .reference_hash(Base64VecU8::from([97, 115, 100, 102].to_vec())),
+        );
+
+        contract
+    }
+}
+
 #[test]
 fn fungible_token_transfer() {
-    let mut ft = MyFungibleTokenContract {};
+    let mut ft = MyFungibleTokenContract::new();
 
     let alice: AccountId = "alice".parse().unwrap();
     let bob: AccountId = "bob".parse().unwrap();
@@ -53,7 +62,7 @@ fn fungible_token_transfer() {
 
 #[test]
 fn metadata() {
-    let ft = MyFungibleTokenContract {};
+    let ft = MyFungibleTokenContract::new();
     let meta = ft.ft_metadata();
 
     assert_eq!(meta.decimals, 18);
