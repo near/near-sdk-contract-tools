@@ -24,6 +24,6 @@ impl Contract {
     }
 
     pub fn mint(&mut self, amount: U128) {
-        self.deposit_unchecked(&env::predecessor_account_id(), amount.into());
+        Nep141Controller::mint(self, env::predecessor_account_id(), amount.into(), None).unwrap();
     }
 }

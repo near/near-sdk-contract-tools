@@ -90,8 +90,8 @@ fn nep141_transfer() {
     assert_eq!(ft.ft_balance_of(bob.clone()).0, 0);
     assert_eq!(ft.ft_total_supply().0, 0);
 
-    ft.deposit_unchecked(&alice, 100);
-    ft.deposit_unchecked(&bob, 20);
+    ft.deposit_unchecked(&alice, 100).unwrap();
+    ft.deposit_unchecked(&bob, 20).unwrap();
 
     assert_eq!(ft.transfers.pop(), None);
     assert_eq!(ft.ft_balance_of(alice.clone()).0, 100);

@@ -75,7 +75,8 @@ pub fn expand(meta: Nep141Meta) -> Result<TokenStream, darling::Error> {
                     revert: false,
                 };
 
-                Nep141Controller::transfer(self, &transfer);
+                Nep141Controller::transfer(self, &transfer)
+                    .unwrap_or_else(|e| #near_sdk::env::panic_str(&e.to_string()));
             }
 
             #[payable]
@@ -108,7 +109,8 @@ pub fn expand(meta: Nep141Meta) -> Result<TokenStream, darling::Error> {
                     revert: false,
                 };
 
-                Nep141Controller::transfer(self, &transfer);
+                Nep141Controller::transfer(self, &transfer)
+                    .unwrap_or_else(|e| #near_sdk::env::panic_str(&e.to_string()));
 
                 let receiver_gas = prepaid_gas
                     .0
@@ -180,7 +182,8 @@ pub fn expand(meta: Nep141Meta) -> Result<TokenStream, darling::Error> {
                             revert: true,
                         };
 
-                        Nep141Controller::transfer(self, &transfer);
+                        Nep141Controller::transfer(self, &transfer)
+                            .unwrap_or_else(|e| env::panic_str(&e.to_string()));
 
                         refund_amount
                     } else {

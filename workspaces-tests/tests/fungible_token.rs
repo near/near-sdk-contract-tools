@@ -162,3 +162,40 @@ async fn transfer_no_deposit() {
         .unwrap()
         .unwrap();
 }
+
+#[tokio::test]
+#[should_panic(expected = "Balance of the sender is insufficient")]
+async fn transfer_more_than_balance() {
+    let Setup { contract, accounts } = setup_balances(3, |i| 10u128.pow(3 - i as u32).into()).await;
+    let alice = &accounts[0];
+    let bob = &accounts[1];
+
+    alice
+        .call(contract.id(), "ft_transfer")
+        .args_json(json!({
+            "receiver_id": bob.id(),
+            "amount": "1000000",
+        }))
+        .deposit(1)
+        .transact()
+        .await
+        .unwrap()
+        .unwrap();
+}
+
+#[tokio::test]
+#[should_panic(expected = "TotalSupplyOverflowError")]
+async fn transfer_overflow_u128() {
+    let Setup { contract, accounts } = setup_balances(2, |_| (u128::MAX / 2).into()).await;
+    let alice = &accounts[0];
+
+    alice
+        .call(contract.id(), "mint")
+        .args_json(json!({
+            "amount": "2",
+        }))
+        .transact()
+        .await
+        .unwrap()
+        .unwrap();
+}

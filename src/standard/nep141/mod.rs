@@ -3,12 +3,14 @@
 
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
-    env, AccountId, BorshStorageKey, Gas,
+    AccountId, BorshStorageKey, Gas,
 };
 use serde::{Deserialize, Serialize};
 
 use crate::{slot::Slot, standard::nep297::*, DefaultStorageKey};
 
+pub mod error;
+pub use error::*;
 pub mod event;
 pub use event::*;
 pub mod ext;
@@ -93,21 +95,19 @@ pub trait Nep141Controller {
 
     /// Removes tokens from an account and decreases total supply. No event
     /// emission.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the current balance of `account_id` is less than `amount` or
-    /// if `total_supply` is less than `amount`.
-    fn withdraw_unchecked(&mut self, account_id: &AccountId, amount: u128);
+    fn withdraw_unchecked(
+        &mut self,
+        account_id: &AccountId,
+        amount: u128,
+    ) -> Result<(), WithdrawError>;
 
     /// Increases the token balance of an account. Updates total supply. No
     /// event emission.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the balance of `account_id` plus `amount` >= `u128::MAX`, or
-    /// if the total supply plus `amount` >= `u128::MAX`.
-    fn deposit_unchecked(&mut self, account_id: &AccountId, amount: u128);
+    fn deposit_unchecked(
+        &mut self,
+        account_id: &AccountId,
+        amount: u128,
+    ) -> Result<(), DepositError>;
 
     /// Decreases the balance of `sender_account_id` by `amount` and increases
     /// the balance of `receiver_account_id` by the same. No change to total
@@ -122,28 +122,38 @@ pub trait Nep141Controller {
         sender_account_id: &AccountId,
         receiver_account_id: &AccountId,
         amount: u128,
-    );
+    ) -> Result<(), TransferError>;
 
     /// Performs an NEP-141 token transfer, with event emission.
     ///
     /// # Panics
     ///
     /// See: [`Nep141Controller::transfer_unchecked`]
-    fn transfer(&mut self, transfer: &Nep141Transfer);
+    fn transfer(&mut self, transfer: &Nep141Transfer) -> Result<(), TransferError>;
 
     /// Performs an NEP-141 token mint, with event emission.
     ///
     /// # Panics
     ///
-    /// See: `Nep141Controller::deposit_unchecked`
-    fn mint(&mut self, account_id: AccountId, amount: u128, memo: Option<String>);
+    /// See: [`Nep141Controller::deposit_unchecked`]
+    fn mint(
+        &mut self,
+        account_id: AccountId,
+        amount: u128,
+        memo: Option<String>,
+    ) -> Result<(), DepositError>;
 
     /// Performs an NEP-141 token burn, with event emission.
     ///
     /// # Panics
     ///
-    /// See: `Nep141Controller::withdraw_unchecked`
-    fn burn(&mut self, account_id: AccountId, amount: u128, memo: Option<String>);
+    /// See: [`Nep141Controller::withdraw_unchecked`]
+    fn burn(
+        &mut self,
+        account_id: AccountId,
+        amount: u128,
+        memo: Option<String>,
+    ) -> Result<(), WithdrawError>;
 }
 
 impl<T: Nep141ControllerInternal> Nep141Controller for T {
@@ -157,40 +167,70 @@ impl<T: Nep141ControllerInternal> Nep141Controller for T {
         Self::slot_total_supply().read().unwrap_or(0)
     }
 
-    fn withdraw_unchecked(&mut self, account_id: &AccountId, amount: u128) {
+    fn withdraw_unchecked(
+        &mut self,
+        account_id: &AccountId,
+        amount: u128,
+    ) -> Result<(), WithdrawError> {
         if amount != 0 {
             let balance = self.balance_of(account_id);
             if let Some(balance) = balance.checked_sub(amount) {
                 Self::slot_account(account_id).write(&balance);
             } else {
-                env::panic_str("Balance underflow");
+                return Err(BalanceUnderflowError {
+                    account_id: account_id.clone(),
+                    balance,
+                    amount,
+                }
+                .into());
             }
 
             let total_supply = self.total_supply();
             if let Some(total_supply) = total_supply.checked_sub(amount) {
                 Self::slot_total_supply().write(&total_supply);
             } else {
-                env::panic_str("Total supply underflow");
+                return Err(TotalSupplyUnderflowError {
+                    total_supply,
+                    amount,
+                }
+                .into());
             }
         }
+
+        Ok(())
     }
 
-    fn deposit_unchecked(&mut self, account_id: &AccountId, amount: u128) {
+    fn deposit_unchecked(
+        &mut self,
+        account_id: &AccountId,
+        amount: u128,
+    ) -> Result<(), DepositError> {
         if amount != 0 {
             let balance = self.balance_of(account_id);
             if let Some(balance) = balance.checked_add(amount) {
                 Self::slot_account(account_id).write(&balance);
             } else {
-                env::panic_str("Balance overflow");
+                return Err(BalanceOverflowError {
+                    account_id: account_id.clone(),
+                    balance,
+                    amount,
+                }
+                .into());
             }
 
             let total_supply = self.total_supply();
             if let Some(total_supply) = total_supply.checked_add(amount) {
                 Self::slot_total_supply().write(&total_supply);
             } else {
-                env::panic_str("Total supply overflow");
+                return Err(TotalSupplyOverflowError {
+                    total_supply,
+                    amount,
+                }
+                .into());
             }
         }
+
+        Ok(())
     }
 
     fn transfer_unchecked(
@@ -198,7 +238,7 @@ impl<T: Nep141ControllerInternal> Nep141Controller for T {
         sender_account_id: &AccountId,
         receiver_account_id: &AccountId,
         amount: u128,
-    ) {
+    ) -> Result<(), TransferError> {
         let sender_balance = self.balance_of(sender_account_id);
 
         if let Some(sender_balance) = sender_balance.checked_sub(amount) {
@@ -207,17 +247,29 @@ impl<T: Nep141ControllerInternal> Nep141Controller for T {
                 Self::slot_account(sender_account_id).write(&sender_balance);
                 Self::slot_account(receiver_account_id).write(&receiver_balance);
             } else {
-                env::panic_str("Receiver balance overflow");
+                return Err(BalanceOverflowError {
+                    account_id: receiver_account_id.clone(),
+                    balance: receiver_balance,
+                    amount,
+                }
+                .into());
             }
         } else {
-            env::panic_str("Sender balance underflow");
+            return Err(BalanceUnderflowError {
+                account_id: sender_account_id.clone(),
+                balance: sender_balance,
+                amount,
+            }
+            .into());
         }
+
+        Ok(())
     }
 
-    fn transfer(&mut self, transfer: &Nep141Transfer) {
+    fn transfer(&mut self, transfer: &Nep141Transfer) -> Result<(), TransferError> {
         let state = Self::Hook::before_transfer(self, transfer);
 
-        self.transfer_unchecked(&transfer.sender_id, &transfer.receiver_id, transfer.amount);
+        self.transfer_unchecked(&transfer.sender_id, &transfer.receiver_id, transfer.amount)?;
 
         Nep141Event::FtTransfer(vec![FtTransferData {
             old_owner_id: transfer.sender_id.clone(),
@@ -228,12 +280,19 @@ impl<T: Nep141ControllerInternal> Nep141Controller for T {
         .emit();
 
         Self::Hook::after_transfer(self, transfer, state);
+
+        Ok(())
     }
 
-    fn mint(&mut self, account_id: AccountId, amount: u128, memo: Option<String>) {
+    fn mint(
+        &mut self,
+        account_id: AccountId,
+        amount: u128,
+        memo: Option<String>,
+    ) -> Result<(), DepositError> {
         let state = Self::Hook::before_mint(self, amount, &account_id);
 
-        self.deposit_unchecked(&account_id, amount);
+        self.deposit_unchecked(&account_id, amount)?;
 
         Self::Hook::after_mint(self, amount, &account_id, state);
 
@@ -243,12 +302,19 @@ impl<T: Nep141ControllerInternal> Nep141Controller for T {
             memo,
         }])
         .emit();
+
+        Ok(())
     }
 
-    fn burn(&mut self, account_id: AccountId, amount: u128, memo: Option<String>) {
+    fn burn(
+        &mut self,
+        account_id: AccountId,
+        amount: u128,
+        memo: Option<String>,
+    ) -> Result<(), WithdrawError> {
         let state = Self::Hook::before_burn(self, amount, &account_id);
 
-        self.withdraw_unchecked(&account_id, amount);
+        self.withdraw_unchecked(&account_id, amount)?;
 
         Self::Hook::after_burn(self, amount, &account_id, state);
 
@@ -258,5 +324,7 @@ impl<T: Nep141ControllerInternal> Nep141Controller for T {
             memo,
         }])
         .emit();
+
+        Ok(())
     }
 }
