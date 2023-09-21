@@ -100,31 +100,31 @@ pub trait Nep145Controller {
         Self: Sized;
 
     /// Returns the storage balance of the given account.
-    fn storage_balance(&self, account_id: &AccountId) -> Option<StorageBalance>;
+    fn get_storage_balance(&self, account_id: &AccountId) -> Option<StorageBalance>;
 
     /// Locks the given amount of storage balance for the given account.
-    fn storage_lock(
+    fn lock_storage(
         &mut self,
         account_id: &AccountId,
         amount: U128,
     ) -> Result<StorageBalance, StorageLockError>;
 
     /// Unlocks the given amount of storage balance for the given account.
-    fn storage_unlock(
+    fn unlock_storage(
         &mut self,
         account_id: &AccountId,
         amount: U128,
     ) -> Result<StorageBalance, StorageUnlockError>;
 
     /// Deposits the given amount of storage balance for the given account.
-    fn storage_deposit(
+    fn deposit_to_storage_account(
         &mut self,
         account_id: &AccountId,
         amount: U128,
     ) -> Result<StorageBalance, StorageDepositError>;
 
     /// Withdraws the given amount of storage balance for the given account.
-    fn storage_withdraw(
+    fn withdraw_from_storage_account(
         &mut self,
         account_id: &AccountId,
         amount: U128,
@@ -132,20 +132,20 @@ pub trait Nep145Controller {
 
     /// Unregisters the given account, returning the amount of storage balance
     /// that should be refunded.
-    fn storage_unregister(
+    fn unregister_storage_account(
         &mut self,
         account_id: &AccountId,
     ) -> Result<U128, StorageUnregisterError>;
 
     /// Force unregisters the given account, returning the amount of storage balance
     /// that should be refunded.
-    fn storage_force_unregister(
+    fn force_unregister_storage_account(
         &mut self,
         account_id: &AccountId,
     ) -> Result<U128, StorageForceUnregisterError>;
 
     /// Returns the storage balance bounds for the contract.
-    fn storage_balance_bounds(&self) -> StorageBalanceBounds;
+    fn get_storage_balance_bounds(&self) -> StorageBalanceBounds;
 
     /// Sets the storage balance bounds for the contract.
     fn set_storage_balance_bounds(&mut self, bounds: &StorageBalanceBounds);
@@ -154,11 +154,11 @@ pub trait Nep145Controller {
 impl<T: Nep145ControllerInternal> Nep145Controller for T {
     type Hook = <Self as Nep145ControllerInternal>::Hook;
 
-    fn storage_balance(&self, account_id: &AccountId) -> Option<StorageBalance> {
+    fn get_storage_balance(&self, account_id: &AccountId) -> Option<StorageBalance> {
         Self::slot_account(account_id).read()
     }
 
-    fn storage_lock(
+    fn lock_storage(
         &mut self,
         account_id: &AccountId,
         amount: U128,
@@ -184,7 +184,7 @@ impl<T: Nep145ControllerInternal> Nep145Controller for T {
         Ok(balance)
     }
 
-    fn storage_unlock(
+    fn unlock_storage(
         &mut self,
         account_id: &AccountId,
         amount: U128,
@@ -215,7 +215,7 @@ impl<T: Nep145ControllerInternal> Nep145Controller for T {
         Ok(balance)
     }
 
-    fn storage_deposit(
+    fn deposit_to_storage_account(
         &mut self,
         account_id: &AccountId,
         amount: U128,
@@ -231,7 +231,7 @@ impl<T: Nep145ControllerInternal> Nep145Controller for T {
                 .checked_add(amount.0)
                 .unwrap_or_else(|| env::panic_str(PANIC_MESSAGE_STORAGE_TOTAL_OVERFLOW));
 
-            let bounds = self.storage_balance_bounds();
+            let bounds = self.get_storage_balance_bounds();
 
             if new_total < bounds.min.0 {
                 return Err(MinimumBalanceUnderrunError {
@@ -261,7 +261,7 @@ impl<T: Nep145ControllerInternal> Nep145Controller for T {
         Ok(balance)
     }
 
-    fn storage_withdraw(
+    fn withdraw_from_storage_account(
         &mut self,
         account_id: &AccountId,
         amount: U128,
@@ -273,7 +273,7 @@ impl<T: Nep145ControllerInternal> Nep145Controller for T {
             .ok_or_else(|| AccountNotRegisteredError(account_id.clone()))?;
 
         balance.total.0 = {
-            let bounds = self.storage_balance_bounds();
+            let bounds = self.get_storage_balance_bounds();
 
             balance
                 .total
@@ -291,7 +291,7 @@ impl<T: Nep145ControllerInternal> Nep145Controller for T {
         Ok(balance)
     }
 
-    fn storage_unregister(
+    fn unregister_storage_account(
         &mut self,
         account_id: &AccountId,
     ) -> Result<U128, StorageUnregisterError> {
@@ -318,7 +318,7 @@ impl<T: Nep145ControllerInternal> Nep145Controller for T {
         Ok(balance.total)
     }
 
-    fn storage_force_unregister(
+    fn force_unregister_storage_account(
         &mut self,
         account_id: &AccountId,
     ) -> Result<U128, StorageForceUnregisterError> {
@@ -333,7 +333,7 @@ impl<T: Nep145ControllerInternal> Nep145Controller for T {
         Ok(balance.available)
     }
 
-    fn storage_balance_bounds(&self) -> StorageBalanceBounds {
+    fn get_storage_balance_bounds(&self) -> StorageBalanceBounds {
         Self::slot_balance_bounds().read().unwrap_or_default()
     }
 

@@ -15,6 +15,12 @@ name = "counter_multisig"
 name = "cross_target"
 
 [[bin]]
+name = "escrow"
+
+[[bin]]
+name = "fungible_token_nep145"
+
+[[bin]]
 name = "fungible_token"
 
 [[bin]]
@@ -55,9 +61,6 @@ name = "upgrade_old_multisig"
 
 [[bin]]
 name = "upgrade_old_raw"
-
-[[bin]]
-name = "escrow"
 
 [dependencies]
 near-sdk.workspace = true

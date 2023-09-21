@@ -62,7 +62,7 @@ pub fn expand(meta: Nep145Meta) -> Result<TokenStream, darling::Error> {
                 use #me::standard::nep145::*;
                 use #near_sdk::{env, json_types::U128, Promise};
 
-                let bounds = Nep145Controller::storage_balance_bounds(self);
+                let bounds = Nep145Controller::get_storage_balance_bounds(self);
 
                 let attached = env::attached_deposit();
                 let amount = if registration_only.unwrap_or(false) {
@@ -80,7 +80,7 @@ pub fn expand(meta: Nep145Meta) -> Result<TokenStream, darling::Error> {
                 });
                 let predecessor = env::predecessor_account_id();
 
-                let storage_balance = Nep145Controller::storage_deposit(
+                let storage_balance = Nep145Controller::deposit_to_storage_account(
                     self,
                     &account_id.unwrap_or_else(|| predecessor.clone()),
                     U128(amount),
@@ -103,7 +103,7 @@ pub fn expand(meta: Nep145Meta) -> Result<TokenStream, darling::Error> {
 
                 let predecessor = env::predecessor_account_id();
 
-                let balance = Nep145Controller::storage_balance(self, &predecessor)
+                let balance = Nep145Controller::get_storage_balance(self, &predecessor)
                     .unwrap_or_else(|| env::panic_str("Account is not registered"));
 
                 let amount = amount.unwrap_or(balance.available);
@@ -112,7 +112,7 @@ pub fn expand(meta: Nep145Meta) -> Result<TokenStream, darling::Error> {
                     return balance;
                 }
 
-                let new_balance = Nep145Controller::storage_withdraw(self, &predecessor, amount)
+                let new_balance = Nep145Controller::withdraw_from_storage_account(self, &predecessor, amount)
                     .unwrap_or_else(|e| env::panic_str(&format!("Storage withdraw error: {}", e)));
 
                 Promise::new(predecessor).transfer(amount.0);
@@ -129,12 +129,12 @@ pub fn expand(meta: Nep145Meta) -> Result<TokenStream, darling::Error> {
                 let predecessor = env::predecessor_account_id();
 
                 let refund = if force.unwrap_or(false) {
-                    match Nep145Controller::storage_force_unregister(self, &predecessor) {
+                    match Nep145Controller::force_unregister_storage_account(self, &predecessor) {
                         Ok(refund) => refund,
                         Err(error::StorageForceUnregisterError::AccountNotRegistered(_)) => return false,
                     }
                 } else {
-                    match Nep145Controller::storage_unregister(self, &predecessor) {
+                    match Nep145Controller::unregister_storage_account(self, &predecessor) {
                         Ok(refund) => refund,
                         Err(error::StorageUnregisterError::UnregisterWithLockedBalance(e)) => {
                             env::panic_str(&format!(
@@ -150,11 +150,11 @@ pub fn expand(meta: Nep145Meta) -> Result<TokenStream, darling::Error> {
             }
 
             fn storage_balance_of(&self, account_id: #near_sdk::AccountId) -> Option<#me::standard::nep145::StorageBalance> {
-                #me::standard::nep145::Nep145Controller::storage_balance(self, &account_id)
+                #me::standard::nep145::Nep145Controller::get_storage_balance(self, &account_id)
             }
 
             fn storage_balance_bounds(&self) -> #me::standard::nep145::StorageBalanceBounds {
-                #me::standard::nep145::Nep145Controller::storage_balance_bounds(self)
+                #me::standard::nep145::Nep145Controller::get_storage_balance_bounds(self)
             }
         }
     })

@@ -55,7 +55,7 @@ impl Contract {
         let storage_usage = env::storage_usage() - storage_usage_start;
         let storage_fee = env::storage_byte_cost() * storage_usage as u128;
 
-        Nep145Controller::storage_lock(self, &predecessor, storage_fee.into())
+        Nep145Controller::lock_storage(self, &predecessor, storage_fee.into())
             .unwrap_or_else(|e| env::panic_str(&format!("Storage lock error: {}", e)));
     }
 }
