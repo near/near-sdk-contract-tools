@@ -148,12 +148,50 @@ pub fn expand(meta: Nep141Meta) -> Result<TokenStream, darling::Error> {
                 receiver_id: #near_sdk::AccountId,
                 amount: #near_sdk::json_types::U128,
             ) -> #near_sdk::json_types::U128 {
-                #me::standard::nep141::Nep141Controller::resolve_transfer(
-                    self,
-                    sender_id,
-                    receiver_id,
-                    amount.into(),
-                ).into()
+                use #near_sdk::{env, PromiseResult, serde_json, json_types::U128};
+                use #me::standard::nep141::*;
+
+                let amount = amount.0;
+
+                let ft_on_transfer_promise_result = env::promise_result(0);
+
+                let unused_amount = match ft_on_transfer_promise_result {
+                    PromiseResult::NotReady => env::abort(),
+                    PromiseResult::Successful(value) => {
+                        if let Ok(U128(unused_amount)) = serde_json::from_slice::<U128>(&value) {
+                            std::cmp::min(amount, unused_amount)
+                        } else {
+                            amount
+                        }
+                    }
+                    PromiseResult::Failed => amount,
+                };
+
+                let refunded_amount = if unused_amount > 0 {
+                    let receiver_balance = Nep141Controller::balance_of(self, &receiver_id);
+                    if receiver_balance > 0 {
+                        let refund_amount = std::cmp::min(receiver_balance, unused_amount);
+                        let transfer = Nep141Transfer {
+                            sender_id: receiver_id,
+                            receiver_id: sender_id,
+                            amount: refund_amount,
+                            memo: None,
+                            msg: None,
+                            revert: true,
+                        };
+
+                        Nep141Controller::transfer(self, &transfer);
+
+                        refund_amount
+                    } else {
+                        0
+                    }
+                } else {
+                    0
+                };
+
+                // Used amount
+                U128(amount - refunded_amount)
             }
         }
     })
