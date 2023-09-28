@@ -41,3 +41,11 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [workspace]
 members = [".", "macros", "workspaces-tests", "workspaces-tests-utils"]
+
+[profile.release]
+codegen-units = 1
+debug = false
+lto = true
+opt-level = "z"
+overflow-checks = true
+panic = "abort"
