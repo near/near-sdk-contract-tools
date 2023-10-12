@@ -74,8 +74,6 @@ impl near_sdk_contract_tools::standard::nep141::Nep141Receiver for FungibleToken
     }
 }
 
-// TODO: transfer_call testing (not possible without workspaces-rs or something
-//  like that, and workspaces-rs doesn't work on macOS)
 #[test]
 fn nep141_transfer() {
     let mut ft = FungibleToken {
