@@ -2,6 +2,7 @@
 
 use near_sdk::{json_types::U128, serde_json::json};
 use near_workspaces::{Account, AccountId, Contract};
+use pretty_assertions::assert_eq;
 
 const WASM: &[u8] =
     include_bytes!("../../target/wasm32-unknown-unknown/release/fungible_token.wasm");

@@ -5,6 +5,7 @@ use near_sdk::{
     serde::Serialize,
 };
 use near_workspaces::{Account, Contract};
+use pretty_assertions::assert_eq;
 
 const WASM_BORSH: &[u8] =
     include_bytes!("../../target/wasm32-unknown-unknown/release/upgrade_old_borsh.wasm");

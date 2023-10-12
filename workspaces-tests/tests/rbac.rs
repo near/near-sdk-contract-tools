@@ -7,6 +7,7 @@ use near_sdk::{
     serde_json::{self, json},
 };
 use near_workspaces::{Account, AccountId, Contract};
+use pretty_assertions::assert_eq;
 use tokio::join;
 
 const WASM: &[u8] = include_bytes!("../../target/wasm32-unknown-unknown/release/rbac.wasm");

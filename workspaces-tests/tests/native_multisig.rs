@@ -11,6 +11,7 @@ use near_workspaces::{
     types::{AccessKeyPermission, Finality},
     Account, AccountDetailsPatch, Contract, DevNetwork, Worker,
 };
+use pretty_assertions::assert_eq;
 use tokio::{join, time::sleep};
 
 const WASM: &[u8] =

@@ -10,6 +10,7 @@ use near_sdk_contract_tools::standard::{
     nep297::Event,
 };
 use near_workspaces::{operations::Function, types::Gas};
+use pretty_assertions::assert_eq;
 use tokio::task::JoinSet;
 use workspaces_tests_utils::{expect_execution_error, nft_token, setup, Setup};
 
@@ -708,7 +709,7 @@ async fn transfer_call_receiver_send_return() {
             "receiver_id": bob.id(),
             "msg": format!("transfer:{}", charlie.id()),
         }))
-        .gas(THIRTY_TERAGAS) // xtra gas
+        .gas(THIRTY_TERAGAS.saturating_mul(10)) // xtra gas
         .deposit(1)
         .transact()
         .await

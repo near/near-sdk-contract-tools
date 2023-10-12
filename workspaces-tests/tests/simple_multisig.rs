@@ -2,6 +2,7 @@
 
 use near_sdk::serde_json::json;
 use near_workspaces::{Account, Contract};
+use pretty_assertions::assert_eq;
 
 const WASM: &[u8] =
     include_bytes!("../../target/wasm32-unknown-unknown/release/simple_multisig.wasm");
