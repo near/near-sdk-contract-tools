@@ -38,11 +38,8 @@ impl IntoStorageKey for DefaultStorageKey {
         match self {
             DefaultStorageKey::ApprovalManager => b"~am".to_vec(),
             DefaultStorageKey::Nep141 => b"~$141".to_vec(),
-<<<<<<< HEAD
             DefaultStorageKey::Nep145 => b"~$145".to_vec(),
-=======
             DefaultStorageKey::Nep148 => b"~$148".to_vec(),
->>>>>>> develop
             DefaultStorageKey::Nep171 => b"~$171".to_vec(),
             DefaultStorageKey::Nep177 => b"~$177".to_vec(),
             DefaultStorageKey::Nep178 => b"~$178".to_vec(),
