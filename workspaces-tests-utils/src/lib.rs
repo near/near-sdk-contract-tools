@@ -2,7 +2,7 @@
 #![cfg(not(windows))]
 
 use near_sdk::{serde::de::DeserializeOwned, serde_json::json};
-use workspaces::{result::ExecutionFinalResult, Account, Contract};
+use near_workspaces::{result::ExecutionFinalResult, Account, Contract};
 
 pub async fn nft_token<T: DeserializeOwned>(contract: &Contract, token_id: &str) -> Option<T> {
     contract
@@ -21,7 +21,7 @@ pub struct Setup {
 
 /// Setup for individual tests
 pub async fn setup(wasm: &[u8], num_accounts: usize) -> Setup {
-    let worker = workspaces::sandbox().await.unwrap();
+    let worker = near_workspaces::sandbox().await.unwrap();
 
     // Initialize contract
     let contract = worker.dev_deploy(wasm).await.unwrap();

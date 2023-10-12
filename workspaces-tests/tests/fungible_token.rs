@@ -1,7 +1,7 @@
 #![cfg(not(windows))]
 
 use near_sdk::{json_types::U128, serde_json::json};
-use workspaces::{Account, AccountId, Contract};
+use near_workspaces::{Account, AccountId, Contract};
 
 const WASM: &[u8] =
     include_bytes!("../../target/wasm32-unknown-unknown/release/fungible_token.wasm");
@@ -24,7 +24,7 @@ struct Setup {
 
 /// Setup for individual tests
 async fn setup(num_accounts: usize) -> Setup {
-    let worker = workspaces::sandbox().await.unwrap();
+    let worker = near_workspaces::sandbox().await.unwrap();
 
     // Initialize contract
     let contract = worker.dev_deploy(WASM).await.unwrap();

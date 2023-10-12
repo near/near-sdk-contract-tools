@@ -5,13 +5,13 @@ use std::{future::IntoFuture, time::Duration};
 use near_crypto::{KeyType, SecretKey};
 use near_sdk::{serde_json::json, Gas, ONE_NEAR};
 use near_sdk_contract_tools::approval::native_transaction_action::PromiseAction;
-use tokio::{join, task::JoinSet, time::sleep};
-use workspaces::{
+use near_workspaces::{
     result::{ExecutionResult, Value},
     sandbox,
     types::{AccessKeyPermission, Finality},
-    Account, Contract, DevNetwork, Worker,
+    Account, AccountDetailsPatch, Contract, DevNetwork, Worker,
 };
+use tokio::{join, time::sleep};
 
 const WASM: &[u8] =
     include_bytes!("../../target/wasm32-unknown-unknown/release/native_multisig.wasm");
@@ -106,23 +106,12 @@ async fn stake() {
 
     const MINIMUM_STAKE: u128 = 800_000_000_000_000_000_000_000_000;
 
-    let mut set = JoinSet::new();
-
-    // Fund contract account to meet minumum stake requirement.
-    // At the time of writing, it looks like workspaces network configuration is not yet released:
-    // https://github.com/near/workspaces-rs/commit/8df17e5d6ebbfe9ced52beb133f3e5b07a86dffb
-    // Otherwise we could just decrease the staking requirement.
-    for _ in 0..10 {
-        let w = worker.clone();
-        let contract_id = contract.id().clone();
-        set.spawn(async move {
-            let a = w.dev_create_account().await.unwrap();
-            a.delete_account(&contract_id).await.unwrap().unwrap();
-        });
-    }
-
-    // Await all
-    while set.join_next().await.is_some() {}
+    worker
+        .patch(contract.id())
+        .account(AccountDetailsPatch::default().balance(MINIMUM_STAKE * 4))
+        .transact()
+        .await
+        .unwrap();
 
     let alice = &accounts[0];
     let bob = &accounts[1];
@@ -136,7 +125,7 @@ async fn stake() {
         "Account should start with no staked tokens"
     );
 
-    let stake_amount = MINIMUM_STAKE;
+    let stake_amount = MINIMUM_STAKE * 2;
 
     let request_id = alice
         .call(contract.id(), "request")
@@ -235,7 +224,7 @@ async fn create_account_transfer_deploy_contract_function_call() {
     let bob = &accounts[1];
 
     let new_account_id_str = format!("new.{}", contract.id());
-    let new_account_id: workspaces::AccountId = new_account_id_str.parse().unwrap();
+    let new_account_id: near_workspaces::AccountId = new_account_id_str.parse().unwrap();
 
     // Account does not exist yet
     assert!(worker.view_account(&new_account_id).await.is_err());

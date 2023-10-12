@@ -71,5 +71,5 @@ near-crypto = "0.15.0"
 tokio = "1.21.1"
 
 [target.'cfg(not(windows))'.dev-dependencies]
-workspaces = "0.7"
+near-workspaces = "0.8"
 workspaces-tests-utils = { path = "../workspaces-tests-utils" }

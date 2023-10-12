@@ -1,7 +1,7 @@
 #![cfg(not(windows))]
 
 use near_sdk::serde_json::json;
-use workspaces::{Account, Contract};
+use near_workspaces::{Account, Contract};
 
 const WASM: &[u8] =
     include_bytes!("../../target/wasm32-unknown-unknown/release/counter_multisig.wasm");
@@ -13,7 +13,7 @@ struct Setup {
 
 /// Setup for individual tests
 async fn setup(num_accounts: usize) -> Setup {
-    let worker = workspaces::sandbox().await.unwrap();
+    let worker = near_workspaces::sandbox().await.unwrap();
 
     // Initialize contract
     let contract = worker.dev_deploy(WASM).await.unwrap();

@@ -1,7 +1,7 @@
 #![cfg(not(windows))]
 
 use near_sdk::{json_types::Base64VecU8, serde_json::json};
-use workspaces::{Account, Contract};
+use near_workspaces::{Account, Contract};
 
 const WASM: &[u8] =
     include_bytes!("../../target/wasm32-unknown-unknown/release/upgrade_old_multisig.wasm");
@@ -16,7 +16,7 @@ struct Setup {
 
 /// Setup for individual tests
 async fn setup(num_accounts: usize, wasm: &[u8]) -> Setup {
-    let worker = workspaces::testnet().await.unwrap();
+    let worker = near_workspaces::sandbox().await.unwrap();
 
     // Initialize user accounts
     let mut accounts = vec![];

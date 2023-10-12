@@ -9,8 +9,8 @@ use near_sdk_contract_tools::standard::{
     nep178,
     nep297::Event,
 };
+use near_workspaces::{operations::Function, types::Gas};
 use tokio::task::JoinSet;
-use workspaces::operations::Function;
 use workspaces_tests_utils::{expect_execution_error, nft_token, setup, Setup};
 
 const WASM_171_ONLY: &[u8] =
@@ -21,6 +21,8 @@ const WASM_FULL: &[u8] =
 
 const RECEIVER_WASM: &[u8] =
     include_bytes!("../../target/wasm32-unknown-unknown/release/non_fungible_token_receiver.wasm");
+
+const THIRTY_TERAGAS: Gas = Gas::from_gas(30_000_000_000_000);
 
 fn token_meta(id: String) -> near_sdk::serde_json::Value {
     near_sdk::serde_json::to_value(TokenMetadata {
@@ -508,7 +510,7 @@ async fn transfer_call_success() {
             "receiver_id": bob.id(),
             "msg": "",
         }))
-        .gas(30_000_000_000_000)
+        .gas(THIRTY_TERAGAS)
         .deposit(1)
         .transact()
         .await
@@ -567,7 +569,7 @@ async fn transfer_call_return_success() {
             "receiver_id": bob.id(),
             "msg": "return",
         }))
-        .gas(30_000_000_000_000)
+        .gas(THIRTY_TERAGAS)
         .deposit(1)
         .transact()
         .await
@@ -636,7 +638,7 @@ async fn transfer_call_receiver_panic() {
             "receiver_id": bob.id(),
             "msg": "panic",
         }))
-        .gas(30_000_000_000_000)
+        .gas(THIRTY_TERAGAS)
         .deposit(1)
         .transact()
         .await
@@ -706,7 +708,7 @@ async fn transfer_call_receiver_send_return() {
             "receiver_id": bob.id(),
             "msg": format!("transfer:{}", charlie.id()),
         }))
-        .gas(300_000_000_000_000) // xtra gas
+        .gas(THIRTY_TERAGAS) // xtra gas
         .deposit(1)
         .transact()
         .await
