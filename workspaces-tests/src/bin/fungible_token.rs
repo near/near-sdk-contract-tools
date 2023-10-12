@@ -9,10 +9,13 @@ use near_sdk::{
     json_types::U128,
     near_bindgen, PanicOnDefault,
 };
-use near_sdk_contract_tools::{standard::nep141::*, FungibleToken};
+use near_sdk_contract_tools::{
+    standard::{nep141::*, nep148::*},
+    FungibleToken,
+};
 
 #[derive(PanicOnDefault, BorshSerialize, BorshDeserialize, FungibleToken)]
-#[fungible_token(name = "My Fungible Token", symbol = "MYFT", decimals = 18, no_hooks)]
+#[fungible_token(no_hooks)]
 #[near_bindgen]
 pub struct Contract {}
 
@@ -20,10 +23,18 @@ pub struct Contract {}
 impl Contract {
     #[init]
     pub fn new() -> Self {
-        Self {}
+        let mut contract = Self {};
+
+        contract.set_metadata(&FungibleTokenMetadata::new(
+            "My Fungible Token".into(),
+            "MYFT".into(),
+            24,
+        ));
+
+        contract
     }
 
     pub fn mint(&mut self, amount: U128) {
-        self.deposit_unchecked(&env::predecessor_account_id(), amount.into());
+        Nep141Controller::mint(self, env::predecessor_account_id(), amount.into(), None).unwrap();
     }
 }

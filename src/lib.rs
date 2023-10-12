@@ -13,6 +13,8 @@ pub enum DefaultStorageKey {
     Nep141,
     /// Default storage key for [`standard::nep145::Nep145ControllerInternal::root`]
     Nep145,
+    /// Default storage key for [`standard::nep148::Nep148ControllerInternal::root`].
+    Nep148,
     /// Default storage key for [`standard::nep171::Nep171ControllerInternal::root`].
     Nep171,
     /// Default storage key for [`standard::nep177::Nep177ControllerInternal::root`].
@@ -36,7 +38,11 @@ impl IntoStorageKey for DefaultStorageKey {
         match self {
             DefaultStorageKey::ApprovalManager => b"~am".to_vec(),
             DefaultStorageKey::Nep141 => b"~$141".to_vec(),
+<<<<<<< HEAD
             DefaultStorageKey::Nep145 => b"~$145".to_vec(),
+=======
+            DefaultStorageKey::Nep148 => b"~$148".to_vec(),
+>>>>>>> develop
             DefaultStorageKey::Nep171 => b"~$171".to_vec(),
             DefaultStorageKey::Nep177 => b"~$177".to_vec(),
             DefaultStorageKey::Nep178 => b"~$178".to_vec(),
@@ -67,5 +73,13 @@ pub mod nft {
     pub use crate::{
         standard::{nep171::*, nep177::*, nep178::*, nep181::*},
         Nep171, Nep177, Nep178, Nep181, NonFungibleToken,
+    };
+}
+
+/// Re-exports of the FT standard traits.
+pub mod ft {
+    pub use crate::{
+        standard::{nep141::*, nep148::*},
+        FungibleToken, Nep141, Nep148,
     };
 }

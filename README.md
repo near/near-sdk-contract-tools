@@ -99,19 +99,28 @@ e.emit();
 To create a contract that is compatible with the NEP-141 and NEP-148 standards, that emits standard-compliant (NEP-141, NEP-297) events.
 
 ```rust
-use near_sdk_contract_tools::FungibleToken;
+use near_sdk_contract_tools::ft::*;
 use near_sdk::near_bindgen;
 
 #[derive(FungibleToken)]
-#[fungible_token(
-    name = "My Fungible Token",
-    symbol = "MYFT",
-    decimals = 18,
-    no_hooks
-)]
+#[fungible_token(no_hooks)]
 #[near_bindgen]
-struct FungibleToken {
-    // ...
+struct FungibleToken {}
+
+#[near_bindgen]
+impl FungibleToken {
+    #[init]
+    pub fn new() -> Self {
+        let mut contract = Self {};
+
+        contract.set_metadata(&FungibleTokenMetadata::new(
+            "My Fungible Token".to_string(),
+            "MYFT".to_string(),
+            24,
+        ));
+
+        contract
+    }
 }
 ```
 
@@ -140,20 +149,15 @@ pub struct MyNft {}
 One may wish to combine the features of multiple macros in one contract. All of the macros are written such that they will work in a standalone manner, so this should largely work without issue. However, sometimes it may be desirable for the macros to work in _combination_ with each other. For example, to make a fungible token pausable, use the fungible token hooks to require that a contract be unpaused before making a token transfer:
 
 ```rust
-use near_sdk_contract_tools::{
-    pause::Pause,
-    standard::nep141::{Nep141Hook, Nep141Transfer},
-    FungibleToken, Pause,
-};
+use near_sdk_contract_tools::{ft::*, pause::Pause, Pause};
 use near_sdk::near_bindgen;
 
 #[derive(FungibleToken, Pause)]
-#[fungible_token(name = "Pausable Fungible Token", symbol = "PFT", decimals = 18)]
 #[near_bindgen]
 struct Contract {}
 
-impl Nep141Hook for Contract {
-    fn before_transfer(&mut self, _transfer: &Nep141Transfer) {
+impl SimpleNep141Hook for Contract {
+    fn before_transfer(&self, _transfer: &Nep141Transfer) {
         Contract::require_unpaused();
     }
 }

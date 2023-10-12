@@ -41,7 +41,17 @@ where
     fn to_event_string(&self) -> String {
         format!(
             "EVENT_JSON:{}",
-            serde_json::to_string(&self.to_event_log()).unwrap_or_else(|_| near_sdk::env::abort()),
+            serde_json::to_string(&self.to_event_log()).unwrap_or_else(|e| {
+                #[cfg(not(target_arch = "wasm32"))]
+                {
+                    panic!("Failed to serialize event: {e}")
+                }
+
+                #[cfg(target_arch = "wasm32")]
+                {
+                    near_sdk::env::panic_str(&format!("Failed to serialize event: {e}"))
+                }
+            }),
         )
     }
 
