@@ -1,8 +1,7 @@
 #![cfg(not(windows))]
 
 use near_sdk::{json_types::U128, serde_json::json, ONE_NEAR};
-
-use workspaces::{sandbox, Account, Contract, DevNetwork, Worker};
+use near_workspaces::{sandbox, Account, Contract, DevNetwork, Worker};
 
 const WASM: &[u8] = include_bytes!("../../target/wasm32-unknown-unknown/release/storage_fee.wasm");
 
@@ -73,7 +72,8 @@ async fn storage_fee() {
 
         // How much was actually charged to the account?
         // Note that there will be *some* overhead, e.g. collection indexing
-        let net_fee = balance_before - balance_after - (r.total_gas_burnt as u128 * gas_price);
+        let net_fee =
+            balance_before - balance_after - (r.total_gas_burnt.as_gas() as u128 * gas_price);
 
         assert!(net_fee >= minimum_storage_fee);
         assert!(net_fee - minimum_storage_fee < byte_cost * 100); // Sanity/validity check / allow up to 100 bytes worth of additional storage to be charged

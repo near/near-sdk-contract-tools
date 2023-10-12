@@ -4,7 +4,8 @@ use near_sdk::{
     borsh::{self, BorshSerialize},
     serde::Serialize,
 };
-use workspaces::{Account, Contract};
+use near_workspaces::{Account, Contract};
+use pretty_assertions::assert_eq;
 
 const WASM_BORSH: &[u8] =
     include_bytes!("../../target/wasm32-unknown-unknown/release/upgrade_old_borsh.wasm");
@@ -42,7 +43,7 @@ struct Setup {
 
 /// Setup for individual tests
 async fn setup(num_accounts: usize, wasm: &[u8]) -> Setup {
-    let worker = workspaces::sandbox().await.unwrap();
+    let worker = near_workspaces::sandbox().await.unwrap();
 
     // Initialize user accounts
     let mut accounts = vec![];

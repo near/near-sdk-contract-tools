@@ -1,7 +1,8 @@
 #![cfg(not(windows))]
 
 use near_sdk::{json_types::U128, serde_json::json};
-use workspaces::{Account, AccountId, Contract};
+use near_workspaces::{Account, AccountId, Contract};
+use pretty_assertions::assert_eq;
 
 const WASM: &[u8] =
     include_bytes!("../../target/wasm32-unknown-unknown/release/fungible_token.wasm");
@@ -24,7 +25,7 @@ struct Setup {
 
 /// Setup for individual tests
 async fn setup(num_accounts: usize) -> Setup {
-    let worker = workspaces::sandbox().await.unwrap();
+    let worker = near_workspaces::sandbox().await.unwrap();
 
     // Initialize contract
     let contract = worker.dev_deploy(WASM).await.unwrap();
@@ -156,6 +157,43 @@ async fn transfer_no_deposit() {
         .args_json(json!({
             "receiver_id": bob.id(),
             "amount": "10",
+        }))
+        .transact()
+        .await
+        .unwrap()
+        .unwrap();
+}
+
+#[tokio::test]
+#[should_panic(expected = "Balance of the sender is insufficient")]
+async fn transfer_more_than_balance() {
+    let Setup { contract, accounts } = setup_balances(3, |i| 10u128.pow(3 - i as u32).into()).await;
+    let alice = &accounts[0];
+    let bob = &accounts[1];
+
+    alice
+        .call(contract.id(), "ft_transfer")
+        .args_json(json!({
+            "receiver_id": bob.id(),
+            "amount": "1000000",
+        }))
+        .deposit(1)
+        .transact()
+        .await
+        .unwrap()
+        .unwrap();
+}
+
+#[tokio::test]
+#[should_panic(expected = "TotalSupplyOverflowError")]
+async fn transfer_overflow_u128() {
+    let Setup { contract, accounts } = setup_balances(2, |_| (u128::MAX / 2).into()).await;
+    let alice = &accounts[0];
+
+    alice
+        .call(contract.id(), "mint")
+        .args_json(json!({
+            "amount": "2",
         }))
         .transact()
         .await
