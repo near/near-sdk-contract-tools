@@ -1,22 +1,12 @@
 #![cfg(not(windows))]
 
 use near_sdk::{json_types::U128, serde_json::json};
-use near_workspaces::{Account, AccountId, Contract};
+use near_workspaces::{Account, Contract};
 use pretty_assertions::assert_eq;
+use workspaces_tests_utils::ft_balance_of;
 
 const WASM: &[u8] =
     include_bytes!("../../target/wasm32-unknown-unknown/release/fungible_token.wasm");
-
-async fn balance(contract: &Contract, account: &AccountId) -> u128 {
-    contract
-        .view("ft_balance_of")
-        .args_json(json!({ "account_id": account }))
-        .await
-        .unwrap()
-        .json::<U128>()
-        .map(u128::from)
-        .unwrap()
-}
 
 struct Setup {
     pub contract: Contract,
@@ -62,7 +52,7 @@ async fn start_empty() {
 
     // All accounts must start with 0 balance
     for account in accounts.iter() {
-        assert_eq!(balance(&contract, account.id()).await, 0);
+        assert_eq!(ft_balance_of(&contract, account.id()).await, 0);
     }
 }
 
@@ -74,9 +64,9 @@ async fn mint() {
     let charlie = &accounts[2];
 
     // Verify issued balances
-    assert_eq!(balance(&contract, alice.id()).await, 1000);
-    assert_eq!(balance(&contract, bob.id()).await, 100);
-    assert_eq!(balance(&contract, charlie.id()).await, 10);
+    assert_eq!(ft_balance_of(&contract, alice.id()).await, 1000);
+    assert_eq!(ft_balance_of(&contract, bob.id()).await, 100);
+    assert_eq!(ft_balance_of(&contract, charlie.id()).await, 10);
 }
 
 #[tokio::test]
@@ -97,9 +87,9 @@ async fn transfer_normal() {
         .await
         .unwrap()
         .unwrap();
-    assert_eq!(balance(&contract, alice.id()).await, 990);
-    assert_eq!(balance(&contract, bob.id()).await, 110);
-    assert_eq!(balance(&contract, charlie.id()).await, 10);
+    assert_eq!(ft_balance_of(&contract, alice.id()).await, 990);
+    assert_eq!(ft_balance_of(&contract, bob.id()).await, 110);
+    assert_eq!(ft_balance_of(&contract, charlie.id()).await, 10);
 }
 
 #[tokio::test]
@@ -120,9 +110,9 @@ async fn transfer_zero() {
         .await
         .unwrap()
         .unwrap();
-    assert_eq!(balance(&contract, alice.id()).await, 1000);
-    assert_eq!(balance(&contract, bob.id()).await, 100);
-    assert_eq!(balance(&contract, charlie.id()).await, 10);
+    assert_eq!(ft_balance_of(&contract, alice.id()).await, 1000);
+    assert_eq!(ft_balance_of(&contract, bob.id()).await, 100);
+    assert_eq!(ft_balance_of(&contract, charlie.id()).await, 10);
 }
 
 #[tokio::test]

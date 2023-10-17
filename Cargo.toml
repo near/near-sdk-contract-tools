@@ -13,11 +13,15 @@ repository = "https://github.com/NEARFoundation/near-sdk-contract-tools"
 version = "1.1.0"
 
 [workspace.dependencies]
+# normal dependencies
 near-sdk = { version = "4.1.1", default-features = false }
 near-sdk-contract-tools-macros = { version = "=1.1.0", path = "./macros" }
 serde = "1.0.144"
 serde_json = "1.0.85"
 thiserror = "1.0.35"
+
+# dev-dependencies
+pretty_assertions = "1.4.0"
 
 [dependencies]
 near-sdk.workspace = true

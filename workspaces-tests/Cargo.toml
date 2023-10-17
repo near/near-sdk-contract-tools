@@ -72,7 +72,7 @@ thiserror.workspace = true
 [dev-dependencies]
 near-crypto = "0.15.0"
 tokio = "1.21.1"
-pretty_assertions = "1.4.0"
+pretty_assertions.workspace = true
 
 [target.'cfg(not(windows))'.dev-dependencies]
 near-workspaces = "0.8"
