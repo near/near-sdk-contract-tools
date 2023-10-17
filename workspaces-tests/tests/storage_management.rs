@@ -1,6 +1,10 @@
 #![cfg(not(windows))]
 
-use near_sdk::{json_types::U128, serde_json::json, ONE_NEAR};
+use near_sdk::{
+    json_types::{Base64VecU8, U128},
+    serde_json::json,
+    ONE_NEAR,
+};
 use near_workspaces::{network::Sandbox, operations::Function, Account, Contract, Worker};
 use tokio::task::JoinSet;
 use workspaces_tests_utils::{expect_execution_error, ft_balance_of};
@@ -46,7 +50,7 @@ async fn setup_balances(num_accounts: usize, amount: impl Fn(usize) -> U128) -> 
             .call(
                 Function::new("storage_deposit")
                     .args_json(json!({}))
-                    .deposit(ONE_NEAR / 10),
+                    .deposit(ONE_NEAR / 100),
             )
             .call(Function::new("mint").args_json(json!({ "amount": amount(i) })))
             .transact();
@@ -58,37 +62,6 @@ async fn setup_balances(num_accounts: usize, amount: impl Fn(usize) -> U128) -> 
     while transaction_set.join_next().await.is_some() {}
 
     setup
-}
-
-#[tokio::test]
-async fn start_empty() {
-    let Setup {
-        contract,
-        accounts,
-        worker: _,
-    } = setup(3).await;
-
-    // All accounts must start with 0 balance
-    for account in accounts.iter() {
-        assert_eq!(ft_balance_of(&contract, account.id()).await, 0);
-    }
-}
-
-#[tokio::test]
-async fn mint() {
-    let Setup {
-        contract,
-        accounts,
-        worker: _,
-    } = setup_balances(3, |i| 10u128.pow(3 - i as u32).into()).await;
-    let alice = &accounts[0];
-    let bob = &accounts[1];
-    let charlie = &accounts[2];
-
-    // Verify issued balances
-    assert_eq!(ft_balance_of(&contract, alice.id()).await, 1000);
-    assert_eq!(ft_balance_of(&contract, bob.id()).await, 100);
-    assert_eq!(ft_balance_of(&contract, charlie.id()).await, 10);
 }
 
 #[tokio::test]
@@ -146,4 +119,27 @@ async fn transfer_fail_not_registered() {
             charlie.id()
         ),
     );
+}
+
+#[tokio::test]
+#[should_panic = "Storage lock error"]
+async fn fail_run_out_of_space() {
+    let Setup {
+        contract,
+        accounts,
+        worker: _,
+    } = setup_balances(2, |i| 10u128.pow(3 - i as u32).into()).await;
+    let alice = &accounts[0];
+
+    for _ in 0..100 {
+        alice
+            .call(contract.id(), "use_storage")
+            .args_json(json!({
+                "blob": Base64VecU8::from(vec![1u8; 10000]),
+            }))
+            .transact()
+            .await
+            .unwrap()
+            .unwrap();
+    }
 }

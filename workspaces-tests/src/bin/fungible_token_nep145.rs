@@ -8,14 +8,18 @@ use std::cmp::Ordering;
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
     env,
-    json_types::U128,
-    near_bindgen, require, AccountId, PanicOnDefault,
+    json_types::{Base64VecU8, U128},
+    near_bindgen, require,
+    store::Vector,
+    AccountId, PanicOnDefault,
 };
 use near_sdk_contract_tools::{ft::*, standard::nep145::*, Nep145};
 
 #[derive(PanicOnDefault, BorshSerialize, BorshDeserialize, FungibleToken, Nep145)]
 #[near_bindgen]
-pub struct Contract {}
+pub struct Contract {
+    blobs: Vector<Vec<u8>>,
+}
 
 impl Nep145Hook for Contract {
     fn after_force_unregister(
@@ -80,11 +84,26 @@ impl Nep141Hook for Contract {
 impl Contract {
     #[init]
     pub fn new() -> Self {
-        Self {}
+        Self {
+            blobs: Vector::new(b"b"),
+        }
     }
 
     pub fn mint(&mut self, amount: U128) {
         Nep141Controller::mint(self, env::predecessor_account_id(), amount.into(), None).unwrap();
+    }
+
+    pub fn use_storage(&mut self, blob: Base64VecU8) {
+        let storage_start = env::storage_usage();
+        let blob = blob.into();
+        self.blobs.push(blob);
+        self.blobs.flush();
+        let storage_end = env::storage_usage();
+        self.lock_storage(
+            &env::predecessor_account_id(),
+            ((storage_end - storage_start) as u128 * env::storage_byte_cost()).into(),
+        )
+        .unwrap_or_else(|e| env::panic_str(&format!("Storage lock error: {}", e)));
     }
 
     fn require_registration(&self, account_id: &AccountId) {
