@@ -7,3 +7,4 @@ publish = false
 [target.'cfg(not(windows))'.dependencies]
 near-sdk.workspace = true
 near-workspaces = "0.8"
+pretty_assertions.workspace = true

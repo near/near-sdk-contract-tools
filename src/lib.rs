@@ -11,6 +11,8 @@ pub enum DefaultStorageKey {
     ApprovalManager,
     /// Default storage key for [`standard::nep141::Nep141ControllerInternal::root`].
     Nep141,
+    /// Default storage key for [`standard::nep145::Nep145ControllerInternal::root`]
+    Nep145,
     /// Default storage key for [`standard::nep148::Nep148ControllerInternal::root`].
     Nep148,
     /// Default storage key for [`standard::nep171::Nep171ControllerInternal::root`].
@@ -27,7 +29,7 @@ pub enum DefaultStorageKey {
     Pause,
     /// Default storage key for [`rbac::RbacInternal::root`].
     Rbac,
-    /// Default storage key for [`escrow::Escrow::root`]
+    /// Default storage key for [`escrow::EscrowInternal::root`]
     Escrow,
 }
 
@@ -36,6 +38,7 @@ impl IntoStorageKey for DefaultStorageKey {
         match self {
             DefaultStorageKey::ApprovalManager => b"~am".to_vec(),
             DefaultStorageKey::Nep141 => b"~$141".to_vec(),
+            DefaultStorageKey::Nep145 => b"~$145".to_vec(),
             DefaultStorageKey::Nep148 => b"~$148".to_vec(),
             DefaultStorageKey::Nep171 => b"~$171".to_vec(),
             DefaultStorageKey::Nep177 => b"~$177".to_vec(),
