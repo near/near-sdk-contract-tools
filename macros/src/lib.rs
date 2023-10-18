@@ -120,6 +120,17 @@ pub fn derive_nep141(input: TokenStream) -> TokenStream {
     make_derive(input, standard::nep141::expand)
 }
 
+/// Adds NEP-145 fungible token core functionality to a contract. Exposes
+/// `storage_*` functions to the public blockchain, implements internal
+/// controller functionality.
+///
+/// The storage key prefix for the fields can be optionally specified (default:
+/// `"~$145"`) using `#[nep145(storage_key = "<expression>")]`.
+#[proc_macro_derive(Nep145, attributes(nep145))]
+pub fn derive_nep145(input: TokenStream) -> TokenStream {
+    make_derive(input, standard::nep145::expand)
+}
+
 /// Adds NEP-148 fungible token metadata functionality to a contract. Metadata
 /// is hardcoded into the contract code, and is therefore not stored in storage.
 ///

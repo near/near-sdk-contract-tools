@@ -1,8 +1,9 @@
 #![allow(missing_docs)]
 #![cfg(not(windows))]
 
-use near_sdk::{serde::de::DeserializeOwned, serde_json::json};
-use near_workspaces::{result::ExecutionFinalResult, Account, Contract};
+use near_sdk::{json_types::U128, serde::de::DeserializeOwned, serde_json::json};
+use near_workspaces::{result::ExecutionFinalResult, Account, AccountId, Contract};
+use pretty_assertions::assert_eq;
 
 pub async fn nft_token<T: DeserializeOwned>(contract: &Contract, token_id: &str) -> Option<T> {
     contract
@@ -11,6 +12,17 @@ pub async fn nft_token<T: DeserializeOwned>(contract: &Contract, token_id: &str)
         .await
         .unwrap()
         .json::<Option<T>>()
+        .unwrap()
+}
+
+pub async fn ft_balance_of(contract: &Contract, account: &AccountId) -> u128 {
+    contract
+        .view("ft_balance_of")
+        .args_json(json!({ "account_id": account }))
+        .await
+        .unwrap()
+        .json::<U128>()
+        .map(u128::from)
         .unwrap()
 }
 
