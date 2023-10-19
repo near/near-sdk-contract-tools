@@ -86,32 +86,26 @@ pub fn assert_nonzero_deposit() {
     );
 }
 
-pub trait Hook<A = (), C = Self> {
-    type State;
-
-    fn before(contract: &C, args: &A) -> Self::State;
-    fn after(contract: &mut C, args: &A, state: Self::State);
+pub trait Hook<C, A = ()> {
+    fn before(contract: &C, args: &A) -> Self;
+    fn after(contract: &mut C, args: &A, state: Self);
 }
 
-impl<A, C> Hook<A, C> for () {
-    type State = ();
-
-    fn before(_contract: &C, _args: &A) -> Self::State {}
-    fn after(_contract: &mut C, _args: &A, _state: Self::State) {}
+impl<C, A> Hook<C, A> for () {
+    fn before(_contract: &C, _args: &A) {}
+    fn after(_contract: &mut C, _args: &A, _: ()) {}
 }
 
-impl<A, C, T, U> Hook<A, C> for (T, U)
+impl<C, A, T, U> Hook<C, A> for (T, U)
 where
-    T: Hook<A, C>,
-    U: Hook<A, C>,
+    T: Hook<C, A>,
+    U: Hook<C, A>,
 {
-    type State = (T::State, U::State);
-
-    fn before(contract: &C, args: &A) -> Self::State {
+    fn before(contract: &C, args: &A) -> Self {
         (T::before(contract, args), U::before(contract, args))
     }
 
-    fn after(contract: &mut C, args: &A, (t_state, u_state): Self::State) {
+    fn after(contract: &mut C, args: &A, (t_state, u_state): Self) {
         T::after(contract, args, t_state);
         U::after(contract, args, u_state);
     }

@@ -69,13 +69,13 @@ pub struct Nep141Burn {
 
 /// Internal functions for [`Nep141Controller`]. Using these methods may result in unexpected behavior.
 pub trait Nep141ControllerInternal {
-    type MintHook: Hook<Nep141Mint, Self>
+    type MintHook: Hook<Self, Nep141Mint>
     where
         Self: Sized;
-    type TransferHook: Hook<Nep141Transfer, Self>
+    type TransferHook: Hook<Self, Nep141Transfer>
     where
         Self: Sized;
-    type BurnHook: Hook<Nep141Burn, Self>
+    type BurnHook: Hook<Self, Nep141Burn>
     where
         Self: Sized;
 
@@ -97,13 +97,13 @@ pub trait Nep141ControllerInternal {
 
 /// Non-public implementations of functions for managing a fungible token.
 pub trait Nep141Controller {
-    type MintHook: Hook<Nep141Mint, Self>
+    type MintHook: Hook<Self, Nep141Mint>
     where
         Self: Sized;
-    type TransferHook: Hook<Nep141Transfer, Self>
+    type TransferHook: Hook<Self, Nep141Transfer>
     where
         Self: Sized;
-    type BurnHook: Hook<Nep141Burn, Self>
+    type BurnHook: Hook<Self, Nep141Burn>
     where
         Self: Sized;
 

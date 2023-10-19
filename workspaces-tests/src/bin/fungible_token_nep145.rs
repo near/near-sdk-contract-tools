@@ -16,6 +16,7 @@ use near_sdk_contract_tools::{ft::*, standard::nep145::*, utils::Hook, Nep145};
 #[derive(PanicOnDefault, BorshSerialize, BorshDeserialize, FungibleToken, Nep145)]
 #[fungible_token(
     mint_hook = "PredecessorStorageAccounting",
+    transfer_hook = "TransferHook",
     burn_hook = "PredecessorStorageAccounting"
 )]
 #[near_bindgen]
@@ -40,32 +41,30 @@ impl Nep145Hook for Contract {
     }
 }
 
-pub struct PredecessorStorageAccounting;
+pub struct PredecessorStorageAccounting(u64);
 
-impl<A> Hook<A, Contract> for PredecessorStorageAccounting {
-    type State = u64;
-
-    fn before(contract: &Contract, _args: &A) -> u64 {
+impl<A> Hook<Contract, A> for PredecessorStorageAccounting {
+    fn before(contract: &Contract, _args: &A) -> Self {
         contract.require_registration(&env::predecessor_account_id());
-        env::storage_usage()
+        Self(env::storage_usage())
     }
 
-    fn after(contract: &mut Contract, _args: &A, storage_usage_start: u64) {
+    fn after(contract: &mut Contract, _args: &A, Self(storage_usage_start): Self) {
         contract
             .storage_accounting(&env::predecessor_account_id(), storage_usage_start)
             .unwrap_or_else(|e| env::panic_str(&e.to_string()));
     }
 }
 
-impl Hook<Nep141Transfer> for Contract {
-    type State = u64;
+pub struct TransferHook(u64);
 
-    fn before(contract: &Contract, transfer: &Nep141Transfer) -> u64 {
+impl Hook<Contract, Nep141Transfer> for TransferHook {
+    fn before(contract: &Contract, transfer: &Nep141Transfer) -> Self {
         contract.require_registration(&transfer.receiver_id);
-        env::storage_usage()
+        Self(env::storage_usage())
     }
 
-    fn after(contract: &mut Contract, _transfer: &Nep141Transfer, storage_usage_start: u64) {
+    fn after(contract: &mut Contract, _transfer: &Nep141Transfer, Self(storage_usage_start): Self) {
         contract
             .storage_accounting(&env::predecessor_account_id(), storage_usage_start)
             .unwrap_or_else(|e| env::panic_str(&e.to_string()));

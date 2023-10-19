@@ -15,7 +15,7 @@ use near_sdk_contract_tools::{
 };
 
 #[derive(PanicOnDefault, BorshSerialize, BorshDeserialize, FungibleToken)]
-#[fungible_token(mint_hook = "()", transfer_hook = "()", burn_hook = "()")]
+#[fungible_token(no_hooks)]
 #[near_bindgen]
 pub struct Contract {}
 

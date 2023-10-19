@@ -7,10 +7,10 @@ use near_sdk::{
     test_utils::VMContextBuilder,
     testing_env, AccountId, PromiseOrValue,
 };
-use near_sdk_contract_tools::{standard::nep141::*, Nep141, utils::Hook};
+use near_sdk_contract_tools::{standard::nep141::*, utils::Hook, Nep141};
 
 #[derive(Nep141, BorshDeserialize, BorshSerialize)]
-#[nep141(mint_hook = "()", burn_hook = "()")]
+#[nep141(no_hooks, transfer_hook = "TransferHook")]
 #[near_bindgen]
 struct FungibleToken {
     pub transfers: Vector<Nep141Transfer>,
@@ -18,20 +18,18 @@ struct FungibleToken {
 }
 
 #[derive(Default)]
-struct HookState {
+struct TransferHook {
     pub storage_usage_start: u64,
 }
 
-impl Hook<Nep141Transfer> for FungibleToken {
-    type State = HookState;
-
-    fn before(_contract: &Self, _transfer: &Nep141Transfer) -> HookState {
-        HookState {
+impl Hook<FungibleToken, Nep141Transfer> for TransferHook {
+    fn before(_contract: &FungibleToken, _transfer: &Nep141Transfer) -> Self {
+        Self {
             storage_usage_start: env::storage_usage(),
         }
     }
 
-    fn after(contract: &mut Self, transfer: &Nep141Transfer, state: HookState) {
+    fn after(contract: &mut FungibleToken, transfer: &Nep141Transfer, state: Self) {
         contract.hooks.push(&"after_transfer".to_string());
         contract.transfers.push(transfer);
         println!(

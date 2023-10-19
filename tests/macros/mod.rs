@@ -402,7 +402,7 @@ mod pausable_fungible_token {
     };
 
     #[derive(FungibleToken, Pause, BorshDeserialize, BorshSerialize)]
-    #[fungible_token(mint_hook = "()", burn_hook = "()")]
+    #[fungible_token(no_hooks, transfer_hook = "TransferHook")]
     #[near_bindgen]
     struct Contract {
         pub storage_usage: u64,
@@ -425,21 +425,19 @@ mod pausable_fungible_token {
     }
 
     #[derive(Default)]
-    struct HookState {
+    struct TransferHook {
         pub storage_usage_start: u64,
     }
 
-    impl Hook<Nep141Transfer> for Contract {
-        type State = HookState;
-
-        fn before(_contract: &Self, _transfer: &Nep141Transfer) -> HookState {
+    impl Hook<Contract, Nep141Transfer> for TransferHook {
+        fn before(_contract: &Contract, _transfer: &Nep141Transfer) -> TransferHook {
             Contract::require_unpaused();
-            HookState {
+            TransferHook {
                 storage_usage_start: env::storage_usage(),
             }
         }
 
-        fn after(contract: &mut Self, _transfer: &Nep141Transfer, state: HookState) {
+        fn after(contract: &mut Contract, _transfer: &Nep141Transfer, state: TransferHook) {
             let storage_delta = env::storage_usage() - state.storage_usage_start;
             println!("Storage delta: {storage_delta}");
 
