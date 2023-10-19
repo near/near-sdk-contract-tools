@@ -397,10 +397,12 @@ mod pausable_fungible_token {
     use near_sdk_contract_tools::{
         pause::Pause,
         standard::{nep141::*, nep148::*},
+        utils::Hook,
         FungibleToken, Pause,
     };
 
     #[derive(FungibleToken, Pause, BorshDeserialize, BorshSerialize)]
+    #[fungible_token(mint_hook = "()", burn_hook = "()")]
     #[near_bindgen]
     struct Contract {
         pub storage_usage: u64,
@@ -427,27 +429,17 @@ mod pausable_fungible_token {
         pub storage_usage_start: u64,
     }
 
-    impl Nep141Hook for Contract {
-        type MintState = ();
-        type TransferState = HookState;
-        type BurnState = ();
+    impl Hook<Nep141Transfer> for Contract {
+        type State = HookState;
 
-        fn before_mint(_contract: &Self, _amount: u128, _account_id: &AccountId) {}
-
-        fn after_mint(_contract: &mut Self, _amount: u128, _account_id: &AccountId, _: ()) {}
-
-        fn before_burn(_contract: &Self, _amount: u128, _account_id: &AccountId) {}
-
-        fn after_burn(_contract: &mut Self, _amount: u128, _account_id: &AccountId, _: ()) {}
-
-        fn before_transfer(_contract: &Self, _transfer: &Nep141Transfer) -> HookState {
+        fn before(_contract: &Self, _transfer: &Nep141Transfer) -> HookState {
             Contract::require_unpaused();
             HookState {
                 storage_usage_start: env::storage_usage(),
             }
         }
 
-        fn after_transfer(contract: &mut Self, _transfer: &Nep141Transfer, state: HookState) {
+        fn after(contract: &mut Self, _transfer: &Nep141Transfer, state: HookState) {
             let storage_delta = env::storage_usage() - state.storage_usage_start;
             println!("Storage delta: {storage_delta}");
 

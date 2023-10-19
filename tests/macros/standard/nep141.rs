@@ -7,9 +7,10 @@ use near_sdk::{
     test_utils::VMContextBuilder,
     testing_env, AccountId, PromiseOrValue,
 };
-use near_sdk_contract_tools::{standard::nep141::*, Nep141};
+use near_sdk_contract_tools::{standard::nep141::*, Nep141, utils::Hook};
 
 #[derive(Nep141, BorshDeserialize, BorshSerialize)]
+#[nep141(mint_hook = "()", burn_hook = "()")]
 #[near_bindgen]
 struct FungibleToken {
     pub transfers: Vector<Nep141Transfer>,
@@ -21,26 +22,16 @@ struct HookState {
     pub storage_usage_start: u64,
 }
 
-impl Nep141Hook for FungibleToken {
-    type MintState = ();
-    type TransferState = HookState;
-    type BurnState = ();
+impl Hook<Nep141Transfer> for FungibleToken {
+    type State = HookState;
 
-    fn before_mint(_contract: &Self, _amount: u128, _account_id: &AccountId) {}
-
-    fn after_mint(_contract: &mut Self, _amount: u128, _account_id: &AccountId, _: ()) {}
-
-    fn before_burn(_contract: &Self, _amount: u128, _account_id: &AccountId) {}
-
-    fn after_burn(_contract: &mut Self, _amount: u128, _account_id: &AccountId, _: ()) {}
-
-    fn before_transfer(_: &Self, _transfer: &Nep141Transfer) -> HookState {
+    fn before(_contract: &Self, _transfer: &Nep141Transfer) -> HookState {
         HookState {
             storage_usage_start: env::storage_usage(),
         }
     }
 
-    fn after_transfer(contract: &mut Self, transfer: &Nep141Transfer, state: HookState) {
+    fn after(contract: &mut Self, transfer: &Nep141Transfer, state: HookState) {
         contract.hooks.push(&"after_transfer".to_string());
         contract.transfers.push(transfer);
         println!(

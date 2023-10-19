@@ -86,6 +86,83 @@ pub fn assert_nonzero_deposit() {
     );
 }
 
+pub trait Hook<A = (), C = Self> {
+    type State;
+
+    fn before(contract: &C, args: &A) -> Self::State;
+    fn after(contract: &mut C, args: &A, state: Self::State);
+}
+
+impl<A, C> Hook<A, C> for () {
+    type State = ();
+
+    fn before(_contract: &C, _args: &A) -> Self::State {}
+    fn after(_contract: &mut C, _args: &A, _state: Self::State) {}
+}
+
+impl<A, C, T, U> Hook<A, C> for (T, U)
+where
+    T: Hook<A, C>,
+    U: Hook<A, C>,
+{
+    type State = (T::State, U::State);
+
+    fn before(contract: &C, args: &A) -> Self::State {
+        (T::before(contract, args), U::before(contract, args))
+    }
+
+    fn after(contract: &mut C, args: &A, (t_state, u_state): Self::State) {
+        T::after(contract, args, t_state);
+        U::after(contract, args, u_state);
+    }
+}
+
+// trait SimpleHook<A> {
+//     fn before(&self, args: &A) {}
+//     fn after(&mut self, args: &A) {}
+// }
+
+// impl<A, C: SimpleHook<A>> Hook<A, C> for C {
+//     type State = ();
+
+//     fn before(contract: &C, args: &A) -> Self::State {
+//         // contract.before(args);
+//     }
+
+//     fn after(contract: &mut C, args: &A, _state: Self::State) {
+//         // contract.after(args);
+//     }
+// }
+
+// struct StorageAccountingHook<A>(std::marker::PhantomData<A>);
+
+// impl<C, A> THook<C, A> for StorageAccountingHook<A> {
+//     type State = u64;
+
+//     fn before(contract: &C, args: &A) -> Self::State {
+//         todo!()
+//     }
+
+//     fn after(contract: &mut C, args: &A, state: Self::State) {
+//         todo!()
+//     }
+// }
+
+// struct MintArgs {
+//     amount: u128,
+//     account_id: String,
+// }
+
+// trait FT {
+//     type MintHook: THook<Self, MintArgs> where Self : Sized;
+// }
+
+// struct Contract;
+
+// impl FT for Contract {
+//     type MintHook = StorageAccountingHook<MintArgs>;
+// }
+
 #[cfg(test)]
 mod tests {
     use super::prefix_key;

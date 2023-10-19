@@ -149,17 +149,22 @@ pub struct MyNft {}
 One may wish to combine the features of multiple macros in one contract. All of the macros are written such that they will work in a standalone manner, so this should largely work without issue. However, sometimes it may be desirable for the macros to work in _combination_ with each other. For example, to make a fungible token pausable, use the fungible token hooks to require that a contract be unpaused before making a token transfer:
 
 ```rust
-use near_sdk_contract_tools::{ft::*, pause::Pause, Pause};
+use near_sdk_contract_tools::{ft::*, pause::Pause, Pause, utils::Hook};
 use near_sdk::near_bindgen;
 
 #[derive(FungibleToken, Pause)]
+#[fungible_token(no_hooks, transfer_hook = "Self")]
 #[near_bindgen]
 struct Contract {}
 
-impl SimpleNep141Hook for Contract {
-    fn before_transfer(&self, _transfer: &Nep141Transfer) {
+impl Hook<Nep141Transfer> for Contract {
+    type State = ();
+
+    fn before(_contract: &Contract, _transfer: &Nep141Transfer) {
         Contract::require_unpaused();
     }
+
+    fn after(_contract: &mut Contract, _transfer: &Nep141Transfer, _: ()) {}
 }
 ```
 

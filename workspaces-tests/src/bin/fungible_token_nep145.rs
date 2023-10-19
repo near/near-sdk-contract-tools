@@ -11,9 +11,13 @@ use near_sdk::{
     store::Vector,
     AccountId, PanicOnDefault,
 };
-use near_sdk_contract_tools::{ft::*, standard::nep145::*, Nep145};
+use near_sdk_contract_tools::{ft::*, standard::nep145::*, utils::Hook, Nep145};
 
 #[derive(PanicOnDefault, BorshSerialize, BorshDeserialize, FungibleToken, Nep145)]
+#[fungible_token(
+    mint_hook = "PredecessorStorageAccounting",
+    burn_hook = "PredecessorStorageAccounting"
+)]
 #[near_bindgen]
 pub struct Contract {
     blobs: Vector<Vec<u8>>,
@@ -27,57 +31,41 @@ impl Nep145Hook for Contract {
     ) {
         let balance = contract.balance_of(account_id);
         contract
-            .burn(
-                account_id.clone(),
-                balance,
-                Some("storage force unregister".to_string()),
-            )
+            .burn(&Nep141Burn {
+                amount: balance,
+                account_id: account_id.clone(),
+                memo: Some("storage force unregister".to_string()),
+            })
             .unwrap();
     }
 }
 
-impl Nep141Hook for Contract {
-    type MintState = u64;
-    type TransferState = u64;
-    type BurnState = u64;
+pub struct PredecessorStorageAccounting;
 
-    fn before_mint(contract: &Self, _amount: u128, account_id: &AccountId) -> u64 {
-        contract.require_registration(account_id);
+impl<A> Hook<A, Contract> for PredecessorStorageAccounting {
+    type State = u64;
+
+    fn before(contract: &Contract, _args: &A) -> u64 {
+        contract.require_registration(&env::predecessor_account_id());
         env::storage_usage()
     }
 
-    fn after_mint(
-        contract: &mut Self,
-        _amount: u128,
-        _account_id: &AccountId,
-        storage_usage_start: u64,
-    ) {
+    fn after(contract: &mut Contract, _args: &A, storage_usage_start: u64) {
         contract
             .storage_accounting(&env::predecessor_account_id(), storage_usage_start)
             .unwrap_or_else(|e| env::panic_str(&e.to_string()));
     }
+}
 
-    fn before_transfer(contract: &Self, transfer: &Nep141Transfer) -> u64 {
+impl Hook<Nep141Transfer> for Contract {
+    type State = u64;
+
+    fn before(contract: &Contract, transfer: &Nep141Transfer) -> u64 {
         contract.require_registration(&transfer.receiver_id);
         env::storage_usage()
     }
 
-    fn after_transfer(contract: &mut Self, _transfer: &Nep141Transfer, storage_usage_start: u64) {
-        contract
-            .storage_accounting(&env::predecessor_account_id(), storage_usage_start)
-            .unwrap_or_else(|e| env::panic_str(&e.to_string()));
-    }
-
-    fn before_burn(_contract: &Self, _amount: u128, _account_id: &AccountId) -> u64 {
-        env::storage_usage()
-    }
-
-    fn after_burn(
-        contract: &mut Self,
-        _amount: u128,
-        _account_id: &AccountId,
-        storage_usage_start: u64,
-    ) {
+    fn after(contract: &mut Contract, _transfer: &Nep141Transfer, storage_usage_start: u64) {
         contract
             .storage_accounting(&env::predecessor_account_id(), storage_usage_start)
             .unwrap_or_else(|e| env::panic_str(&e.to_string()));
@@ -102,7 +90,15 @@ impl Contract {
     }
 
     pub fn mint(&mut self, amount: U128) {
-        Nep141Controller::mint(self, env::predecessor_account_id(), amount.into(), None).unwrap();
+        Nep141Controller::mint(
+            self,
+            &Nep141Mint {
+                amount: amount.into(),
+                account_id: env::predecessor_account_id(),
+                memo: None,
+            },
+        )
+        .unwrap();
     }
 
     pub fn use_storage(&mut self, blob: Base64VecU8) {

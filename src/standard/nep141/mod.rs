@@ -7,7 +7,7 @@ use near_sdk::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{slot::Slot, standard::nep297::*, DefaultStorageKey};
+use crate::{slot::Slot, standard::nep297::*, utils::Hook, DefaultStorageKey};
 
 mod error;
 pub use error::*;
@@ -15,8 +15,6 @@ mod event;
 pub use event::*;
 mod ext;
 pub use ext::*;
-mod hook;
-pub use hook::*;
 
 /// Gas value required for ft_resolve_transfer calls
 pub const GAS_FOR_RESOLVE_TRANSFER: Gas = Gas(5_000_000_000_000);
@@ -57,10 +55,27 @@ impl Nep141Transfer {
     }
 }
 
+pub struct Nep141Mint {
+    pub amount: u128,
+    pub account_id: AccountId,
+    pub memo: Option<String>,
+}
+
+pub struct Nep141Burn {
+    pub amount: u128,
+    pub account_id: AccountId,
+    pub memo: Option<String>,
+}
+
 /// Internal functions for [`Nep141Controller`]. Using these methods may result in unexpected behavior.
 pub trait Nep141ControllerInternal {
-    /// Fungible token lifecycle hooks.
-    type Hook: Nep141Hook<Self>
+    type MintHook: Hook<Nep141Mint, Self>
+    where
+        Self: Sized;
+    type TransferHook: Hook<Nep141Transfer, Self>
+    where
+        Self: Sized;
+    type BurnHook: Hook<Nep141Burn, Self>
     where
         Self: Sized;
 
@@ -82,8 +97,13 @@ pub trait Nep141ControllerInternal {
 
 /// Non-public implementations of functions for managing a fungible token.
 pub trait Nep141Controller {
-    /// Fungible token lifecycle hooks.
-    type Hook: Nep141Hook<Self>
+    type MintHook: Hook<Nep141Mint, Self>
+    where
+        Self: Sized;
+    type TransferHook: Hook<Nep141Transfer, Self>
+    where
+        Self: Sized;
+    type BurnHook: Hook<Nep141Burn, Self>
     where
         Self: Sized;
 
@@ -136,28 +156,20 @@ pub trait Nep141Controller {
     /// # Panics
     ///
     /// See: [`Nep141Controller::deposit_unchecked`]
-    fn mint(
-        &mut self,
-        account_id: AccountId,
-        amount: u128,
-        memo: Option<String>,
-    ) -> Result<(), DepositError>;
+    fn mint(&mut self, mint: &Nep141Mint) -> Result<(), DepositError>;
 
     /// Performs an NEP-141 token burn, with event emission.
     ///
     /// # Panics
     ///
     /// See: [`Nep141Controller::withdraw_unchecked`]
-    fn burn(
-        &mut self,
-        account_id: AccountId,
-        amount: u128,
-        memo: Option<String>,
-    ) -> Result<(), WithdrawError>;
+    fn burn(&mut self, mint: &Nep141Burn) -> Result<(), WithdrawError>;
 }
 
 impl<T: Nep141ControllerInternal> Nep141Controller for T {
-    type Hook = T::Hook;
+    type MintHook = T::MintHook;
+    type TransferHook = T::TransferHook;
+    type BurnHook = T::BurnHook;
 
     fn balance_of(&self, account_id: &AccountId) -> u128 {
         Self::slot_account(account_id).read().unwrap_or(0)
@@ -267,7 +279,7 @@ impl<T: Nep141ControllerInternal> Nep141Controller for T {
     }
 
     fn transfer(&mut self, transfer: &Nep141Transfer) -> Result<(), TransferError> {
-        let state = Self::Hook::before_transfer(self, transfer);
+        let state = Self::TransferHook::before(self, transfer);
 
         self.transfer_unchecked(&transfer.sender_id, &transfer.receiver_id, transfer.amount)?;
 
@@ -279,49 +291,39 @@ impl<T: Nep141ControllerInternal> Nep141Controller for T {
         }])
         .emit();
 
-        Self::Hook::after_transfer(self, transfer, state);
+        Self::TransferHook::after(self, transfer, state);
 
         Ok(())
     }
 
-    fn mint(
-        &mut self,
-        account_id: AccountId,
-        amount: u128,
-        memo: Option<String>,
-    ) -> Result<(), DepositError> {
-        let state = Self::Hook::before_mint(self, amount, &account_id);
+    fn mint(&mut self, mint: &Nep141Mint) -> Result<(), DepositError> {
+        let state = Self::MintHook::before(self, mint);
 
-        self.deposit_unchecked(&account_id, amount)?;
+        self.deposit_unchecked(&mint.account_id, mint.amount)?;
 
-        Self::Hook::after_mint(self, amount, &account_id, state);
+        Self::MintHook::after(self, mint, state);
 
         Nep141Event::FtMint(vec![FtMintData {
-            owner_id: account_id,
-            amount: amount.into(),
-            memo,
+            owner_id: mint.account_id.clone(),
+            amount: mint.amount.into(),
+            memo: mint.memo.clone(),
         }])
         .emit();
 
         Ok(())
     }
 
-    fn burn(
-        &mut self,
-        account_id: AccountId,
-        amount: u128,
-        memo: Option<String>,
-    ) -> Result<(), WithdrawError> {
-        let state = Self::Hook::before_burn(self, amount, &account_id);
+    fn burn(&mut self, burn: &Nep141Burn) -> Result<(), WithdrawError> {
+        let state = Self::BurnHook::before(self, burn);
 
-        self.withdraw_unchecked(&account_id, amount)?;
+        self.withdraw_unchecked(&burn.account_id, burn.amount)?;
 
-        Self::Hook::after_burn(self, amount, &account_id, state);
+        Self::BurnHook::after(self, burn, state);
 
         Nep141Event::FtBurn(vec![FtBurnData {
-            owner_id: account_id,
-            amount: amount.into(),
-            memo,
+            owner_id: burn.account_id.clone(),
+            amount: burn.amount.into(),
+            memo: burn.memo.clone(),
         }])
         .emit();
 

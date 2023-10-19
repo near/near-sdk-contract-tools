@@ -8,7 +8,9 @@ use syn::Expr;
 pub struct Nep141Meta {
     pub storage_key: Option<Expr>,
     pub no_hooks: Flag,
-    pub extension_hooks: Option<syn::Type>,
+    pub mint_hook: Option<Expr>,
+    pub transfer_hook: Option<Expr>,
+    pub burn_hook: Option<Expr>,
     pub generics: syn::Generics,
     pub ident: syn::Ident,
 
@@ -23,7 +25,9 @@ pub fn expand(meta: Nep141Meta) -> Result<TokenStream, darling::Error> {
     let Nep141Meta {
         storage_key,
         no_hooks,
-        extension_hooks,
+        mint_hook,
+        transfer_hook,
+        burn_hook,
         generics,
         ident,
 
@@ -41,21 +45,29 @@ pub fn expand(meta: Nep141Meta) -> Result<TokenStream, darling::Error> {
         }
     });
 
-    let self_hook = if no_hooks.is_present() {
-        quote! { () }
-    } else {
-        quote! { Self }
+    let default_hook = || {
+        no_hooks
+            .is_present()
+            .then(|| quote! { () })
+            .unwrap_or_else(|| quote! { Self })
     };
 
-    let hook = if let Some(extension_hooks) = extension_hooks {
-        quote! { (#self_hook, #extension_hooks) }
-    } else {
-        self_hook
-    };
+    let mint_hook = mint_hook
+        .map(|h| quote! { #h })
+        .unwrap_or_else(default_hook);
+    let transfer_hook = transfer_hook
+        .map(|h| quote! { #h })
+        .unwrap_or_else(default_hook);
+    let burn_hook = burn_hook
+        .map(|h| quote! { #h })
+        .unwrap_or_else(default_hook);
 
     Ok(quote! {
         impl #imp #me::standard::nep141::Nep141ControllerInternal for #ident #ty #wher {
-            type Hook = #hook;
+            type MintHook = #mint_hook;
+            type TransferHook = #transfer_hook;
+            type BurnHook = #burn_hook;
+
             #root
         }
 

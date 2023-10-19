@@ -11,6 +11,9 @@ pub struct FungibleTokenMeta {
     // NEP-141 fields
     pub core_storage_key: Option<Expr>,
     pub no_hooks: Flag,
+    pub mint_hook: Option<Expr>,
+    pub transfer_hook: Option<Expr>,
+    pub burn_hook: Option<Expr>,
 
     // NEP-148 fields
     pub metadata_storage_key: Option<Expr>,
@@ -31,6 +34,9 @@ pub fn expand(meta: FungibleTokenMeta) -> Result<TokenStream, darling::Error> {
         core_storage_key,
         metadata_storage_key,
         no_hooks,
+        mint_hook,
+        transfer_hook,
+        burn_hook,
 
         generics,
         ident,
@@ -42,7 +48,9 @@ pub fn expand(meta: FungibleTokenMeta) -> Result<TokenStream, darling::Error> {
     let expand_nep141 = nep141::expand(nep141::Nep141Meta {
         storage_key: core_storage_key,
         no_hooks,
-        extension_hooks: None,
+        mint_hook,
+        transfer_hook,
+        burn_hook,
 
         generics: generics.clone(),
         ident: ident.clone(),
