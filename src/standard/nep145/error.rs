@@ -120,10 +120,23 @@ pub enum StorageUnregisterError {
     UnregisterWithLockedBalance(#[from] UnregisterWithLockedBalanceError),
 }
 
-/// Errors that can occur when force unregistering storage balance.
+/// Errors that can occur when force-unregistering storage balance.
 #[derive(Debug, Error)]
 pub enum StorageForceUnregisterError {
     /// The account is not registered.
     #[error(transparent)]
     AccountNotRegistered(#[from] AccountNotRegisteredError),
+}
+
+
+/// Errors that can occur when performing storage accounting.
+#[derive(Debug, Error)]
+pub enum StorageAccountingError {
+    /// Storage lock error.
+    #[error(transparent)]
+    StorageLockError(#[from] StorageLockError),
+
+    /// Storage unlock error.
+    #[error(transparent)]
+    StorageUnlockError(#[from] StorageUnlockError),
 }

@@ -1,6 +1,8 @@
 //! NEP-145 Storage Management
 //! <https://github.com/near/NEPs/blob/master/neps/nep-0145.md>
 
+use std::cmp::Ordering;
+
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
     env,
@@ -100,7 +102,10 @@ pub trait Nep145Controller {
         Self: Sized;
 
     /// Returns the storage balance of the given account.
-    fn get_storage_balance(&self, account_id: &AccountId) -> Option<StorageBalance>;
+    fn get_storage_balance(
+        &self,
+        account_id: &AccountId,
+    ) -> Result<StorageBalance, AccountNotRegisteredError>;
 
     /// Locks the given amount of storage balance for the given account.
     fn lock_storage(
@@ -149,13 +154,46 @@ pub trait Nep145Controller {
 
     /// Sets the storage balance bounds for the contract.
     fn set_storage_balance_bounds(&mut self, bounds: &StorageBalanceBounds);
+
+    /// Convenience method for performing storage accounting, to be used after
+    /// storage writes that are to be debited from the account's balance.
+    fn storage_accounting(
+        &mut self,
+        account_id: &AccountId,
+        storage_usage_start: u64,
+    ) -> Result<(), StorageAccountingError> {
+        let storage_usage_end = env::storage_usage();
+
+        match storage_usage_end.cmp(&storage_usage_start) {
+            Ordering::Equal => {}
+            Ordering::Greater => {
+                let storage_consumed = storage_usage_end - storage_usage_start;
+                let storage_fee = env::storage_byte_cost() * storage_consumed as u128;
+
+                Nep145Controller::lock_storage(self, account_id, storage_fee.into())?;
+            }
+            Ordering::Less => {
+                let storage_released = storage_usage_start - storage_usage_end;
+                let storage_credit = env::storage_byte_cost() * storage_released as u128;
+
+                Nep145Controller::unlock_storage(self, account_id, storage_credit.into())?;
+            }
+        };
+
+        Ok(())
+    }
 }
 
 impl<T: Nep145ControllerInternal> Nep145Controller for T {
     type Hook = <Self as Nep145ControllerInternal>::Hook;
 
-    fn get_storage_balance(&self, account_id: &AccountId) -> Option<StorageBalance> {
-        Self::slot_account(account_id).read()
+    fn get_storage_balance(
+        &self,
+        account_id: &AccountId,
+    ) -> Result<StorageBalance, AccountNotRegisteredError> {
+        Self::slot_account(account_id)
+            .read()
+            .ok_or_else(|| AccountNotRegisteredError(account_id.clone()))
     }
 
     fn lock_storage(

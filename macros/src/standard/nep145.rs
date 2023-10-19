@@ -104,7 +104,7 @@ pub fn expand(meta: Nep145Meta) -> Result<TokenStream, darling::Error> {
                 let predecessor = env::predecessor_account_id();
 
                 let balance = Nep145Controller::get_storage_balance(self, &predecessor)
-                    .unwrap_or_else(|| env::panic_str("Account is not registered"));
+                    .unwrap_or_else(|e| env::panic_str(&e.to_string()));
 
                 let amount = amount.unwrap_or(balance.available);
 
@@ -150,7 +150,7 @@ pub fn expand(meta: Nep145Meta) -> Result<TokenStream, darling::Error> {
             }
 
             fn storage_balance_of(&self, account_id: #near_sdk::AccountId) -> Option<#me::standard::nep145::StorageBalance> {
-                #me::standard::nep145::Nep145Controller::get_storage_balance(self, &account_id)
+                #me::standard::nep145::Nep145Controller::get_storage_balance(self, &account_id).ok()
             }
 
             fn storage_balance_bounds(&self) -> #me::standard::nep145::StorageBalanceBounds {

@@ -3,13 +3,11 @@
 // Ignore
 pub fn main() {}
 
-use std::cmp::Ordering;
-
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
     env,
     json_types::{Base64VecU8, U128},
-    near_bindgen, require,
+    near_bindgen,
     store::Vector,
     AccountId, PanicOnDefault,
 };
@@ -54,7 +52,9 @@ impl Nep141Hook for Contract {
         _account_id: &AccountId,
         storage_usage_start: u64,
     ) {
-        contract.storage_accounting(storage_usage_start);
+        contract
+            .storage_accounting(&env::predecessor_account_id(), storage_usage_start)
+            .unwrap_or_else(|e| env::panic_str(&e.to_string()));
     }
 
     fn before_transfer(contract: &Self, transfer: &Nep141Transfer) -> u64 {
@@ -63,7 +63,9 @@ impl Nep141Hook for Contract {
     }
 
     fn after_transfer(contract: &mut Self, _transfer: &Nep141Transfer, storage_usage_start: u64) {
-        contract.storage_accounting(storage_usage_start);
+        contract
+            .storage_accounting(&env::predecessor_account_id(), storage_usage_start)
+            .unwrap_or_else(|e| env::panic_str(&e.to_string()));
     }
 
     fn before_burn(_contract: &Self, _amount: u128, _account_id: &AccountId) -> u64 {
@@ -76,7 +78,9 @@ impl Nep141Hook for Contract {
         _account_id: &AccountId,
         storage_usage_start: u64,
     ) {
-        contract.storage_accounting(storage_usage_start);
+        contract
+            .storage_accounting(&env::predecessor_account_id(), storage_usage_start)
+            .unwrap_or_else(|e| env::panic_str(&e.to_string()));
     }
 }
 
@@ -84,9 +88,17 @@ impl Nep141Hook for Contract {
 impl Contract {
     #[init]
     pub fn new() -> Self {
-        Self {
+        let mut contract = Self {
             blobs: Vector::new(b"b"),
-        }
+        };
+
+        contract.set_metadata(&FungibleTokenMetadata::new(
+            "My Fungible Token".to_string(),
+            "MFT".to_string(),
+            24,
+        ));
+
+        contract
     }
 
     pub fn mint(&mut self, amount: U128) {
@@ -107,39 +119,7 @@ impl Contract {
     }
 
     fn require_registration(&self, account_id: &AccountId) {
-        require!(
-            self.get_storage_balance(account_id).is_some(),
-            format!("Account {account_id} is not registered."),
-        );
-    }
-
-    fn storage_accounting(&mut self, storage_usage_start: u64) {
-        let current_usage = env::storage_usage();
-
-        match current_usage.cmp(&storage_usage_start) {
-            Ordering::Equal => {}
-            Ordering::Greater => {
-                let storage_usage = current_usage - storage_usage_start;
-                let storage_fee = env::storage_byte_cost() * storage_usage as u128;
-
-                Nep145Controller::lock_storage(
-                    self,
-                    &env::predecessor_account_id(),
-                    storage_fee.into(),
-                )
-                .unwrap_or_else(|e| env::panic_str(&format!("Storage lock error: {}", e)));
-            }
-            Ordering::Less => {
-                let storage_released = storage_usage_start - current_usage;
-                let storage_credit = env::storage_byte_cost() * storage_released as u128;
-
-                Nep145Controller::unlock_storage(
-                    self,
-                    &env::predecessor_account_id(),
-                    storage_credit.into(),
-                )
-                .unwrap_or_else(|e| env::panic_str(&format!("Storage unlock error: {}", e)));
-            }
-        }
+        self.get_storage_balance(account_id)
+            .unwrap_or_else(|e| env::panic_str(&e.to_string()));
     }
 }
