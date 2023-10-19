@@ -153,18 +153,19 @@ use near_sdk_contract_tools::{ft::*, pause::Pause, Pause, utils::Hook};
 use near_sdk::near_bindgen;
 
 #[derive(FungibleToken, Pause)]
-#[fungible_token(no_hooks, transfer_hook = "Self")]
+#[fungible_token(no_hooks, transfer_hook = "TransferHook")]
 #[near_bindgen]
 struct Contract {}
 
-impl Hook<Nep141Transfer> for Contract {
-    type State = ();
+struct TransferHook;
 
-    fn before(_contract: &Contract, _transfer: &Nep141Transfer) {
+impl Hook<Contract, Nep141Transfer> for TransferHook {
+    fn before(_contract: &Contract, _transfer: &Nep141Transfer) -> Self {
         Contract::require_unpaused();
+        Self
     }
 
-    fn after(_contract: &mut Contract, _transfer: &Nep141Transfer, _: ()) {}
+    fn after(_contract: &mut Contract, _transfer: &Nep141Transfer, _: Self) {}
 }
 ```
 
