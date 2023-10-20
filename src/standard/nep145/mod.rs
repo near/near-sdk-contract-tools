@@ -394,19 +394,27 @@ impl<T: Nep145ControllerInternal> Nep145Controller for T {
     }
 }
 
-pub struct PredecessorStorageAccountingHook(u64);
+pub mod hooks {
+    use near_sdk::env;
 
-impl<C: Nep145Controller, A> Hook<C, A> for PredecessorStorageAccountingHook {
-    fn before(contract: &C, _args: &A) -> Self {
-        contract
-            .get_storage_balance(&env::predecessor_account_id())
-            .unwrap_or_else(|e| env::panic_str(&e.to_string()));
-        Self(env::storage_usage())
-    }
+    use crate::utils::Hook;
 
-    fn after(contract: &mut C, _args: &A, Self(storage_usage_start): Self) {
-        contract
-            .storage_accounting(&env::predecessor_account_id(), storage_usage_start)
-            .unwrap_or_else(|e| env::panic_str(&format!("Storage accounting error: {}", e)));
+    use super::Nep145Controller;
+
+    pub struct PredecessorStorageAccountingHook(u64);
+
+    impl<C: Nep145Controller, A> Hook<C, A> for PredecessorStorageAccountingHook {
+        fn before(contract: &C, _args: &A) -> Self {
+            contract
+                .get_storage_balance(&env::predecessor_account_id())
+                .unwrap_or_else(|e| env::panic_str(&e.to_string()));
+            Self(env::storage_usage())
+        }
+
+        fn after(contract: &mut C, _args: &A, Self(storage_usage_start): Self) {
+            contract
+                .storage_accounting(&env::predecessor_account_id(), storage_usage_start)
+                .unwrap_or_else(|e| env::panic_str(&format!("Storage accounting error: {}", e)));
+        }
     }
 }

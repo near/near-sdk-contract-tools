@@ -1,14 +1,14 @@
 use darling::FromDeriveInput;
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::Expr;
+use syn::{Expr, Type};
 
 #[derive(Debug, FromDeriveInput)]
 #[darling(attributes(nep145), supports(struct_named))]
 pub struct Nep145Meta {
     pub storage_key: Option<Expr>,
-    pub all_hooks: Option<Expr>,
-    pub force_unregister_hook: Option<Expr>,
+    pub all_hooks: Option<Type>,
+    pub force_unregister_hook: Option<Type>,
     pub generics: syn::Generics,
     pub ident: syn::Ident,
 

@@ -11,36 +11,13 @@ use near_sdk::{
     store::Vector,
     AccountId, PanicOnDefault,
 };
-use near_sdk_contract_tools::{ft::*, standard::nep145::*, utils::Hook, Nep145};
+use near_sdk_contract_tools::{ft::*, utils::Hook};
 
-#[derive(PanicOnDefault, BorshSerialize, BorshDeserialize, FungibleToken, Nep145)]
-#[fungible_token(
-    all_hooks = "PredecessorStorageAccountingHook",
-    transfer_hook = "TransferHook"
-)]
-#[nep145(force_unregister_hook = "ForceUnregisterHook")]
+#[derive(PanicOnDefault, BorshSerialize, BorshDeserialize, FungibleToken)]
+#[fungible_token(transfer_hook = "TransferHook")]
 #[near_bindgen]
 pub struct Contract {
     blobs: Vector<Vec<u8>>,
-}
-
-pub struct ForceUnregisterHook;
-
-impl<'a> Hook<Contract, Nep145ForceUnregister<'a>> for ForceUnregisterHook {
-    fn before(_contract: &Contract, _args: &Nep145ForceUnregister<'a>) -> Self {
-        Self
-    }
-
-    fn after(contract: &mut Contract, args: &Nep145ForceUnregister<'a>, _: Self) {
-        let balance = contract.balance_of(args.account_id);
-        contract
-            .burn(&Nep141Burn {
-                amount: balance,
-                account_id: args.account_id.clone(),
-                memo: Some("storage force unregister".to_string()),
-            })
-            .unwrap();
-    }
 }
 
 pub struct TransferHook;

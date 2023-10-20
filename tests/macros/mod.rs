@@ -392,13 +392,13 @@ mod pausable_fungible_token {
         borsh::{self, BorshDeserialize, BorshSerialize},
         env, near_bindgen,
         test_utils::VMContextBuilder,
-        testing_env, AccountId,
+        testing_env, AccountId, ONE_NEAR,
     };
     use near_sdk_contract_tools::{
         pause::{PausableHook, Pause},
-        standard::{nep141::*, nep148::*},
         utils::Hook,
-        FungibleToken, Pause,
+        Pause,
+        ft::*,
     };
 
     #[derive(FungibleToken, Pause, BorshDeserialize, BorshSerialize)]
@@ -451,13 +451,25 @@ mod pausable_fungible_token {
 
         let mut c = Contract::new();
 
+        let context = VMContextBuilder::new()
+            .attached_deposit(ONE_NEAR / 100)
+            .predecessor_account_id(alice.clone())
+            .build();
+        testing_env!(context);
+        c.storage_deposit(None, None);
+        let context = VMContextBuilder::new()
+            .attached_deposit(ONE_NEAR / 100)
+            .predecessor_account_id(bob.clone())
+            .build();
+        testing_env!(context);
+        c.storage_deposit(None, None);
+
         c.deposit_unchecked(&alice, 100).unwrap();
 
         let context = VMContextBuilder::new()
             .attached_deposit(1)
             .predecessor_account_id(alice.clone())
             .build();
-
         testing_env!(context);
 
         c.ft_transfer(bob.clone(), 50.into(), None);

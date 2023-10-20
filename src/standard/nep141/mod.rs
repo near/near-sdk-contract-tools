@@ -7,7 +7,12 @@ use near_sdk::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{slot::Slot, standard::nep297::*, utils::Hook, DefaultStorageKey};
+use crate::{
+    slot::Slot,
+    standard::{nep145::*, nep297::*},
+    utils::Hook,
+    DefaultStorageKey,
+};
 
 mod error;
 pub use error::*;
@@ -328,5 +333,38 @@ impl<T: Nep141ControllerInternal> Nep141Controller for T {
         .emit();
 
         Ok(())
+    }
+}
+
+pub mod hooks {
+    use crate::{utils::Hook, standard::nep145::Nep145ForceUnregister};
+
+    use super::{Nep141Controller, Nep141ControllerInternal, Nep141Burn};
+
+    pub struct BurnOnForceUnregisterHook;
+
+    impl<C: Nep141Controller + Nep141ControllerInternal> Hook<C, Nep145ForceUnregister<'_>>
+        for BurnOnForceUnregisterHook
+    {
+        fn before(_contract: &C, _args: &Nep145ForceUnregister<'_>) -> Self {
+            Self
+        }
+
+        fn after(contract: &mut C, args: &Nep145ForceUnregister<'_>, _: Self) {
+            let balance = contract.balance_of(args.account_id);
+            contract
+                .burn(&Nep141Burn {
+                    amount: balance,
+                    account_id: args.account_id.clone(),
+                    memo: Some("storage forced unregistration".to_string()),
+                })
+                .unwrap_or_else(|e| {
+                    near_sdk::env::panic_str(&format!(
+                        "Failed to burn tokens during forced unregistration: {e}",
+                    ))
+                });
+
+            <C as Nep141ControllerInternal>::slot_account(args.account_id).remove();
+        }
     }
 }
