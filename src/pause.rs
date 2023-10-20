@@ -23,7 +23,7 @@
 //! * (ERR) [`Pause::require_unpaused`] may only be called when the contract is unpaused.
 #![allow(missing_docs)] // #[ext_contract(...)] does not play nicely with clippy
 
-use crate::{slot::Slot, standard::nep297::Event, DefaultStorageKey};
+use crate::{slot::Slot, standard::nep297::Event, utils::Hook, DefaultStorageKey};
 use near_sdk::{ext_contract, require};
 use near_sdk_contract_tools_macros::event;
 
@@ -149,4 +149,18 @@ impl<T: PauseInternal> Pause for T {
 pub trait PauseExternal {
     /// Returns `true` if the contract is paused, `false` otherwise
     fn paus_is_paused(&self) -> bool;
+}
+
+pub struct PausableHook;
+
+impl<C, A> Hook<C, A> for PausableHook
+where
+    C: Pause,
+{
+    fn before(_contract: &C, _args: &A) -> Self {
+        C::require_unpaused();
+        Self
+    }
+
+    fn after(_contract: &mut C, _args: &A, _state: Self) {}
 }

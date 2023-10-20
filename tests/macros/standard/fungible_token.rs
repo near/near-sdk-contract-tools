@@ -5,7 +5,6 @@ use near_sdk_contract_tools::{
 };
 
 #[derive(FungibleToken)]
-#[fungible_token(no_hooks)]
 #[near_bindgen]
 struct MyFungibleTokenContract {}
 

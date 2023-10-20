@@ -10,7 +10,7 @@ use near_sdk::{
 use near_sdk_contract_tools::{standard::nep141::*, utils::Hook, Nep141};
 
 #[derive(Nep141, BorshDeserialize, BorshSerialize)]
-#[nep141(no_hooks, transfer_hook = "TransferHook")]
+#[nep141(transfer_hook = "TransferHook")]
 #[near_bindgen]
 struct FungibleToken {
     pub transfers: Vector<Nep141Transfer>,

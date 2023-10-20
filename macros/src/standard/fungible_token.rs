@@ -1,4 +1,4 @@
-use darling::{util::Flag, FromDeriveInput};
+use darling::FromDeriveInput;
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::Expr;
@@ -10,7 +10,7 @@ use super::{nep141, nep148};
 pub struct FungibleTokenMeta {
     // NEP-141 fields
     pub core_storage_key: Option<Expr>,
-    pub no_hooks: Flag,
+    pub all_hooks: Option<Expr>,
     pub mint_hook: Option<Expr>,
     pub transfer_hook: Option<Expr>,
     pub burn_hook: Option<Expr>,
@@ -33,7 +33,7 @@ pub fn expand(meta: FungibleTokenMeta) -> Result<TokenStream, darling::Error> {
     let FungibleTokenMeta {
         core_storage_key,
         metadata_storage_key,
-        no_hooks,
+        all_hooks,
         mint_hook,
         transfer_hook,
         burn_hook,
@@ -47,7 +47,7 @@ pub fn expand(meta: FungibleTokenMeta) -> Result<TokenStream, darling::Error> {
 
     let expand_nep141 = nep141::expand(nep141::Nep141Meta {
         storage_key: core_storage_key,
-        no_hooks,
+        all_hooks,
         mint_hook,
         transfer_hook,
         burn_hook,

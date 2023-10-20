@@ -15,9 +15,8 @@ use near_sdk_contract_tools::{ft::*, standard::nep145::*, utils::Hook, Nep145};
 
 #[derive(PanicOnDefault, BorshSerialize, BorshDeserialize, FungibleToken, Nep145)]
 #[fungible_token(
-    mint_hook = "PredecessorStorageAccounting",
-    transfer_hook = "TransferHook",
-    burn_hook = "PredecessorStorageAccounting"
+    all_hooks = "PredecessorStorageAccounting",
+    transfer_hook = "TransferHook"
 )]
 #[near_bindgen]
 pub struct Contract {

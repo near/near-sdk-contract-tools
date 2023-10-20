@@ -1,4 +1,4 @@
-use darling::{util::Flag, FromDeriveInput};
+use darling::FromDeriveInput;
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::Expr;
@@ -7,7 +7,7 @@ use syn::Expr;
 #[darling(attributes(nep141), supports(struct_named))]
 pub struct Nep141Meta {
     pub storage_key: Option<Expr>,
-    pub no_hooks: Flag,
+    pub all_hooks: Option<Expr>,
     pub mint_hook: Option<Expr>,
     pub transfer_hook: Option<Expr>,
     pub burn_hook: Option<Expr>,
@@ -24,7 +24,7 @@ pub struct Nep141Meta {
 pub fn expand(meta: Nep141Meta) -> Result<TokenStream, darling::Error> {
     let Nep141Meta {
         storage_key,
-        no_hooks,
+        all_hooks,
         mint_hook,
         transfer_hook,
         burn_hook,
@@ -45,28 +45,25 @@ pub fn expand(meta: Nep141Meta) -> Result<TokenStream, darling::Error> {
         }
     });
 
-    let default_hook = || {
-        no_hooks
-            .is_present()
-            .then(|| quote! { () })
-            .unwrap_or_else(|| quote! { Self })
-    };
-
     let mint_hook = mint_hook
         .map(|h| quote! { #h })
-        .unwrap_or_else(default_hook);
+        .unwrap_or_else(|| quote! { () });
     let transfer_hook = transfer_hook
         .map(|h| quote! { #h })
-        .unwrap_or_else(default_hook);
+        .unwrap_or_else(|| quote! { () });
     let burn_hook = burn_hook
         .map(|h| quote! { #h })
-        .unwrap_or_else(default_hook);
+        .unwrap_or_else(|| quote! { () });
+
+    let default_hook = all_hooks
+        .map(|h| quote! { #h })
+        .unwrap_or_else(|| quote! { () });
 
     Ok(quote! {
         impl #imp #me::standard::nep141::Nep141ControllerInternal for #ident #ty #wher {
-            type MintHook = #mint_hook;
-            type TransferHook = #transfer_hook;
-            type BurnHook = #burn_hook;
+            type MintHook = (#mint_hook, #default_hook);
+            type TransferHook = (#transfer_hook, #default_hook);
+            type BurnHook = (#burn_hook, #default_hook);
 
             #root
         }

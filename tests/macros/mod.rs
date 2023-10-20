@@ -395,14 +395,14 @@ mod pausable_fungible_token {
         testing_env, AccountId,
     };
     use near_sdk_contract_tools::{
-        pause::Pause,
+        pause::{PausableHook, Pause},
         standard::{nep141::*, nep148::*},
         utils::Hook,
         FungibleToken, Pause,
     };
 
     #[derive(FungibleToken, Pause, BorshDeserialize, BorshSerialize)]
-    #[fungible_token(no_hooks, transfer_hook = "TransferHook")]
+    #[fungible_token(all_hooks = "PausableHook", transfer_hook = "TransferHook")]
     #[near_bindgen]
     struct Contract {
         pub storage_usage: u64,
@@ -431,7 +431,6 @@ mod pausable_fungible_token {
 
     impl Hook<Contract, Nep141Transfer> for TransferHook {
         fn before(_contract: &Contract, _transfer: &Nep141Transfer) -> TransferHook {
-            Contract::require_unpaused();
             TransferHook {
                 storage_usage_start: env::storage_usage(),
             }

@@ -128,7 +128,6 @@ pub enum StorageForceUnregisterError {
     AccountNotRegistered(#[from] AccountNotRegisteredError),
 }
 
-
 /// Errors that can occur when performing storage accounting.
 #[derive(Debug, Error)]
 pub enum StorageAccountingError {
