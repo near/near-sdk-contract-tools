@@ -133,9 +133,9 @@ pub enum StorageForceUnregisterError {
 pub enum StorageAccountingError {
     /// Storage lock error.
     #[error(transparent)]
-    StorageLockError(#[from] StorageLockError),
+    StorageLock(#[from] StorageLockError),
 
     /// Storage unlock error.
     #[error(transparent)]
-    StorageUnlockError(#[from] StorageUnlockError),
+    StorageUnlock(#[from] StorageUnlockError),
 }

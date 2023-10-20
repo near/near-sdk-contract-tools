@@ -15,59 +15,43 @@ use near_sdk_contract_tools::{ft::*, standard::nep145::*, utils::Hook, Nep145};
 
 #[derive(PanicOnDefault, BorshSerialize, BorshDeserialize, FungibleToken, Nep145)]
 #[fungible_token(
-    all_hooks = "PredecessorStorageAccounting",
+    all_hooks = "PredecessorStorageAccountingHook",
     transfer_hook = "TransferHook"
 )]
+#[nep145(force_unregister_hook = "ForceUnregisterHook")]
 #[near_bindgen]
 pub struct Contract {
     blobs: Vector<Vec<u8>>,
 }
 
-impl Nep145Hook for Contract {
-    fn after_force_unregister(
-        contract: &mut Self,
-        account_id: &AccountId,
-        _balance: &StorageBalance,
-    ) {
-        let balance = contract.balance_of(account_id);
+pub struct ForceUnregisterHook;
+
+impl<'a> Hook<Contract, Nep145ForceUnregister<'a>> for ForceUnregisterHook {
+    fn before(_contract: &Contract, _args: &Nep145ForceUnregister<'a>) -> Self {
+        Self
+    }
+
+    fn after(contract: &mut Contract, args: &Nep145ForceUnregister<'a>, _: Self) {
+        let balance = contract.balance_of(args.account_id);
         contract
             .burn(&Nep141Burn {
                 amount: balance,
-                account_id: account_id.clone(),
+                account_id: args.account_id.clone(),
                 memo: Some("storage force unregister".to_string()),
             })
             .unwrap();
     }
 }
 
-pub struct PredecessorStorageAccounting(u64);
-
-impl<A> Hook<Contract, A> for PredecessorStorageAccounting {
-    fn before(contract: &Contract, _args: &A) -> Self {
-        contract.require_registration(&env::predecessor_account_id());
-        Self(env::storage_usage())
-    }
-
-    fn after(contract: &mut Contract, _args: &A, Self(storage_usage_start): Self) {
-        contract
-            .storage_accounting(&env::predecessor_account_id(), storage_usage_start)
-            .unwrap_or_else(|e| env::panic_str(&e.to_string()));
-    }
-}
-
-pub struct TransferHook(u64);
+pub struct TransferHook;
 
 impl Hook<Contract, Nep141Transfer> for TransferHook {
     fn before(contract: &Contract, transfer: &Nep141Transfer) -> Self {
         contract.require_registration(&transfer.receiver_id);
-        Self(env::storage_usage())
+        Self
     }
 
-    fn after(contract: &mut Contract, _transfer: &Nep141Transfer, Self(storage_usage_start): Self) {
-        contract
-            .storage_accounting(&env::predecessor_account_id(), storage_usage_start)
-            .unwrap_or_else(|e| env::panic_str(&e.to_string()));
-    }
+    fn after(_contract: &mut Contract, _transfer: &Nep141Transfer, _: Self) {}
 }
 
 #[near_bindgen]

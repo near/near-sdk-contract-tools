@@ -128,35 +128,6 @@ where
 //     }
 // }
 
-// struct StorageAccountingHook<A>(std::marker::PhantomData<A>);
-
-// impl<C, A> THook<C, A> for StorageAccountingHook<A> {
-//     type State = u64;
-
-//     fn before(contract: &C, args: &A) -> Self::State {
-//         todo!()
-//     }
-
-//     fn after(contract: &mut C, args: &A, state: Self::State) {
-//         todo!()
-//     }
-// }
-
-// struct MintArgs {
-//     amount: u128,
-//     account_id: String,
-// }
-
-// trait FT {
-//     type MintHook: THook<Self, MintArgs> where Self : Sized;
-// }
-
-// struct Contract;
-
-// impl FT for Contract {
-//     type MintHook = StorageAccountingHook<MintArgs>;
-// }
-
 #[cfg(test)]
 mod tests {
     use super::prefix_key;

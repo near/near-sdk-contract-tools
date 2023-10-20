@@ -1,4 +1,4 @@
-use darling::{util::Flag, FromDeriveInput};
+use darling::FromDeriveInput;
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::Expr;
@@ -7,7 +7,8 @@ use syn::Expr;
 #[darling(attributes(nep145), supports(struct_named))]
 pub struct Nep145Meta {
     pub storage_key: Option<Expr>,
-    pub no_hooks: Flag,
+    pub all_hooks: Option<Expr>,
+    pub force_unregister_hook: Option<Expr>,
     pub generics: syn::Generics,
     pub ident: syn::Ident,
 
@@ -21,7 +22,8 @@ pub struct Nep145Meta {
 pub fn expand(meta: Nep145Meta) -> Result<TokenStream, darling::Error> {
     let Nep145Meta {
         storage_key,
-        no_hooks,
+        all_hooks,
+        force_unregister_hook,
         generics,
         ident,
 
@@ -39,14 +41,16 @@ pub fn expand(meta: Nep145Meta) -> Result<TokenStream, darling::Error> {
         }
     });
 
-    let hook = no_hooks
-        .is_present()
-        .then(|| quote! { () })
-        .unwrap_or_else(|| quote! { Self });
+    let all_hooks = all_hooks
+        .map(|h| quote! { #h })
+        .unwrap_or_else(|| quote! { () });
+    let force_unregister_hook = force_unregister_hook
+        .map(|h| quote! { #h })
+        .unwrap_or_else(|| quote! { () });
 
     Ok(quote! {
         impl #imp #me::standard::nep145::Nep145ControllerInternal for #ident #ty #wher {
-            type Hook = #hook;
+            type ForceUnregisterHook = (#force_unregister_hook, #all_hooks);
 
             #root
         }
