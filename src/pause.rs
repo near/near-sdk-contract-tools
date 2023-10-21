@@ -21,10 +21,9 @@
 //! * (ERR) Only a "paused" contract can call `unpause`.
 //! * (ERR) [`Pause::require_paused`] may only be called when the contract is paused.
 //! * (ERR) [`Pause::require_unpaused`] may only be called when the contract is unpaused.
-#![allow(missing_docs)] // #[ext_contract(...)] does not play nicely with clippy
 
 use crate::{slot::Slot, standard::nep297::Event, DefaultStorageKey};
-use near_sdk::{ext_contract, require};
+use near_sdk::require;
 use near_sdk_contract_tools_macros::event;
 
 const UNPAUSED_FAIL_MESSAGE: &str = "Disallowed while contract is unpaused";
@@ -144,9 +143,39 @@ impl<T: PauseInternal> Pause for T {
     }
 }
 
-/// External (public) methods for [`Pause`]
-#[ext_contract(ext_pause)]
-pub trait PauseExternal {
-    /// Returns `true` if the contract is paused, `false` otherwise
-    fn paus_is_paused(&self) -> bool;
+mod ext {
+    #![allow(missing_docs)] // #[ext_contract(...)] does not play nicely with clippy
+
+    use near_sdk::ext_contract;
+
+    /// External (public) methods for [`Pause`]
+    #[ext_contract(ext_pause)]
+    pub trait PauseExternal {
+        /// Returns `true` if the contract is paused, `false` otherwise
+        fn paus_is_paused(&self) -> bool;
+    }
+}
+pub use ext::*;
+
+pub mod hooks {
+    //! Hooks to integrate [`Pause`] with other components.
+
+    use crate::hook::Hook;
+
+    use super::Pause;
+
+    /// Ensures that a contract is unpaused before calling a method.
+    pub struct PausableHook;
+
+    impl<C, A> Hook<C, A> for PausableHook
+    where
+        C: Pause,
+    {
+        fn before(_contract: &C, _args: &A) -> Self {
+            C::require_unpaused();
+            Self
+        }
+
+        fn after(_contract: &mut C, _args: &A, _state: Self) {}
+    }
 }

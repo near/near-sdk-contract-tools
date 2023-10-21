@@ -1,8 +1,9 @@
 #![cfg(not(windows))]
 
-use near_sdk::{json_types::U128, serde_json::json};
-use near_workspaces::{Account, Contract};
+use near_sdk::{json_types::U128, serde_json::json, ONE_NEAR};
+use near_workspaces::{operations::Function, Account, Contract};
 use pretty_assertions::assert_eq;
+use tokio::task::JoinSet;
 use workspaces_tests_utils::ft_balance_of;
 
 const WASM: &[u8] =
@@ -30,20 +31,29 @@ async fn setup(num_accounts: usize) -> Setup {
     Setup { contract, accounts }
 }
 
-async fn setup_balances(num_accounts: usize, balance: impl Fn(usize) -> U128) -> Setup {
-    let s = setup(num_accounts).await;
+async fn setup_balances(num_accounts: usize, amount: impl Fn(usize) -> U128) -> Setup {
+    let setup = setup(num_accounts).await;
 
-    for (i, account) in s.accounts.iter().enumerate() {
-        account
-            .call(s.contract.id(), "mint")
-            .args_json(json!({ "amount": balance(i) }))
-            .transact()
-            .await
-            .unwrap()
-            .unwrap();
+    let mut transaction_set = JoinSet::new();
+
+    for (i, account) in setup.accounts.iter().enumerate() {
+        let transaction = account
+            .batch(setup.contract.id())
+            .call(
+                Function::new("storage_deposit")
+                    .args_json(json!({}))
+                    .deposit(ONE_NEAR / 100),
+            )
+            .call(Function::new("mint").args_json(json!({ "amount": amount(i) })))
+            .transact();
+        transaction_set.spawn(async move {
+            transaction.await.unwrap().unwrap();
+        });
     }
 
-    s
+    while transaction_set.join_next().await.is_some() {}
+
+    setup
 }
 
 #[tokio::test]

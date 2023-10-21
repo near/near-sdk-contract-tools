@@ -392,15 +392,17 @@ mod pausable_fungible_token {
         borsh::{self, BorshDeserialize, BorshSerialize},
         env, near_bindgen,
         test_utils::VMContextBuilder,
-        testing_env, AccountId,
+        testing_env, AccountId, ONE_NEAR,
     };
     use near_sdk_contract_tools::{
-        pause::Pause,
-        standard::{nep141::*, nep148::*},
-        FungibleToken, Pause,
+        ft::*,
+        hook::Hook,
+        pause::{hooks::PausableHook, Pause},
+        Pause,
     };
 
     #[derive(FungibleToken, Pause, BorshDeserialize, BorshSerialize)]
+    #[fungible_token(all_hooks = "PausableHook", transfer_hook = "TransferHook")]
     #[near_bindgen]
     struct Contract {
         pub storage_usage: u64,
@@ -423,31 +425,18 @@ mod pausable_fungible_token {
     }
 
     #[derive(Default)]
-    struct HookState {
+    struct TransferHook {
         pub storage_usage_start: u64,
     }
 
-    impl Nep141Hook for Contract {
-        type MintState = ();
-        type TransferState = HookState;
-        type BurnState = ();
-
-        fn before_mint(_contract: &Self, _amount: u128, _account_id: &AccountId) {}
-
-        fn after_mint(_contract: &mut Self, _amount: u128, _account_id: &AccountId, _: ()) {}
-
-        fn before_burn(_contract: &Self, _amount: u128, _account_id: &AccountId) {}
-
-        fn after_burn(_contract: &mut Self, _amount: u128, _account_id: &AccountId, _: ()) {}
-
-        fn before_transfer(_contract: &Self, _transfer: &Nep141Transfer) -> HookState {
-            Contract::require_unpaused();
-            HookState {
+    impl Hook<Contract, Nep141Transfer> for TransferHook {
+        fn before(_contract: &Contract, _transfer: &Nep141Transfer) -> TransferHook {
+            TransferHook {
                 storage_usage_start: env::storage_usage(),
             }
         }
 
-        fn after_transfer(contract: &mut Self, _transfer: &Nep141Transfer, state: HookState) {
+        fn after(contract: &mut Contract, _transfer: &Nep141Transfer, state: TransferHook) {
             let storage_delta = env::storage_usage() - state.storage_usage_start;
             println!("Storage delta: {storage_delta}");
 
@@ -462,13 +451,25 @@ mod pausable_fungible_token {
 
         let mut c = Contract::new();
 
+        let context = VMContextBuilder::new()
+            .attached_deposit(ONE_NEAR / 100)
+            .predecessor_account_id(alice.clone())
+            .build();
+        testing_env!(context);
+        c.storage_deposit(None, None);
+        let context = VMContextBuilder::new()
+            .attached_deposit(ONE_NEAR / 100)
+            .predecessor_account_id(bob.clone())
+            .build();
+        testing_env!(context);
+        c.storage_deposit(None, None);
+
         c.deposit_unchecked(&alice, 100).unwrap();
 
         let context = VMContextBuilder::new()
             .attached_deposit(1)
             .predecessor_account_id(alice.clone())
             .build();
-
         testing_env!(context);
 
         c.ft_transfer(bob.clone(), 50.into(), None);

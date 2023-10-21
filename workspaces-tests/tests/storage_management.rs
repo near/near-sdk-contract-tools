@@ -115,8 +115,8 @@ async fn transfer_fail_not_registered() {
     expect_execution_error(
         &result,
         format!(
-            "Smart contract panicked: Account {} is not registered.",
-            charlie.id()
+            "Smart contract panicked: Account {} is not registered",
+            charlie.id(),
         ),
     );
 }

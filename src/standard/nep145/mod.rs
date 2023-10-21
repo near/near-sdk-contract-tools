@@ -1,6 +1,8 @@
 //! NEP-145 Storage Management
 //! <https://github.com/near/NEPs/blob/master/neps/nep-0145.md>
 
+use std::cmp::Ordering;
+
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
     env,
@@ -9,13 +11,13 @@ use near_sdk::{
     AccountId, BorshStorageKey,
 };
 
-use crate::{slot::Slot, DefaultStorageKey};
+use crate::{hook::Hook, slot::Slot, DefaultStorageKey};
 
 pub mod error;
 use error::*;
-
 mod ext;
 pub use ext::*;
+pub mod hooks;
 
 const PANIC_MESSAGE_STORAGE_TOTAL_OVERFLOW: &str = "storage total balance overflow";
 const PANIC_MESSAGE_STORAGE_AVAILABLE_OVERFLOW: &str = "storage available balance overflow";
@@ -68,10 +70,19 @@ enum StorageKey<'a> {
     Account(&'a AccountId),
 }
 
+/// Describes a force unregister action.
+#[derive(Clone, Debug, Serialize, BorshSerialize, PartialEq, Eq)]
+pub struct Nep145ForceUnregister<'a> {
+    /// The account to be unregistered.
+    pub account_id: &'a AccountId,
+    /// The account's balance at the time of unregistration.
+    pub balance: StorageBalance,
+}
+
 /// NEP-145 Storage Management internal controller interface.
 pub trait Nep145ControllerInternal {
     /// NEP-145 lifecycle hook.
-    type Hook: Nep145Hook<Self>
+    type ForceUnregisterHook: for<'a> Hook<Self, Nep145ForceUnregister<'a>>
     where
         Self: Sized;
 
@@ -95,12 +106,15 @@ pub trait Nep145ControllerInternal {
 /// exposed to the blockchain.
 pub trait Nep145Controller {
     /// NEP-145 lifecycle hook.
-    type Hook: Nep145Hook<Self>
+    type ForceUnregisterHook: for<'a> Hook<Self, Nep145ForceUnregister<'a>>
     where
         Self: Sized;
 
     /// Returns the storage balance of the given account.
-    fn get_storage_balance(&self, account_id: &AccountId) -> Option<StorageBalance>;
+    fn get_storage_balance(
+        &self,
+        account_id: &AccountId,
+    ) -> Result<StorageBalance, AccountNotRegisteredError>;
 
     /// Locks the given amount of storage balance for the given account.
     fn lock_storage(
@@ -149,13 +163,46 @@ pub trait Nep145Controller {
 
     /// Sets the storage balance bounds for the contract.
     fn set_storage_balance_bounds(&mut self, bounds: &StorageBalanceBounds);
+
+    /// Convenience method for performing storage accounting, to be used after
+    /// storage writes that are to be debited from the account's balance.
+    fn storage_accounting(
+        &mut self,
+        account_id: &AccountId,
+        storage_usage_start: u64,
+    ) -> Result<(), StorageAccountingError> {
+        let storage_usage_end = env::storage_usage();
+
+        match storage_usage_end.cmp(&storage_usage_start) {
+            Ordering::Equal => {}
+            Ordering::Greater => {
+                let storage_consumed = storage_usage_end - storage_usage_start;
+                let storage_fee = env::storage_byte_cost() * storage_consumed as u128;
+
+                Nep145Controller::lock_storage(self, account_id, storage_fee.into())?;
+            }
+            Ordering::Less => {
+                let storage_released = storage_usage_start - storage_usage_end;
+                let storage_credit = env::storage_byte_cost() * storage_released as u128;
+
+                Nep145Controller::unlock_storage(self, account_id, storage_credit.into())?;
+            }
+        };
+
+        Ok(())
+    }
 }
 
 impl<T: Nep145ControllerInternal> Nep145Controller for T {
-    type Hook = <Self as Nep145ControllerInternal>::Hook;
+    type ForceUnregisterHook = <Self as Nep145ControllerInternal>::ForceUnregisterHook;
 
-    fn get_storage_balance(&self, account_id: &AccountId) -> Option<StorageBalance> {
-        Self::slot_account(account_id).read()
+    fn get_storage_balance(
+        &self,
+        account_id: &AccountId,
+    ) -> Result<StorageBalance, AccountNotRegisteredError> {
+        Self::slot_account(account_id)
+            .read()
+            .ok_or_else(|| AccountNotRegisteredError(account_id.clone()))
     }
 
     fn lock_storage(
@@ -325,12 +372,21 @@ impl<T: Nep145ControllerInternal> Nep145Controller for T {
         let mut account_slot = Self::slot_account(account_id);
 
         let balance = account_slot
-            .take()
+            .read()
             .ok_or_else(|| AccountNotRegisteredError(account_id.clone()))?;
 
-        Self::Hook::after_force_unregister(self, account_id, &balance);
+        let action = Nep145ForceUnregister {
+            account_id,
+            balance,
+        };
 
-        Ok(balance.available)
+        let state = Self::ForceUnregisterHook::before(self, &action);
+
+        account_slot.remove();
+
+        Self::ForceUnregisterHook::after(self, &action, state);
+
+        Ok(action.balance.available)
     }
 
     fn get_storage_balance_bounds(&self) -> StorageBalanceBounds {
@@ -339,32 +395,5 @@ impl<T: Nep145ControllerInternal> Nep145Controller for T {
 
     fn set_storage_balance_bounds(&mut self, bounds: &StorageBalanceBounds) {
         Self::slot_balance_bounds().write(bounds);
-    }
-}
-
-/// NEP-145 lifecycle hook.
-pub trait Nep145Hook<C = Self> {
-    /// Called after an account force-unregisters. Can be used to clear any
-    /// state associated with the account.
-    fn after_force_unregister(contract: &mut C, account_id: &AccountId, balance: &StorageBalance);
-}
-
-impl<C> Nep145Hook<C> for () {
-    fn after_force_unregister(
-        _contract: &mut C,
-        _account_id: &AccountId,
-        _balance: &StorageBalance,
-    ) {
-    }
-}
-
-impl<C, T, U> Nep145Hook<C> for (T, U)
-where
-    T: Nep145Hook<C>,
-    U: Nep145Hook<C>,
-{
-    fn after_force_unregister(contract: &mut C, account_id: &AccountId, balance: &StorageBalance) {
-        T::after_force_unregister(contract, account_id, balance);
-        U::after_force_unregister(contract, account_id, balance);
     }
 }

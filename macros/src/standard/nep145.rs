@@ -1,13 +1,14 @@
-use darling::{util::Flag, FromDeriveInput};
+use darling::FromDeriveInput;
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::Expr;
+use syn::{Expr, Type};
 
 #[derive(Debug, FromDeriveInput)]
 #[darling(attributes(nep145), supports(struct_named))]
 pub struct Nep145Meta {
     pub storage_key: Option<Expr>,
-    pub no_hooks: Flag,
+    pub all_hooks: Option<Type>,
+    pub force_unregister_hook: Option<Type>,
     pub generics: syn::Generics,
     pub ident: syn::Ident,
 
@@ -21,7 +22,8 @@ pub struct Nep145Meta {
 pub fn expand(meta: Nep145Meta) -> Result<TokenStream, darling::Error> {
     let Nep145Meta {
         storage_key,
-        no_hooks,
+        all_hooks,
+        force_unregister_hook,
         generics,
         ident,
 
@@ -39,14 +41,16 @@ pub fn expand(meta: Nep145Meta) -> Result<TokenStream, darling::Error> {
         }
     });
 
-    let hook = no_hooks
-        .is_present()
-        .then(|| quote! { () })
-        .unwrap_or_else(|| quote! { Self });
+    let all_hooks = all_hooks
+        .map(|h| quote! { #h })
+        .unwrap_or_else(|| quote! { () });
+    let force_unregister_hook = force_unregister_hook
+        .map(|h| quote! { #h })
+        .unwrap_or_else(|| quote! { () });
 
     Ok(quote! {
         impl #imp #me::standard::nep145::Nep145ControllerInternal for #ident #ty #wher {
-            type Hook = #hook;
+            type ForceUnregisterHook = (#force_unregister_hook, #all_hooks);
 
             #root
         }
@@ -104,7 +108,7 @@ pub fn expand(meta: Nep145Meta) -> Result<TokenStream, darling::Error> {
                 let predecessor = env::predecessor_account_id();
 
                 let balance = Nep145Controller::get_storage_balance(self, &predecessor)
-                    .unwrap_or_else(|| env::panic_str("Account is not registered"));
+                    .unwrap_or_else(|e| env::panic_str(&e.to_string()));
 
                 let amount = amount.unwrap_or(balance.available);
 
@@ -150,7 +154,7 @@ pub fn expand(meta: Nep145Meta) -> Result<TokenStream, darling::Error> {
             }
 
             fn storage_balance_of(&self, account_id: #near_sdk::AccountId) -> Option<#me::standard::nep145::StorageBalance> {
-                #me::standard::nep145::Nep145Controller::get_storage_balance(self, &account_id)
+                #me::standard::nep145::Nep145Controller::get_storage_balance(self, &account_id).ok()
             }
 
             fn storage_balance_bounds(&self) -> #me::standard::nep145::StorageBalanceBounds {

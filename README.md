@@ -103,7 +103,6 @@ use near_sdk_contract_tools::ft::*;
 use near_sdk::near_bindgen;
 
 #[derive(FungibleToken)]
-#[fungible_token(no_hooks)]
 #[near_bindgen]
 struct FungibleToken {}
 
@@ -149,21 +148,22 @@ pub struct MyNft {}
 One may wish to combine the features of multiple macros in one contract. All of the macros are written such that they will work in a standalone manner, so this should largely work without issue. However, sometimes it may be desirable for the macros to work in _combination_ with each other. For example, to make a fungible token pausable, use the fungible token hooks to require that a contract be unpaused before making a token transfer:
 
 ```rust
-use near_sdk_contract_tools::{ft::*, pause::Pause, Pause};
-use near_sdk::near_bindgen;
+use near_sdk_contract_tools::{
+    ft::*,
+    pause::{*, hooks::PausableHook},
+    Pause,
+};
+use near_sdk::{
+    borsh::{self, BorshSerialize, BorshDeserialize},
+    PanicOnDefault,
+    near_bindgen,
+};
 
-#[derive(FungibleToken, Pause)]
+#[derive(BorshSerialize, BorshDeserialize, PanicOnDefault, FungibleToken, Pause)]
+#[fungible_token(all_hooks = "PausableHook")]
 #[near_bindgen]
 struct Contract {}
-
-impl SimpleNep141Hook for Contract {
-    fn before_transfer(&self, _transfer: &Nep141Transfer) {
-        Contract::require_unpaused();
-    }
-}
 ```
-
-Note: Hooks can be disabled using `#[nep141(no_hooks)]` or `#[fungible_token(no_hooks)]`.
 
 ### Custom Crates
 

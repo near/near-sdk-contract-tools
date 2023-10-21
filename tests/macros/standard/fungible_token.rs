@@ -1,11 +1,7 @@
 use near_sdk::{json_types::Base64VecU8, near_bindgen};
-use near_sdk_contract_tools::{
-    standard::{nep141::*, nep148::*},
-    FungibleToken,
-};
+use near_sdk_contract_tools::ft::*;
 
 #[derive(FungibleToken)]
-#[fungible_token(no_hooks)]
 #[near_bindgen]
 struct MyFungibleTokenContract {}
 
@@ -29,7 +25,7 @@ impl MyFungibleTokenContract {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use near_sdk::{test_utils::VMContextBuilder, testing_env, AccountId};
+    use near_sdk::{test_utils::VMContextBuilder, testing_env, AccountId, ONE_NEAR};
 
     #[test]
     fn fungible_token_transfer() {
@@ -37,6 +33,20 @@ mod tests {
 
         let alice: AccountId = "alice".parse().unwrap();
         let bob: AccountId = "bob".parse().unwrap();
+
+        let context = VMContextBuilder::new()
+            .predecessor_account_id(alice.clone())
+            .attached_deposit(ONE_NEAR / 100)
+            .build();
+        testing_env!(context);
+        ft.storage_deposit(None, None);
+
+        let context = VMContextBuilder::new()
+            .predecessor_account_id(bob.clone())
+            .attached_deposit(ONE_NEAR / 100)
+            .build();
+        testing_env!(context);
+        ft.storage_deposit(None, None);
 
         assert_eq!(ft.ft_balance_of(alice.clone()).0, 0);
         assert_eq!(ft.ft_balance_of(bob.clone()).0, 0);

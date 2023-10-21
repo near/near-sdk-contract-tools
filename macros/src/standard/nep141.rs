@@ -1,14 +1,16 @@
-use darling::{util::Flag, FromDeriveInput};
+use darling::FromDeriveInput;
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::Expr;
+use syn::{Expr, Type};
 
 #[derive(Debug, FromDeriveInput)]
 #[darling(attributes(nep141), supports(struct_named))]
 pub struct Nep141Meta {
     pub storage_key: Option<Expr>,
-    pub no_hooks: Flag,
-    pub extension_hooks: Option<syn::Type>,
+    pub all_hooks: Option<Type>,
+    pub mint_hook: Option<Type>,
+    pub transfer_hook: Option<Type>,
+    pub burn_hook: Option<Type>,
     pub generics: syn::Generics,
     pub ident: syn::Ident,
 
@@ -22,8 +24,10 @@ pub struct Nep141Meta {
 pub fn expand(meta: Nep141Meta) -> Result<TokenStream, darling::Error> {
     let Nep141Meta {
         storage_key,
-        no_hooks,
-        extension_hooks,
+        all_hooks,
+        mint_hook,
+        transfer_hook,
+        burn_hook,
         generics,
         ident,
 
@@ -41,21 +45,26 @@ pub fn expand(meta: Nep141Meta) -> Result<TokenStream, darling::Error> {
         }
     });
 
-    let self_hook = if no_hooks.is_present() {
-        quote! { () }
-    } else {
-        quote! { Self }
-    };
+    let mint_hook = mint_hook
+        .map(|h| quote! { #h })
+        .unwrap_or_else(|| quote! { () });
+    let transfer_hook = transfer_hook
+        .map(|h| quote! { #h })
+        .unwrap_or_else(|| quote! { () });
+    let burn_hook = burn_hook
+        .map(|h| quote! { #h })
+        .unwrap_or_else(|| quote! { () });
 
-    let hook = if let Some(extension_hooks) = extension_hooks {
-        quote! { (#self_hook, #extension_hooks) }
-    } else {
-        self_hook
-    };
+    let default_hook = all_hooks
+        .map(|h| quote! { #h })
+        .unwrap_or_else(|| quote! { () });
 
     Ok(quote! {
         impl #imp #me::standard::nep141::Nep141ControllerInternal for #ident #ty #wher {
-            type Hook = #hook;
+            type MintHook = (#mint_hook, #default_hook);
+            type TransferHook = (#transfer_hook, #default_hook);
+            type BurnHook = (#burn_hook, #default_hook);
+
             #root
         }
 
