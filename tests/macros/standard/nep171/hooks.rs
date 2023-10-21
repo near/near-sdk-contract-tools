@@ -2,16 +2,19 @@ use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
     log, near_bindgen, PanicOnDefault,
 };
-use near_sdk_contract_tools::nft::*;
+use near_sdk_contract_tools::{hook::Hook, nft::*};
 
 #[derive(BorshSerialize, BorshDeserialize, PanicOnDefault, Nep171)]
+#[nep171(transfer_hook = "Self")]
 #[near_bindgen]
 pub struct Contract {
     transfer_count: u32,
 }
 
-impl SimpleNep171Hook for Contract {
-    fn before_nft_transfer(&self, transfer: &Nep171Transfer) {
+impl Hook<Contract, Nep171Transfer<'_>> for Contract {
+    type State = ();
+
+    fn before(_contract: &Contract, transfer: &Nep171Transfer<'_>, _: &mut ()) {
         log!(
             "{:?} is transferring {} to {}",
             transfer.sender_id,
@@ -20,7 +23,7 @@ impl SimpleNep171Hook for Contract {
         );
     }
 
-    fn after_nft_transfer(&mut self, _transfer: &Nep171Transfer) {
-        self.transfer_count += 1;
+    fn after(contract: &mut Contract, _transfer: &Nep171Transfer<'_>, _: ()) {
+        contract.transfer_count += 1;
     }
 }

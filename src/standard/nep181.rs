@@ -10,27 +10,25 @@ use near_sdk::{
     AccountId, BorshStorageKey,
 };
 
-use crate::{slot::Slot, standard::nep171::*, DefaultStorageKey};
+use crate::{hook::Hook, slot::Slot, standard::nep171::*, DefaultStorageKey};
 
 pub use ext::*;
 
 /// Extension hook for [`Nep171Controller`].
 pub struct TokenEnumeration;
 
-impl<C: Nep171Controller + Nep181Controller> Nep171Hook<C> for TokenEnumeration {
-    type MintState = ();
-    type NftTransferState = ();
-    type BurnState = ();
+impl<C: Nep171Controller + Nep181Controller> Hook<C, Nep171Mint<'_>> for TokenEnumeration {
+    type State = ();
 
-    fn before_mint(_contract: &C, _token_ids: &[TokenId], _owner_id: &AccountId) {}
-
-    fn after_mint(contract: &mut C, token_ids: &[TokenId], owner_id: &AccountId, _: ()) {
-        contract.add_tokens_to_enumeration(token_ids, owner_id);
+    fn after(contract: &mut C, mint: &Nep171Mint<'_>, _: ()) {
+        contract.add_tokens_to_enumeration(mint.token_ids, mint.receiver_id);
     }
+}
 
-    fn before_nft_transfer(_contract: &C, _transfer: &Nep171Transfer) {}
+impl<C: Nep171Controller + Nep181Controller> Hook<C, Nep171Transfer<'_>> for TokenEnumeration {
+    type State = ();
 
-    fn after_nft_transfer(contract: &mut C, transfer: &Nep171Transfer, _: ()) {
+    fn after(contract: &mut C, transfer: &Nep171Transfer<'_>, _: ()) {
         let owner_id = match transfer.authorization {
             Nep171TransferAuthorization::Owner => Cow::Borrowed(transfer.sender_id),
             Nep171TransferAuthorization::ApprovalId(_) => Cow::Owned(contract.token_owner(transfer.token_id).unwrap_or_else(|| {
@@ -44,11 +42,13 @@ impl<C: Nep171Controller + Nep181Controller> Nep171Hook<C> for TokenEnumeration 
             transfer.receiver_id,
         );
     }
+}
 
-    fn before_burn(_contract: &C, _token_ids: &[TokenId], _owner_id: &AccountId) {}
+impl<C: Nep171Controller + Nep181Controller> Hook<C, Nep171Burn<'_>> for TokenEnumeration {
+    type State = ();
 
-    fn after_burn(contract: &mut C, token_ids: &[TokenId], owner_id: &AccountId, _: ()) {
-        contract.remove_tokens_from_enumeration(token_ids, owner_id);
+    fn after(contract: &mut C, burn: &Nep171Burn<'_>, _: ()) {
+        contract.remove_tokens_from_enumeration(burn.token_ids, burn.owner_id);
     }
 }
 

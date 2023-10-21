@@ -10,7 +10,7 @@ use near_sdk::{
 };
 use thiserror::Error;
 
-use crate::{slot::Slot, standard::nep171::*, DefaultStorageKey};
+use crate::{hook::Hook, slot::Slot, standard::nep171::*, DefaultStorageKey};
 
 pub use ext::*;
 
@@ -43,25 +43,23 @@ impl<C: Nep178Controller> LoadTokenMetadata<C> for TokenApprovals {
     }
 }
 
-impl<C: Nep178Controller> Nep171Hook<C> for TokenApprovals {
-    type MintState = ();
-    type NftTransferState = ();
-    type BurnState = ();
+impl<C: Nep178Controller> Hook<C, Nep171Mint<'_>> for TokenApprovals {
+    type State = ();
+}
 
-    fn before_mint(_contract: &C, _token_ids: &[TokenId], _owner_id: &AccountId) {}
+impl<C: Nep178Controller> Hook<C, Nep171Transfer<'_>> for TokenApprovals {
+    type State = ();
 
-    fn after_mint(_contract: &mut C, _token_ids: &[TokenId], _owner_id: &AccountId, _: ()) {}
-
-    fn before_nft_transfer(_contract: &C, _transfer: &Nep171Transfer) {}
-
-    fn after_nft_transfer(contract: &mut C, transfer: &Nep171Transfer, _: ()) {
+    fn after(contract: &mut C, transfer: &Nep171Transfer<'_>, _: ()) {
         contract.revoke_all_unchecked(transfer.token_id);
     }
+}
 
-    fn before_burn(_contract: &C, _token_ids: &[TokenId], _owner_id: &AccountId) {}
+impl<C: Nep178Controller> Hook<C, Nep171Burn<'_>> for TokenApprovals {
+    type State = ();
 
-    fn after_burn(contract: &mut C, token_ids: &[TokenId], _owner_id: &AccountId, _: ()) {
-        for token_id in token_ids {
+    fn after(contract: &mut C, transfer: &Nep171Burn<'_>, _: ()) {
+        for token_id in transfer.token_ids {
             contract.revoke_all_unchecked(token_id);
         }
     }

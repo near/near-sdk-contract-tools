@@ -263,10 +263,11 @@ pub trait Nep177Controller {
     fn burn_with_metadata(
         &mut self,
         token_id: TokenId,
-        current_owner_id: &AccountId,
+        owner_id: &AccountId,
     ) -> Result<(), Nep171BurnError>;
 
-    /// Sets the metadata for a token ID without checking whether the token exists, etc. and emits an [`Nep171Event::NftMetadataUpdate`] event.
+    /// Sets the metadata for a token ID without checking whether the token
+    /// exists, etc. and emits an [`Nep171Event::NftMetadataUpdate`] event.
     fn set_token_metadata_unchecked(&mut self, token_id: TokenId, metadata: Option<TokenMetadata>);
 
     /// Sets the metadata for a token ID and emits an [`Nep171Event::NftMetadataUpdate`] event.
@@ -321,7 +322,12 @@ impl<T: Nep177ControllerInternal + Nep171Controller> Nep177Controller for T {
         metadata: TokenMetadata,
     ) -> Result<(), Nep171MintError> {
         let token_ids = [token_id];
-        self.mint(&token_ids, &owner_id, None)?;
+        let action = Nep171Mint {
+            token_ids: &token_ids,
+            receiver_id: &owner_id,
+            memo: None,
+        };
+        self.mint(&action)?;
         let [token_id] = token_ids;
         self.set_token_metadata_unchecked(token_id, Some(metadata));
         Ok(())
@@ -330,10 +336,15 @@ impl<T: Nep177ControllerInternal + Nep171Controller> Nep177Controller for T {
     fn burn_with_metadata(
         &mut self,
         token_id: TokenId,
-        current_owner_id: &AccountId,
+        owner_id: &AccountId,
     ) -> Result<(), Nep171BurnError> {
         let token_ids = [token_id];
-        self.burn(&token_ids, current_owner_id, None)?;
+        let action = Nep171Burn {
+            token_ids: &token_ids,
+            owner_id,
+            memo: None,
+        };
+        self.burn(&action)?;
         let [token_id] = token_ids;
         self.set_token_metadata_unchecked(token_id, None);
         Ok(())

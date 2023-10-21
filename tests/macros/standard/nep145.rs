@@ -18,11 +18,9 @@ pub struct Contract {
 pub struct ForceUnregisterHook;
 
 impl<'a> Hook<Contract, Nep145ForceUnregister<'a>> for ForceUnregisterHook {
-    fn before(_contract: &Contract, _args: &Nep145ForceUnregister<'a>) -> Self {
-        Self
-    }
+    type State = ();
 
-    fn after(_contract: &mut Contract, _args: &Nep145ForceUnregister<'a>, _state: Self) {
+    fn after(_contract: &mut Contract, _args: &Nep145ForceUnregister<'a>, _: ()) {
         log!("After force unregister");
     }
 }

@@ -1,18 +1,20 @@
-use std::ops::Not;
-
-use darling::{util::Flag, FromDeriveInput};
+use darling::FromDeriveInput;
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::Expr;
+use syn::{parse_quote, Expr, Type};
+
+use crate::unitify;
 
 #[derive(Debug, FromDeriveInput)]
 #[darling(attributes(nep171), supports(struct_named))]
 pub struct Nep171Meta {
     pub storage_key: Option<Expr>,
-    pub no_hooks: Flag,
-    pub extension_hooks: Option<syn::Type>,
-    pub check_external_transfer: Option<syn::Type>,
-    pub token_data: Option<syn::Type>,
+    pub all_hooks: Option<Type>,
+    pub mint_hook: Option<Type>,
+    pub transfer_hook: Option<Type>,
+    pub burn_hook: Option<Type>,
+    pub check_external_transfer: Option<Type>,
+    pub token_data: Option<Type>,
 
     pub generics: syn::Generics,
     pub ident: syn::Ident,
@@ -27,8 +29,10 @@ pub struct Nep171Meta {
 pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
     let Nep171Meta {
         storage_key,
-        no_hooks,
-        extension_hooks,
+        all_hooks,
+        mint_hook,
+        transfer_hook,
+        burn_hook,
         check_external_transfer,
         token_data,
 
@@ -41,17 +45,11 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
 
     let (imp, ty, wher) = generics.split_for_impl();
 
-    let token_data = token_data
-        .map(|token_data| quote! { #token_data })
-        .unwrap_or_else(|| {
-            quote! { () }
-        });
+    let token_data = unitify(token_data);
 
-    let check_external_transfer = check_external_transfer
-        .map(|check_external_transfer| quote! { #check_external_transfer })
-        .unwrap_or_else(|| {
-            quote! { #me::standard::nep171::DefaultCheckExternalTransfer }
-        });
+    let check_external_transfer = check_external_transfer.unwrap_or_else(|| {
+        parse_quote! { #me::standard::nep171::DefaultCheckExternalTransfer }
+    });
 
     let root = storage_key.map(|storage_key| {
         quote! {
@@ -61,31 +59,17 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
         }
     });
 
-    let extension_hooks_type = extension_hooks
-        .map(|extension_hooks| quote! { #extension_hooks })
-        .unwrap_or_else(|| {
-            quote! { () }
-        });
-
-    let self_hooks_type = no_hooks
-        .is_present()
-        .not()
-        .then(|| {
-            quote! {
-                Self
-            }
-        })
-        .unwrap_or_else(|| {
-            quote! {
-                ()
-            }
-        });
-
-    let hooks_type = quote! { (#self_hooks_type, #extension_hooks_type) };
+    let all_hooks = unitify(all_hooks);
+    let mint_hook = unitify(mint_hook);
+    let transfer_hook = unitify(transfer_hook);
+    let burn_hook = unitify(burn_hook);
 
     Ok(quote! {
         impl #imp #me::standard::nep171::Nep171ControllerInternal for #ident #ty #wher {
-            type Hook = #hooks_type;
+            type MintHook = (#mint_hook, #all_hooks);
+            type TransferHook = (#transfer_hook, #all_hooks);
+            type BurnHook = (#burn_hook, #all_hooks);
+
             type CheckExternalTransfer = #check_external_transfer;
             type LoadTokenMetadata = #token_data;
 

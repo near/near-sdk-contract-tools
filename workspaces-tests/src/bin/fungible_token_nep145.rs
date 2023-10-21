@@ -23,12 +23,11 @@ pub struct Contract {
 pub struct TransferHook;
 
 impl Hook<Contract, Nep141Transfer> for TransferHook {
-    fn before(contract: &Contract, transfer: &Nep141Transfer) -> Self {
-        contract.require_registration(&transfer.receiver_id);
-        Self
-    }
+    type State = ();
 
-    fn after(_contract: &mut Contract, _transfer: &Nep141Transfer, _: Self) {}
+    fn before(contract: &Contract, transfer: &Nep141Transfer, _: &mut ()) {
+        contract.require_registration(&transfer.receiver_id);
+    }
 }
 
 #[near_bindgen]

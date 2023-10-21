@@ -7,7 +7,7 @@ use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
     env, log, near_bindgen, AccountId, PanicOnDefault,
 };
-use near_sdk_contract_tools::nft::*;
+use near_sdk_contract_tools::{hook::Hook, nft::*};
 
 #[derive(PanicOnDefault, BorshSerialize, BorshDeserialize, NonFungibleToken)]
 #[near_bindgen]
@@ -44,12 +44,14 @@ impl SimpleNep178Hook for Contract {
     }
 }
 
-impl SimpleNep171Hook for Contract {
-    fn before_nft_transfer(&self, transfer: &Nep171Transfer) {
+impl Hook<Contract, Nep171Transfer<'_>> for Contract {
+    type State = ();
+
+    fn before(_contract: &Contract, transfer: &Nep171Transfer<'_>, _: &mut ()) {
         log!("before_nft_transfer({})", transfer.token_id);
     }
 
-    fn after_nft_transfer(&mut self, transfer: &Nep171Transfer) {
+    fn after(_contract: &mut Contract, transfer: &Nep171Transfer<'_>, _: ()) {
         log!("after_nft_transfer({})", transfer.token_id);
     }
 }

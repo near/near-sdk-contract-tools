@@ -296,54 +296,52 @@ impl<T: Nep141ControllerInternal> Nep141Controller for T {
     }
 
     fn transfer(&mut self, transfer: &Nep141Transfer) -> Result<(), TransferError> {
-        let state = Self::TransferHook::before(self, transfer);
+        Self::TransferHook::execute(self, transfer, |contract| {
+            contract.transfer_unchecked(
+                &transfer.sender_id,
+                &transfer.receiver_id,
+                transfer.amount,
+            )?;
 
-        self.transfer_unchecked(&transfer.sender_id, &transfer.receiver_id, transfer.amount)?;
+            Nep141Event::FtTransfer(vec![FtTransferData {
+                old_owner_id: transfer.sender_id.clone(),
+                new_owner_id: transfer.receiver_id.clone(),
+                amount: transfer.amount.into(),
+                memo: transfer.memo.clone(),
+            }])
+            .emit();
 
-        Nep141Event::FtTransfer(vec![FtTransferData {
-            old_owner_id: transfer.sender_id.clone(),
-            new_owner_id: transfer.receiver_id.clone(),
-            amount: transfer.amount.into(),
-            memo: transfer.memo.clone(),
-        }])
-        .emit();
-
-        Self::TransferHook::after(self, transfer, state);
-
-        Ok(())
+            Ok(())
+        })
     }
 
     fn mint(&mut self, mint: &Nep141Mint) -> Result<(), DepositError> {
-        let state = Self::MintHook::before(self, mint);
+        Self::MintHook::execute(self, mint, |contract| {
+            contract.deposit_unchecked(&mint.account_id, mint.amount)?;
 
-        self.deposit_unchecked(&mint.account_id, mint.amount)?;
+            Nep141Event::FtMint(vec![FtMintData {
+                owner_id: mint.account_id.clone(),
+                amount: mint.amount.into(),
+                memo: mint.memo.clone(),
+            }])
+            .emit();
 
-        Self::MintHook::after(self, mint, state);
-
-        Nep141Event::FtMint(vec![FtMintData {
-            owner_id: mint.account_id.clone(),
-            amount: mint.amount.into(),
-            memo: mint.memo.clone(),
-        }])
-        .emit();
-
-        Ok(())
+            Ok(())
+        })
     }
 
     fn burn(&mut self, burn: &Nep141Burn) -> Result<(), WithdrawError> {
-        let state = Self::BurnHook::before(self, burn);
+        Self::BurnHook::execute(self, burn, |contract| {
+            contract.withdraw_unchecked(&burn.account_id, burn.amount)?;
 
-        self.withdraw_unchecked(&burn.account_id, burn.amount)?;
+            Nep141Event::FtBurn(vec![FtBurnData {
+                owner_id: burn.account_id.clone(),
+                amount: burn.amount.into(),
+                memo: burn.memo.clone(),
+            }])
+            .emit();
 
-        Self::BurnHook::after(self, burn, state);
-
-        Nep141Event::FtBurn(vec![FtBurnData {
-            owner_id: burn.account_id.clone(),
-            amount: burn.amount.into(),
-            memo: burn.memo.clone(),
-        }])
-        .emit();
-
-        Ok(())
+            Ok(())
+        })
     }
 }

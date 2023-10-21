@@ -10,11 +10,9 @@ pub struct BurnOnForceUnregisterHook;
 impl<C: Nep141Controller + Nep141ControllerInternal> Hook<C, Nep145ForceUnregister<'_>>
     for BurnOnForceUnregisterHook
 {
-    fn before(_contract: &C, _args: &Nep145ForceUnregister<'_>) -> Self {
-        Self
-    }
+    type State = ();
 
-    fn after(contract: &mut C, args: &Nep145ForceUnregister<'_>, _: Self) {
+    fn after(contract: &mut C, args: &Nep145ForceUnregister<'_>, _: ()) {
         let balance = contract.balance_of(args.account_id);
         contract
             .burn(&Nep141Burn {

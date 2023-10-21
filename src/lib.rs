@@ -76,8 +76,8 @@ pub mod nft {
             },
             nep171::{
                 self, ext_nep171, ext_nep171_receiver, ext_nep171_resolver, Nep171,
-                Nep171Controller, Nep171ControllerInternal, Nep171Hook, Nep171Receiver,
-                Nep171Resolver, Nep171Transfer, SimpleNep171Hook, Token, TokenId,
+                Nep171Controller, Nep171ControllerInternal, Nep171Receiver, Nep171Resolver,
+                Nep171Transfer, Token, TokenId,
             },
             nep177::{
                 self, ext_nep177, ContractMetadata, Nep177, Nep177Controller,

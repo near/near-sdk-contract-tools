@@ -18,24 +18,19 @@ struct FungibleToken {
 }
 
 #[derive(Default)]
-struct TransferHook {
-    pub storage_usage_start: u64,
-}
+struct TransferHook;
 
 impl Hook<FungibleToken, Nep141Transfer> for TransferHook {
-    fn before(_contract: &FungibleToken, _transfer: &Nep141Transfer) -> Self {
-        Self {
-            storage_usage_start: env::storage_usage(),
-        }
+    type State = u64;
+
+    fn before(_contract: &FungibleToken, _transfer: &Nep141Transfer, state: &mut Self::State) {
+        *state = env::storage_usage();
     }
 
-    fn after(contract: &mut FungibleToken, transfer: &Nep141Transfer, state: Self) {
+    fn after(contract: &mut FungibleToken, transfer: &Nep141Transfer, state: Self::State) {
         contract.hooks.push(&"after_transfer".to_string());
         contract.transfers.push(transfer);
-        println!(
-            "Storage delta: {}",
-            env::storage_usage() - state.storage_usage_start
-        );
+        println!("Storage delta: {}", env::storage_usage() - state);
     }
 }
 
