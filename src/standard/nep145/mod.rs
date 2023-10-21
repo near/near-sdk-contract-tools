@@ -70,8 +70,11 @@ enum StorageKey<'a> {
     Account(&'a AccountId),
 }
 
+/// Describes a force unregister action.
 pub struct Nep145ForceUnregister<'a> {
+    /// The account to be unregistered.
     pub account_id: &'a AccountId,
+    /// The account's balance at the time of unregistration.
     pub balance: StorageBalance,
 }
 
@@ -394,6 +397,7 @@ impl<T: Nep145ControllerInternal> Nep145Controller for T {
     }
 }
 
+/// Hooks to integrate NEP-145 with other standards.
 pub mod hooks {
     use near_sdk::env;
 
@@ -401,6 +405,7 @@ pub mod hooks {
 
     use super::Nep145Controller;
 
+    /// Hook to perform storage accounting before and after a storage write.
     pub struct PredecessorStorageAccountingHook(u64);
 
     impl<C: Nep145Controller, A> Hook<C, A> for PredecessorStorageAccountingHook {

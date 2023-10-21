@@ -7,12 +7,7 @@ use near_sdk::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    slot::Slot,
-    standard::{nep145::*, nep297::*},
-    utils::Hook,
-    DefaultStorageKey,
-};
+use crate::{slot::Slot, standard::nep297::*, utils::Hook, DefaultStorageKey};
 
 mod error;
 pub use error::*;
@@ -60,26 +55,37 @@ impl Nep141Transfer {
     }
 }
 
+/// Describes a mint operation.
 pub struct Nep141Mint {
+    /// Amount to mint.
     pub amount: u128,
+    /// Account ID to mint to.
     pub account_id: AccountId,
+    /// Optional memo string.
     pub memo: Option<String>,
 }
 
+/// Describes a burn operation.
 pub struct Nep141Burn {
+    /// Amount to burn.
     pub amount: u128,
+    /// Account ID to burn from.
     pub account_id: AccountId,
+    /// Optional memo string.
     pub memo: Option<String>,
 }
 
 /// Internal functions for [`Nep141Controller`]. Using these methods may result in unexpected behavior.
 pub trait Nep141ControllerInternal {
+    /// Hook for mint operations.
     type MintHook: Hook<Self, Nep141Mint>
     where
         Self: Sized;
+    /// Hook for transfer operations.
     type TransferHook: Hook<Self, Nep141Transfer>
     where
         Self: Sized;
+    /// Hook for burn operations.
     type BurnHook: Hook<Self, Nep141Burn>
     where
         Self: Sized;
@@ -102,12 +108,15 @@ pub trait Nep141ControllerInternal {
 
 /// Non-public implementations of functions for managing a fungible token.
 pub trait Nep141Controller {
+    /// Hook for mint operations.
     type MintHook: Hook<Self, Nep141Mint>
     where
         Self: Sized;
+    /// Hook for transfer operations.
     type TransferHook: Hook<Self, Nep141Transfer>
     where
         Self: Sized;
+    /// Hook for burn operations.
     type BurnHook: Hook<Self, Nep141Burn>
     where
         Self: Sized;
@@ -336,11 +345,13 @@ impl<T: Nep141ControllerInternal> Nep141Controller for T {
     }
 }
 
+/// Hooks to integrate NEP-141 with other standards.
 pub mod hooks {
-    use crate::{utils::Hook, standard::nep145::Nep145ForceUnregister};
+    use crate::{standard::nep145::Nep145ForceUnregister, utils::Hook};
 
-    use super::{Nep141Controller, Nep141ControllerInternal, Nep141Burn};
+    use super::{Nep141Burn, Nep141Controller, Nep141ControllerInternal};
 
+    /// Hook that burns all tokens on NEP-145 force unregister.
     pub struct BurnOnForceUnregisterHook;
 
     impl<C: Nep141Controller + Nep141ControllerInternal> Hook<C, Nep145ForceUnregister<'_>>

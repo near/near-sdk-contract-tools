@@ -86,8 +86,12 @@ pub fn assert_nonzero_deposit() {
     );
 }
 
+/// Generic hook trait for injecting code before and after component functions.
 pub trait Hook<C, A = ()> {
+    /// Before hook. Returns state to be passed to after hook.
     fn before(contract: &C, args: &A) -> Self;
+
+    /// After hook. Receives state from before hook.
     fn after(contract: &mut C, args: &A, state: Self);
 }
 
@@ -110,23 +114,6 @@ where
         U::after(contract, args, u_state);
     }
 }
-
-// trait SimpleHook<A> {
-//     fn before(&self, args: &A) {}
-//     fn after(&mut self, args: &A) {}
-// }
-
-// impl<A, C: SimpleHook<A>> Hook<A, C> for C {
-//     type State = ();
-
-//     fn before(contract: &C, args: &A) -> Self::State {
-//         // contract.before(args);
-//     }
-
-//     fn after(contract: &mut C, args: &A, _state: Self::State) {
-//         // contract.after(args);
-//     }
-// }
 
 #[cfg(test)]
 mod tests {

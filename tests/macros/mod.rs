@@ -395,10 +395,10 @@ mod pausable_fungible_token {
         testing_env, AccountId, ONE_NEAR,
     };
     use near_sdk_contract_tools::{
+        ft::*,
         pause::{PausableHook, Pause},
         utils::Hook,
         Pause,
-        ft::*,
     };
 
     #[derive(FungibleToken, Pause, BorshDeserialize, BorshSerialize)]
