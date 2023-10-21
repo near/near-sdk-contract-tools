@@ -6,7 +6,7 @@ use near_sdk::{
     store::LookupMap,
     AccountId, PanicOnDefault,
 };
-use near_sdk_contract_tools::{standard::nep145::*, utils::Hook, Nep145};
+use near_sdk_contract_tools::{hook::Hook, standard::nep145::*, Nep145};
 
 #[derive(BorshSerialize, BorshDeserialize, PanicOnDefault, Nep145)]
 #[nep145(force_unregister_hook = "ForceUnregisterHook")]

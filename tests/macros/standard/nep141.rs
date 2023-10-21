@@ -7,7 +7,7 @@ use near_sdk::{
     test_utils::VMContextBuilder,
     testing_env, AccountId, PromiseOrValue,
 };
-use near_sdk_contract_tools::{standard::nep141::*, utils::Hook, Nep141};
+use near_sdk_contract_tools::{hook::Hook, standard::nep141::*, Nep141};
 
 #[derive(Nep141, BorshDeserialize, BorshSerialize)]
 #[nep141(transfer_hook = "TransferHook")]

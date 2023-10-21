@@ -11,7 +11,7 @@ use near_sdk::{
     store::Vector,
     AccountId, PanicOnDefault,
 };
-use near_sdk_contract_tools::{ft::*, utils::Hook};
+use near_sdk_contract_tools::{ft::*, hook::Hook};
 
 #[derive(PanicOnDefault, BorshSerialize, BorshDeserialize, FungibleToken)]
 #[fungible_token(transfer_hook = "TransferHook")]

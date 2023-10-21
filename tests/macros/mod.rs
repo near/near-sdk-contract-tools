@@ -396,8 +396,8 @@ mod pausable_fungible_token {
     };
     use near_sdk_contract_tools::{
         ft::*,
-        pause::{PausableHook, Pause},
-        utils::Hook,
+        hook::Hook,
+        pause::{hooks::PausableHook, Pause},
         Pause,
     };
 

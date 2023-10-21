@@ -85,36 +85,6 @@ pub fn assert_nonzero_deposit() {
         "Attached deposit must be greater than zero"
     );
 }
-
-/// Generic hook trait for injecting code before and after component functions.
-pub trait Hook<C, A = ()> {
-    /// Before hook. Returns state to be passed to after hook.
-    fn before(contract: &C, args: &A) -> Self;
-
-    /// After hook. Receives state from before hook.
-    fn after(contract: &mut C, args: &A, state: Self);
-}
-
-impl<C, A> Hook<C, A> for () {
-    fn before(_contract: &C, _args: &A) {}
-    fn after(_contract: &mut C, _args: &A, _: ()) {}
-}
-
-impl<C, A, T, U> Hook<C, A> for (T, U)
-where
-    T: Hook<C, A>,
-    U: Hook<C, A>,
-{
-    fn before(contract: &C, args: &A) -> Self {
-        (T::before(contract, args), U::before(contract, args))
-    }
-
-    fn after(contract: &mut C, args: &A, (t_state, u_state): Self) {
-        T::after(contract, args, t_state);
-        U::after(contract, args, u_state);
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::prefix_key;

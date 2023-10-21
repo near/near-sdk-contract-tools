@@ -57,6 +57,7 @@ pub mod standard;
 pub mod approval;
 pub mod escrow;
 pub mod fast_account_id;
+pub mod hook;
 pub mod migrate;
 pub mod owner;
 pub mod pause;

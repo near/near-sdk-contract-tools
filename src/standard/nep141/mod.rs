@@ -7,7 +7,7 @@ use near_sdk::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{slot::Slot, standard::nep297::*, utils::Hook, DefaultStorageKey};
+use crate::{hook::Hook, slot::Slot, standard::nep297::*, DefaultStorageKey};
 
 mod error;
 pub use error::*;
@@ -15,6 +15,7 @@ mod event;
 pub use event::*;
 mod ext;
 pub use ext::*;
+pub mod hooks;
 
 /// Gas value required for ft_resolve_transfer calls
 pub const GAS_FOR_RESOLVE_TRANSFER: Gas = Gas(5_000_000_000_000);
@@ -56,6 +57,7 @@ impl Nep141Transfer {
 }
 
 /// Describes a mint operation.
+#[derive(Clone, Debug, Serialize, BorshSerialize, PartialEq, Eq)]
 pub struct Nep141Mint {
     /// Amount to mint.
     pub amount: u128,
@@ -66,6 +68,7 @@ pub struct Nep141Mint {
 }
 
 /// Describes a burn operation.
+#[derive(Clone, Debug, Serialize, BorshSerialize, PartialEq, Eq)]
 pub struct Nep141Burn {
     /// Amount to burn.
     pub amount: u128,
@@ -342,40 +345,5 @@ impl<T: Nep141ControllerInternal> Nep141Controller for T {
         .emit();
 
         Ok(())
-    }
-}
-
-/// Hooks to integrate NEP-141 with other standards.
-pub mod hooks {
-    use crate::{standard::nep145::Nep145ForceUnregister, utils::Hook};
-
-    use super::{Nep141Burn, Nep141Controller, Nep141ControllerInternal};
-
-    /// Hook that burns all tokens on NEP-145 force unregister.
-    pub struct BurnOnForceUnregisterHook;
-
-    impl<C: Nep141Controller + Nep141ControllerInternal> Hook<C, Nep145ForceUnregister<'_>>
-        for BurnOnForceUnregisterHook
-    {
-        fn before(_contract: &C, _args: &Nep145ForceUnregister<'_>) -> Self {
-            Self
-        }
-
-        fn after(contract: &mut C, args: &Nep145ForceUnregister<'_>, _: Self) {
-            let balance = contract.balance_of(args.account_id);
-            contract
-                .burn(&Nep141Burn {
-                    amount: balance,
-                    account_id: args.account_id.clone(),
-                    memo: Some("storage forced unregistration".to_string()),
-                })
-                .unwrap_or_else(|e| {
-                    near_sdk::env::panic_str(&format!(
-                        "Failed to burn tokens during forced unregistration: {e}",
-                    ))
-                });
-
-            <C as Nep141ControllerInternal>::slot_account(args.account_id).remove();
-        }
     }
 }

@@ -11,13 +11,13 @@ use near_sdk::{
     AccountId, BorshStorageKey,
 };
 
-use crate::{slot::Slot, utils::Hook, DefaultStorageKey};
+use crate::{hook::Hook, slot::Slot, DefaultStorageKey};
 
 pub mod error;
 use error::*;
-
 mod ext;
 pub use ext::*;
+pub mod hooks;
 
 const PANIC_MESSAGE_STORAGE_TOTAL_OVERFLOW: &str = "storage total balance overflow";
 const PANIC_MESSAGE_STORAGE_AVAILABLE_OVERFLOW: &str = "storage available balance overflow";
@@ -71,6 +71,7 @@ enum StorageKey<'a> {
 }
 
 /// Describes a force unregister action.
+#[derive(Clone, Debug, Serialize, BorshSerialize, PartialEq, Eq)]
 pub struct Nep145ForceUnregister<'a> {
     /// The account to be unregistered.
     pub account_id: &'a AccountId,
@@ -394,32 +395,5 @@ impl<T: Nep145ControllerInternal> Nep145Controller for T {
 
     fn set_storage_balance_bounds(&mut self, bounds: &StorageBalanceBounds) {
         Self::slot_balance_bounds().write(bounds);
-    }
-}
-
-/// Hooks to integrate NEP-145 with other standards.
-pub mod hooks {
-    use near_sdk::env;
-
-    use crate::utils::Hook;
-
-    use super::Nep145Controller;
-
-    /// Hook to perform storage accounting before and after a storage write.
-    pub struct PredecessorStorageAccountingHook(u64);
-
-    impl<C: Nep145Controller, A> Hook<C, A> for PredecessorStorageAccountingHook {
-        fn before(contract: &C, _args: &A) -> Self {
-            contract
-                .get_storage_balance(&env::predecessor_account_id())
-                .unwrap_or_else(|e| env::panic_str(&e.to_string()));
-            Self(env::storage_usage())
-        }
-
-        fn after(contract: &mut C, _args: &A, Self(storage_usage_start): Self) {
-            contract
-                .storage_accounting(&env::predecessor_account_id(), storage_usage_start)
-                .unwrap_or_else(|e| env::panic_str(&format!("Storage accounting error: {}", e)));
-        }
     }
 }
