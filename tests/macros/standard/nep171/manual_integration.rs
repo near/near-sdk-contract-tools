@@ -30,10 +30,13 @@ pub struct Contract {
 }
 
 impl Hook<Contract, Nep171Transfer<'_>> for Contract {
-    type State = ();
-
-    fn before(_contract: &Contract, _transfer: &Nep171Transfer<'_>, _: &mut ()) {
+    fn hook<R>(
+        contract: &mut Contract,
+        _args: &Nep171Transfer<'_>,
+        f: impl FnOnce(&mut Contract) -> R,
+    ) -> R {
         Contract::require_unpaused();
+        f(contract)
     }
 }
 

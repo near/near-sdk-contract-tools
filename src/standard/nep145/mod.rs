@@ -380,7 +380,7 @@ impl<T: Nep145ControllerInternal> Nep145Controller for T {
             balance,
         };
 
-        Self::ForceUnregisterHook::execute(self, &action, |_| {
+        Self::ForceUnregisterHook::hook(self, &action, |_| {
             account_slot.remove();
         });
 

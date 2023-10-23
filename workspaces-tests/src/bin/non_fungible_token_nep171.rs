@@ -15,14 +15,15 @@ use near_sdk_contract_tools::{hook::Hook, standard::nep171::*, Nep171};
 pub struct Contract {}
 
 impl Hook<Contract, Nep171Transfer<'_>> for Contract {
-    type State = ();
-
-    fn before(_contract: &Contract, transfer: &Nep171Transfer<'_>, _: &mut ()) {
-        log!("before_nft_transfer({})", transfer.token_id);
-    }
-
-    fn after(_contract: &mut Contract, transfer: &Nep171Transfer<'_>, _: ()) {
-        log!("after_nft_transfer({})", transfer.token_id);
+    fn hook<R>(
+        contract: &mut Contract,
+        args: &Nep171Transfer<'_>,
+        f: impl FnOnce(&mut Contract) -> R,
+    ) -> R {
+        log!("before_nft_transfer({})", args.token_id);
+        let r = f(contract);
+        log!("after_nft_transfer({})", args.token_id);
+        r
     }
 }
 

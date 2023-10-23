@@ -357,7 +357,7 @@ impl<T: Nep171ControllerInternal> Nep171Controller for T {
     fn external_transfer(&mut self, transfer: &Nep171Transfer) -> Result<(), Nep171TransferError> {
         match Self::CheckExternalTransfer::check_external_transfer(self, transfer) {
             Ok(current_owner_id) => {
-                Self::TransferHook::execute(self, transfer, |contract| {
+                Self::TransferHook::hook(self, transfer, |contract| {
                     contract.transfer_unchecked(
                         std::array::from_ref(transfer.token_id),
                         transfer.receiver_id,
@@ -408,7 +408,7 @@ impl<T: Nep171ControllerInternal> Nep171Controller for T {
             }
         }
 
-        Self::MintHook::execute(self, action, |contract| {
+        Self::MintHook::hook(self, action, |contract| {
             contract.mint_unchecked(action.token_ids, action.receiver_id);
 
             Nep171Event::NftMint(vec![event::NftMintLog {
@@ -445,7 +445,7 @@ impl<T: Nep171ControllerInternal> Nep171Controller for T {
             }
         }
 
-        Self::BurnHook::execute(self, action, |contract| {
+        Self::BurnHook::hook(self, action, |contract| {
             contract.burn_unchecked(action.token_ids);
 
             Nep171Event::NftBurn(vec![event::NftBurnLog {

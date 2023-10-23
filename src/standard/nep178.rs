@@ -43,25 +43,23 @@ impl<C: Nep178Controller> LoadTokenMetadata<C> for TokenApprovals {
     }
 }
 
-impl<C: Nep178Controller> Hook<C, Nep171Mint<'_>> for TokenApprovals {
-    type State = ();
-}
+impl<C: Nep178Controller> Hook<C, Nep171Mint<'_>> for TokenApprovals {}
 
 impl<C: Nep178Controller> Hook<C, Nep171Transfer<'_>> for TokenApprovals {
-    type State = ();
-
-    fn after(contract: &mut C, transfer: &Nep171Transfer<'_>, _: ()) {
-        contract.revoke_all_unchecked(transfer.token_id);
+    fn hook<R>(contract: &mut C, args: &Nep171Transfer<'_>, f: impl FnOnce(&mut C) -> R) -> R {
+        let r = f(contract);
+        contract.revoke_all_unchecked(args.token_id);
+        r
     }
 }
 
 impl<C: Nep178Controller> Hook<C, Nep171Burn<'_>> for TokenApprovals {
-    type State = ();
-
-    fn after(contract: &mut C, transfer: &Nep171Burn<'_>, _: ()) {
-        for token_id in transfer.token_ids {
+    fn hook<R>(contract: &mut C, args: &Nep171Burn<'_>, f: impl FnOnce(&mut C) -> R) -> R {
+        let r = f(contract);
+        for token_id in args.token_ids {
             contract.revoke_all_unchecked(token_id);
         }
+        r
     }
 }
 

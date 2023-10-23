@@ -12,18 +12,19 @@ pub struct Contract {
 }
 
 impl Hook<Contract, Nep171Transfer<'_>> for Contract {
-    type State = ();
-
-    fn before(_contract: &Contract, transfer: &Nep171Transfer<'_>, _: &mut ()) {
+    fn hook<R>(
+        contract: &mut Contract,
+        args: &Nep171Transfer<'_>,
+        f: impl FnOnce(&mut Contract) -> R,
+    ) -> R {
         log!(
             "{:?} is transferring {} to {}",
-            transfer.sender_id,
-            transfer.token_id,
-            transfer.receiver_id,
+            args.sender_id,
+            args.token_id,
+            args.receiver_id,
         );
-    }
-
-    fn after(contract: &mut Contract, _transfer: &Nep171Transfer<'_>, _: ()) {
+        let r = f(contract);
         contract.transfer_count += 1;
+        r
     }
 }

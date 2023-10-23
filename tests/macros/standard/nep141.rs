@@ -21,16 +21,19 @@ struct FungibleToken {
 struct TransferHook;
 
 impl Hook<FungibleToken, Nep141Transfer> for TransferHook {
-    type State = u64;
-
-    fn before(_contract: &FungibleToken, _transfer: &Nep141Transfer, state: &mut Self::State) {
-        *state = env::storage_usage();
-    }
-
-    fn after(contract: &mut FungibleToken, transfer: &Nep141Transfer, state: Self::State) {
+    fn hook<R>(
+        contract: &mut FungibleToken,
+        args: &Nep141Transfer,
+        f: impl FnOnce(&mut FungibleToken) -> R,
+    ) -> R {
+        let storage_usage_start = env::storage_usage();
+        contract.hooks.push(&"before_transfer".to_string());
+        let r = f(contract);
         contract.hooks.push(&"after_transfer".to_string());
-        contract.transfers.push(transfer);
-        println!("Storage delta: {}", env::storage_usage() - state);
+        contract.transfers.push(args);
+        let storage_usage_end = env::storage_usage();
+        println!("Storage delta: {}", storage_usage_end - storage_usage_start);
+        r
     }
 }
 
@@ -101,7 +104,7 @@ fn nep141_transfer() {
         })
     );
 
-    let expected_hook_execution_order = vec!["after_transfer"];
+    let expected_hook_execution_order = vec!["before_transfer", "after_transfer"];
     let actual_hook_execution_order = ft.hooks.to_vec();
     assert_eq!(expected_hook_execution_order, actual_hook_execution_order);
 

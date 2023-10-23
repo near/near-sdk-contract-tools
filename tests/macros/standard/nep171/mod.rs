@@ -83,25 +83,21 @@ struct NonFungibleToken {
 }
 
 impl Hook<NonFungibleToken, Nep171Transfer<'_>> for NonFungibleToken {
-    type State = Option<TokenRecord>;
-
-    fn before(contract: &Self, transfer: &Nep171Transfer, state: &mut Self::State) {
-        let token = Nep171::nft_token(contract, transfer.token_id.clone());
-        *state = token.map(Into::into);
-    }
-
-    fn after(
-        contract: &mut Self,
-        transfer: &Nep171Transfer,
-        before_nft_transfer: Option<TokenRecord>,
-    ) {
-        let token = Nep171::nft_token(contract, transfer.token_id.clone());
+    fn hook<R>(
+        contract: &mut NonFungibleToken,
+        args: &Nep171Transfer<'_>,
+        f: impl FnOnce(&mut NonFungibleToken) -> R,
+    ) -> R {
+        let before_nft_transfer = contract.nft_token(args.token_id.clone()).map(Into::into);
         contract
             .before_nft_transfer_balance_record
             .push(before_nft_transfer);
+        let r = f(contract);
+        let after_nft_transfer = contract.nft_token(args.token_id.clone()).map(Into::into);
         contract
             .after_nft_transfer_balance_record
-            .push(token.map(Into::into));
+            .push(after_nft_transfer);
+        r
     }
 }
 

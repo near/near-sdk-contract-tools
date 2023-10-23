@@ -171,10 +171,9 @@ pub mod hooks {
     where
         C: Pause,
     {
-        type State = ();
-
-        fn before(_contract: &C, _args: &A, _: &mut ()) {
+        fn hook<R>(contract: &mut C, _args: &A, f: impl FnOnce(&mut C) -> R) -> R {
             C::require_unpaused();
+            f(contract)
         }
     }
 }

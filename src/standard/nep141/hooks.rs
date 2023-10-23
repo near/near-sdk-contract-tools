@@ -10,9 +10,13 @@ pub struct BurnOnForceUnregisterHook;
 impl<C: Nep141Controller + Nep141ControllerInternal> Hook<C, Nep145ForceUnregister<'_>>
     for BurnOnForceUnregisterHook
 {
-    type State = ();
+    fn hook<R>(
+        contract: &mut C,
+        args: &Nep145ForceUnregister<'_>,
+        f: impl FnOnce(&mut C) -> R,
+    ) -> R {
+        let r = f(contract);
 
-    fn after(contract: &mut C, args: &Nep145ForceUnregister<'_>, _: ()) {
         let balance = contract.balance_of(args.account_id);
         contract
             .burn(&Nep141Burn {
@@ -27,5 +31,7 @@ impl<C: Nep141Controller + Nep141ControllerInternal> Hook<C, Nep145ForceUnregist
             });
 
         <C as Nep141ControllerInternal>::slot_account(args.account_id).remove();
+
+        r
     }
 }

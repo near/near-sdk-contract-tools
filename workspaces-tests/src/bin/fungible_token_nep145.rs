@@ -23,10 +23,13 @@ pub struct Contract {
 pub struct TransferHook;
 
 impl Hook<Contract, Nep141Transfer> for TransferHook {
-    type State = ();
-
-    fn before(contract: &Contract, transfer: &Nep141Transfer, _: &mut ()) {
-        contract.require_registration(&transfer.receiver_id);
+    fn hook<R>(
+        contract: &mut Contract,
+        args: &Nep141Transfer,
+        f: impl FnOnce(&mut Contract) -> R,
+    ) -> R {
+        contract.require_registration(&args.receiver_id);
+        f(contract)
     }
 }
 

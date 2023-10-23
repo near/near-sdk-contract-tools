@@ -296,7 +296,7 @@ impl<T: Nep141ControllerInternal> Nep141Controller for T {
     }
 
     fn transfer(&mut self, transfer: &Nep141Transfer) -> Result<(), TransferError> {
-        Self::TransferHook::execute(self, transfer, |contract| {
+        Self::TransferHook::hook(self, transfer, |contract| {
             contract.transfer_unchecked(
                 &transfer.sender_id,
                 &transfer.receiver_id,
@@ -316,7 +316,7 @@ impl<T: Nep141ControllerInternal> Nep141Controller for T {
     }
 
     fn mint(&mut self, mint: &Nep141Mint) -> Result<(), DepositError> {
-        Self::MintHook::execute(self, mint, |contract| {
+        Self::MintHook::hook(self, mint, |contract| {
             contract.deposit_unchecked(&mint.account_id, mint.amount)?;
 
             Nep141Event::FtMint(vec![FtMintData {
@@ -331,7 +331,7 @@ impl<T: Nep141ControllerInternal> Nep141Controller for T {
     }
 
     fn burn(&mut self, burn: &Nep141Burn) -> Result<(), WithdrawError> {
-        Self::BurnHook::execute(self, burn, |contract| {
+        Self::BurnHook::hook(self, burn, |contract| {
             contract.withdraw_unchecked(&burn.account_id, burn.amount)?;
 
             Nep141Event::FtBurn(vec![FtBurnData {

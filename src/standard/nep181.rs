@@ -18,37 +18,37 @@ pub use ext::*;
 pub struct TokenEnumeration;
 
 impl<C: Nep171Controller + Nep181Controller> Hook<C, Nep171Mint<'_>> for TokenEnumeration {
-    type State = ();
-
-    fn after(contract: &mut C, mint: &Nep171Mint<'_>, _: ()) {
-        contract.add_tokens_to_enumeration(mint.token_ids, mint.receiver_id);
+    fn hook<R>(contract: &mut C, args: &Nep171Mint<'_>, f: impl FnOnce(&mut C) -> R) -> R {
+        let r = f(contract);
+        contract.add_tokens_to_enumeration(args.token_ids, args.receiver_id);
+        r
     }
 }
 
 impl<C: Nep171Controller + Nep181Controller> Hook<C, Nep171Transfer<'_>> for TokenEnumeration {
-    type State = ();
-
-    fn after(contract: &mut C, transfer: &Nep171Transfer<'_>, _: ()) {
-        let owner_id = match transfer.authorization {
-            Nep171TransferAuthorization::Owner => Cow::Borrowed(transfer.sender_id),
-            Nep171TransferAuthorization::ApprovalId(_) => Cow::Owned(contract.token_owner(transfer.token_id).unwrap_or_else(|| {
-                env::panic_str(&format!("Inconsistent state: Enumeration reconciliation should only run after a token has been transferred, but token {} does not exist.", transfer.token_id))
+    fn hook<R>(contract: &mut C, args: &Nep171Transfer<'_>, f: impl FnOnce(&mut C) -> R) -> R {
+        let r = f(contract);
+        let owner_id = match args.authorization {
+            Nep171TransferAuthorization::Owner => Cow::Borrowed(args.sender_id),
+            Nep171TransferAuthorization::ApprovalId(_) => Cow::Owned(contract.token_owner(args.token_id).unwrap_or_else(|| {
+                env::panic_str(&format!("Inconsistent state: Enumeration reconciliation should only run after a token has been transferred, but token {} does not exist.", args.token_id))
             })),
         };
 
         contract.transfer_token_enumeration(
-            std::array::from_ref(transfer.token_id),
+            std::array::from_ref(args.token_id),
             owner_id.as_ref(),
-            transfer.receiver_id,
+            args.receiver_id,
         );
+        r
     }
 }
 
 impl<C: Nep171Controller + Nep181Controller> Hook<C, Nep171Burn<'_>> for TokenEnumeration {
-    type State = ();
-
-    fn after(contract: &mut C, burn: &Nep171Burn<'_>, _: ()) {
-        contract.remove_tokens_from_enumeration(burn.token_ids, burn.owner_id);
+    fn hook<R>(contract: &mut C, args: &Nep171Burn<'_>, f: impl FnOnce(&mut C) -> R) -> R {
+        let r = f(contract);
+        contract.remove_tokens_from_enumeration(args.token_ids, args.owner_id);
+        r
     }
 }
 

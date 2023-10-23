@@ -10,18 +10,20 @@ use super::Nep145Controller;
 pub struct PredecessorStorageAccountingHook;
 
 impl<C: Nep145Controller, A> Hook<C, A> for PredecessorStorageAccountingHook {
-    type State = u64;
+    fn hook<R>(contract: &mut C, _args: &A, f: impl FnOnce(&mut C) -> R) -> R {
+        let storage_usage_start = env::storage_usage();
+        let predecessor = env::predecessor_account_id();
 
-    fn before(contract: &C, _args: &A, storage_usage_start: &mut Self::State) {
         contract
-            .get_storage_balance(&env::predecessor_account_id())
+            .get_storage_balance(&predecessor)
             .unwrap_or_else(|e| env::panic_str(&e.to_string()));
-        *storage_usage_start = env::storage_usage();
-    }
 
-    fn after(contract: &mut C, _args: &A, storage_usage_start: Self::State) {
+        let r = f(contract);
+
         contract
-            .storage_accounting(&env::predecessor_account_id(), storage_usage_start)
+            .storage_accounting(&predecessor, storage_usage_start)
             .unwrap_or_else(|e| env::panic_str(&format!("Storage accounting error: {}", e)));
+
+        r
     }
 }
