@@ -10,7 +10,7 @@ use near_sdk_contract_tools::{
 };
 
 #[derive(BorshSerialize, BorshDeserialize, PanicOnDefault, NonFungibleToken, Pause, Owner)]
-#[non_fungible_token(transfer_hook = "PausableHook", no_approval_hooks)]
+#[non_fungible_token(transfer_hook = "PausableHook")]
 #[near_bindgen]
 pub struct Contract {
     next_token_id: u32,

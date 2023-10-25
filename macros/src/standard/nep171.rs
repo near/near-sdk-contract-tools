@@ -106,7 +106,7 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
                 if should_revert {
                     let token_ids = [token_id];
 
-                    let transfer = Nep171Transfer {
+                    let transfer = action::Nep171Transfer {
                         token_id: &token_ids[0],
                         authorization: Nep171TransferAuthorization::Owner,
                         sender_id: &receiver_id,
@@ -142,7 +142,7 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
 
                 let token_ids = [token_id];
 
-                let transfer = Nep171Transfer {
+                let transfer = action::Nep171Transfer {
                     token_id: &token_ids[0],
                     authorization: approval_id.map(Nep171TransferAuthorization::ApprovalId).unwrap_or(Nep171TransferAuthorization::Owner),
                     sender_id: &sender_id,
@@ -178,7 +178,7 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
 
                 let token_ids = [token_id];
 
-                let transfer = Nep171Transfer {
+                let transfer = action::Nep171Transfer {
                     token_id: &token_ids[0],
                     authorization: approval_id.map(Nep171TransferAuthorization::ApprovalId).unwrap_or(Nep171TransferAuthorization::Owner),
                     sender_id: &sender_id,

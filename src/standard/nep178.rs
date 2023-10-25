@@ -5,6 +5,7 @@ use std::{collections::HashMap, error::Error};
 
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
+    serde::Serialize,
     store::UnorderedMap,
     AccountId, BorshStorageKey,
 };
@@ -43,18 +44,22 @@ impl<C: Nep178Controller> LoadTokenMetadata<C> for TokenApprovals {
     }
 }
 
-impl<C: Nep178Controller> Hook<C, Nep171Mint<'_>> for TokenApprovals {}
+impl<C: Nep178Controller> Hook<C, action::Nep171Mint<'_>> for TokenApprovals {}
 
-impl<C: Nep178Controller> Hook<C, Nep171Transfer<'_>> for TokenApprovals {
-    fn hook<R>(contract: &mut C, args: &Nep171Transfer<'_>, f: impl FnOnce(&mut C) -> R) -> R {
+impl<C: Nep178Controller> Hook<C, action::Nep171Transfer<'_>> for TokenApprovals {
+    fn hook<R>(
+        contract: &mut C,
+        args: &action::Nep171Transfer<'_>,
+        f: impl FnOnce(&mut C) -> R,
+    ) -> R {
         let r = f(contract);
         contract.revoke_all_unchecked(args.token_id);
         r
     }
 }
 
-impl<C: Nep178Controller> Hook<C, Nep171Burn<'_>> for TokenApprovals {
-    fn hook<R>(contract: &mut C, args: &Nep171Burn<'_>, f: impl FnOnce(&mut C) -> R) -> R {
+impl<C: Nep178Controller> Hook<C, action::Nep171Burn<'_>> for TokenApprovals {
+    fn hook<R>(contract: &mut C, args: &action::Nep171Burn<'_>, f: impl FnOnce(&mut C) -> R) -> R {
         let r = f(contract);
         for token_id in args.token_ids {
             contract.revoke_all_unchecked(token_id);
@@ -66,7 +71,7 @@ impl<C: Nep178Controller> Hook<C, Nep171Burn<'_>> for TokenApprovals {
 impl<C: Nep171Controller + Nep178Controller> CheckExternalTransfer<C> for TokenApprovals {
     fn check_external_transfer(
         contract: &C,
-        transfer: &Nep171Transfer,
+        transfer: &action::Nep171Transfer,
     ) -> Result<AccountId, Nep171TransferError> {
         let normal_check =
             DefaultCheckExternalTransfer::check_external_transfer(contract, transfer);
@@ -97,10 +102,38 @@ enum StorageKey<'a> {
     TokenApprovalsUnorderedMap(&'a TokenId),
 }
 
+/// NEP-178 approve action.
+#[derive(Clone, Debug, Serialize, BorshSerialize, PartialEq, Eq)]
+pub struct Nep178Approve<'a> {
+    pub token_id: &'a TokenId,
+    pub current_owner_id: &'a AccountId,
+    pub account_id: &'a AccountId,
+}
+
+/// NEP-178 revoke action.
+#[derive(Clone, Debug, Serialize, BorshSerialize, PartialEq, Eq)]
+pub struct Nep178Revoke<'a> {
+    pub token_id: &'a TokenId,
+    pub current_owner_id: &'a AccountId,
+    pub account_id: &'a AccountId,
+}
+
+/// NEP-178 revoke all action.
+#[derive(Clone, Debug, Serialize, BorshSerialize, PartialEq, Eq)]
+pub struct Nep178RevokeAll<'a> {
+    pub token_id: &'a TokenId,
+    pub current_owner_id: &'a AccountId,
+}
+
 /// Internal functions for [`Nep178Controller`].
 pub trait Nep178ControllerInternal {
-    /// Lifecycle hooks for NEP-178.
-    type Hook: Nep178Hook<Self>
+    type ApproveHook: for<'a> Hook<Self, Nep178Approve<'a>>
+    where
+        Self: Sized;
+    type RevokeHook: for<'a> Hook<Self, Nep178Revoke<'a>>
+    where
+        Self: Sized;
+    type RevokeAllHook: for<'a> Hook<Self, Nep178RevokeAll<'a>>
     where
         Self: Sized;
 
@@ -188,41 +221,32 @@ pub enum Nep178RevokeAllError {
 
 /// Functions for managing non-fungible tokens with attached metadata, NEP-178.
 pub trait Nep178Controller {
-    /// Lifecycle hooks for NEP-178.
-    type Hook: Nep178Hook<Self>
+    type ApproveHook: for<'a> Hook<Self, Nep178Approve<'a>>
+    where
+        Self: Sized;
+    type RevokeHook: for<'a> Hook<Self, Nep178Revoke<'a>>
+    where
+        Self: Sized;
+    type RevokeAllHook: for<'a> Hook<Self, Nep178RevokeAll<'a>>
     where
         Self: Sized;
 
     /// Approve a token for transfer by a delegated account.
-    fn approve(
-        &mut self,
-        token_id: &TokenId,
-        current_owner_id: &AccountId,
-        account_id: &AccountId,
-    ) -> Result<ApprovalId, Nep178ApproveError>;
+    fn approve(&mut self, action: &Nep178Approve<'_>) -> Result<ApprovalId, Nep178ApproveError>;
 
     /// Approve a token without checking if the account is already approved or
     /// if it exceeds the maximum number of approvals.
     fn approve_unchecked(&mut self, token_id: &TokenId, account_id: &AccountId) -> ApprovalId;
 
     /// Revoke approval for an account to transfer token.
-    fn revoke(
-        &mut self,
-        token_id: &TokenId,
-        current_owner_id: &AccountId,
-        account_id: &AccountId,
-    ) -> Result<(), Nep178RevokeError>;
+    fn revoke(&mut self, action: &Nep178Revoke<'_>) -> Result<(), Nep178RevokeError>;
 
     /// Revoke approval for an account to transfer token without checking if
     /// the account is approved.
     fn revoke_unchecked(&mut self, token_id: &TokenId, account_id: &AccountId);
 
     /// Revoke all approvals for a token.
-    fn revoke_all(
-        &mut self,
-        token_id: &TokenId,
-        current_owner_id: &AccountId,
-    ) -> Result<(), Nep178RevokeAllError>;
+    fn revoke_all(&mut self, action: &Nep178RevokeAll<'_>) -> Result<(), Nep178RevokeAllError>;
 
     /// Revoke all approvals for a token without checking current owner.
     fn revoke_all_unchecked(&mut self, token_id: &TokenId);
@@ -236,7 +260,9 @@ pub trait Nep178Controller {
 }
 
 impl<T: Nep178ControllerInternal + Nep171Controller> Nep178Controller for T {
-    type Hook = <Self as Nep178ControllerInternal>::Hook;
+    type ApproveHook = T::ApproveHook;
+    type RevokeHook = T::RevokeHook;
+    type RevokeAllHook = T::RevokeAllHook;
 
     fn approve_unchecked(&mut self, token_id: &TokenId, account_id: &AccountId) -> ApprovalId {
         let mut slot = Self::slot_token_approvals(token_id);
@@ -252,49 +278,44 @@ impl<T: Nep178ControllerInternal + Nep171Controller> Nep178Controller for T {
         approval_id
     }
 
-    fn approve(
-        &mut self,
-        token_id: &TokenId,
-        current_owner_id: &AccountId,
-        account_id: &AccountId,
-    ) -> Result<ApprovalId, Nep178ApproveError> {
+    fn approve(&mut self, action: &Nep178Approve<'_>) -> Result<ApprovalId, Nep178ApproveError> {
         // owner check
-        if self.token_owner(token_id).as_ref() != Some(current_owner_id) {
+        if self.token_owner(action.token_id).as_ref() != Some(action.current_owner_id) {
             return Err(Nep178ApproveError::Unauthorized {
-                token_id: token_id.clone(),
-                account_id: account_id.clone(),
+                token_id: action.token_id.clone(),
+                account_id: action.account_id.clone(),
             });
         }
 
-        let mut slot = Self::slot_token_approvals(token_id);
+        let mut slot = Self::slot_token_approvals(action.token_id);
         let mut approvals = slot.read().unwrap_or_else(|| TokenApprovals {
             next_approval_id: 0,
-            accounts: UnorderedMap::new(Self::slot_token_approvals_unordered_map(token_id)),
+            accounts: UnorderedMap::new(Self::slot_token_approvals_unordered_map(action.token_id)),
         });
 
         if approvals.accounts.len() >= MAX_APPROVALS {
             return Err(Nep178ApproveError::TooManyApprovals {
-                token_id: token_id.clone(),
+                token_id: action.token_id.clone(),
             });
         }
 
         let approval_id = approvals.next_approval_id;
-        if approvals.accounts.contains_key(account_id) {
+        if approvals.accounts.contains_key(action.account_id) {
             return Err(Nep178ApproveError::AccountAlreadyApproved {
-                token_id: token_id.clone(),
-                account_id: account_id.clone(),
+                token_id: action.token_id.clone(),
+                account_id: action.account_id.clone(),
             });
         }
 
-        let hook_state = Self::Hook::before_nft_approve(self, token_id, account_id);
+        Self::ApproveHook::hook(self, action, |_| {
+            approvals
+                .accounts
+                .insert(action.account_id.clone(), approval_id);
+            approvals.next_approval_id += 1; // overflow unrealistic
+            slot.write(&approvals);
 
-        approvals.accounts.insert(account_id.clone(), approval_id);
-        approvals.next_approval_id += 1; // overflow unrealistic
-        slot.write(&approvals);
-
-        Self::Hook::after_nft_approve(self, token_id, account_id, &approval_id, hook_state);
-
-        Ok(approval_id)
+            Ok(approval_id)
+        })
     }
 
     fn revoke_unchecked(&mut self, token_id: &TokenId, account_id: &AccountId) {
@@ -311,65 +332,52 @@ impl<T: Nep178ControllerInternal + Nep171Controller> Nep178Controller for T {
         }
     }
 
-    fn revoke(
-        &mut self,
-        token_id: &TokenId,
-        current_owner_id: &AccountId,
-        account_id: &AccountId,
-    ) -> Result<(), Nep178RevokeError> {
+    fn revoke(&mut self, action: &Nep178Revoke<'_>) -> Result<(), Nep178RevokeError> {
         // owner check
-        if self.token_owner(token_id).as_ref() != Some(current_owner_id) {
+        if self.token_owner(action.token_id).as_ref() != Some(action.current_owner_id) {
             return Err(Nep178RevokeError::Unauthorized {
-                token_id: token_id.clone(),
-                account_id: account_id.clone(),
+                token_id: action.token_id.clone(),
+                account_id: action.account_id.clone(),
             });
         }
 
-        let mut slot = Self::slot_token_approvals(token_id);
+        let mut slot = Self::slot_token_approvals(action.token_id);
         let mut approvals = slot
             .read()
             .ok_or_else(|| Nep178RevokeError::AccountNotApproved {
-                token_id: token_id.clone(),
-                account_id: account_id.clone(),
+                token_id: action.token_id.clone(),
+                account_id: action.account_id.clone(),
             })?;
 
-        if !approvals.accounts.contains_key(account_id) {
+        if !approvals.accounts.contains_key(action.account_id) {
             return Err(Nep178RevokeError::AccountNotApproved {
-                token_id: token_id.clone(),
-                account_id: account_id.clone(),
+                token_id: action.token_id.clone(),
+                account_id: action.account_id.clone(),
             });
         }
 
-        let hook_state = Self::Hook::before_nft_revoke(self, token_id, account_id);
+        Self::RevokeHook::hook(self, action, |_| {
+            approvals.accounts.remove(action.account_id);
+            slot.write(&approvals);
 
-        approvals.accounts.remove(account_id);
-        slot.write(&approvals);
-
-        Self::Hook::after_nft_revoke(self, token_id, account_id, hook_state);
-
-        Ok(())
+            Ok(())
+        })
     }
 
-    fn revoke_all(
-        &mut self,
-        token_id: &TokenId,
-        current_owner_id: &AccountId,
-    ) -> Result<(), Nep178RevokeAllError> {
+    fn revoke_all(&mut self, action: &Nep178RevokeAll<'_>) -> Result<(), Nep178RevokeAllError> {
         // owner check
-        if self.token_owner(token_id).as_ref() != Some(current_owner_id) {
+        if self.token_owner(action.token_id).as_ref() != Some(action.current_owner_id) {
             return Err(Nep178RevokeAllError::Unauthorized {
-                token_id: token_id.clone(),
-                account_id: current_owner_id.clone(),
+                token_id: action.token_id.clone(),
+                account_id: action.current_owner_id.clone(),
             });
         }
 
-        let hook_state = Self::Hook::before_nft_revoke_all(self, token_id);
+        Self::RevokeAllHook::hook(self, action, |contract| {
+            contract.revoke_all_unchecked(action.token_id);
 
-        self.revoke_all_unchecked(token_id);
-
-        Self::Hook::after_nft_revoke_all(self, token_id, hook_state);
-
-        Ok(())
+            Ok(())
+        })
     }
 
     fn revoke_all_unchecked(&mut self, token_id: &TokenId) {
@@ -408,216 +416,6 @@ impl<T: Nep178ControllerInternal + Nep171Controller> Nep178Controller for T {
             .into_iter()
             .map(|(k, v)| (k.clone(), *v))
             .collect()
-    }
-}
-
-/// Hooks for NEP-178.
-pub trait Nep178Hook<C = Self> {
-    /// State passed from [`Nep178Hook::before_nft_approve`] to
-    /// [`Nep178Hook::after_nft_approve`].
-    type NftApproveState;
-
-    /// State passed from [`Nep178Hook::before_nft_revoke`] to
-    /// [`Nep178Hook::after_nft_revoke`].
-    type NftRevokeState;
-
-    /// State passed from [`Nep178Hook::before_nft_revoke_all`] to
-    /// [`Nep178Hook::after_nft_revoke_all`].
-    type NftRevokeAllState;
-
-    /// Called before a token is approved for transfer.
-    fn before_nft_approve(
-        contract: &C,
-        token_id: &TokenId,
-        account_id: &AccountId,
-    ) -> Self::NftApproveState;
-
-    /// Called after a token is approved for transfer.
-    fn after_nft_approve(
-        contract: &mut C,
-        token_id: &TokenId,
-        account_id: &AccountId,
-        approval_id: &ApprovalId,
-        state: Self::NftApproveState,
-    );
-
-    /// Called before a token approval is revoked.
-    fn before_nft_revoke(
-        contract: &C,
-        token_id: &TokenId,
-        account_id: &AccountId,
-    ) -> Self::NftRevokeState;
-
-    /// Called after a token approval is revoked.
-    fn after_nft_revoke(
-        contract: &mut C,
-        token_id: &TokenId,
-        account_id: &AccountId,
-        state: Self::NftRevokeState,
-    );
-
-    /// Called before all approvals for a token are revoked.
-    fn before_nft_revoke_all(contract: &C, token_id: &TokenId) -> Self::NftRevokeAllState;
-
-    /// Called after all approvals for a token are revoked.
-    fn after_nft_revoke_all(contract: &mut C, token_id: &TokenId, state: Self::NftRevokeAllState);
-}
-
-impl<C> Nep178Hook<C> for () {
-    type NftApproveState = ();
-    type NftRevokeState = ();
-    type NftRevokeAllState = ();
-
-    fn before_nft_approve(_contract: &C, _token_id: &TokenId, _account_id: &AccountId) {}
-
-    fn after_nft_approve(
-        _contract: &mut C,
-        _token_id: &TokenId,
-        _account_id: &AccountId,
-        _approval_id: &ApprovalId,
-        _: (),
-    ) {
-    }
-
-    fn before_nft_revoke(_contract: &C, _token_id: &TokenId, _account_id: &AccountId) {}
-
-    fn after_nft_revoke(_contract: &mut C, _token_id: &TokenId, _account_id: &AccountId, _: ()) {}
-
-    fn before_nft_revoke_all(_contract: &C, _token_id: &TokenId) {}
-
-    fn after_nft_revoke_all(_contract: &mut C, _token_id: &TokenId, _: ()) {}
-}
-
-impl<T, U, C> Nep178Hook<C> for (T, U)
-where
-    T: Nep178Hook<C>,
-    U: Nep178Hook<C>,
-{
-    type NftApproveState = (T::NftApproveState, U::NftApproveState);
-    type NftRevokeState = (T::NftRevokeState, U::NftRevokeState);
-    type NftRevokeAllState = (T::NftRevokeAllState, U::NftRevokeAllState);
-
-    fn before_nft_approve(
-        contract: &C,
-        token_id: &TokenId,
-        account_id: &AccountId,
-    ) -> Self::NftApproveState {
-        (
-            T::before_nft_approve(contract, token_id, account_id),
-            U::before_nft_approve(contract, token_id, account_id),
-        )
-    }
-
-    fn after_nft_approve(
-        contract: &mut C,
-        token_id: &TokenId,
-        account_id: &AccountId,
-        approval_id: &ApprovalId,
-        (t_state, u_state): Self::NftApproveState,
-    ) {
-        T::after_nft_approve(contract, token_id, account_id, approval_id, t_state);
-        U::after_nft_approve(contract, token_id, account_id, approval_id, u_state);
-    }
-
-    fn before_nft_revoke(
-        contract: &C,
-        token_id: &TokenId,
-        account_id: &AccountId,
-    ) -> Self::NftRevokeState {
-        (
-            T::before_nft_revoke(contract, token_id, account_id),
-            U::before_nft_revoke(contract, token_id, account_id),
-        )
-    }
-
-    fn after_nft_revoke(
-        contract: &mut C,
-        token_id: &TokenId,
-        account_id: &AccountId,
-        (t_state, u_state): Self::NftRevokeState,
-    ) {
-        T::after_nft_revoke(contract, token_id, account_id, t_state);
-        U::after_nft_revoke(contract, token_id, account_id, u_state);
-    }
-
-    fn before_nft_revoke_all(contract: &C, token_id: &TokenId) -> Self::NftRevokeAllState {
-        (
-            T::before_nft_revoke_all(contract, token_id),
-            U::before_nft_revoke_all(contract, token_id),
-        )
-    }
-
-    fn after_nft_revoke_all(
-        contract: &mut C,
-        token_id: &TokenId,
-        (t_state, u_state): Self::NftRevokeAllState,
-    ) {
-        T::after_nft_revoke_all(contract, token_id, t_state);
-        U::after_nft_revoke_all(contract, token_id, u_state);
-    }
-}
-
-/// Alternative to [`Nep178Hook`] that is simpler to implement. There is a
-/// blanket implementation of [`Nep178Hook`] for all types that implement
-/// [`SimpleNep178Hook`].
-pub trait SimpleNep178Hook {
-    /// Called before a token is approved for transfer.
-    fn before_nft_approve(&self, _token_id: &TokenId, _account_id: &AccountId) {}
-    /// Called after a token is approved for transfer.
-    fn after_nft_approve(
-        &mut self,
-        _token_id: &TokenId,
-        _account_id: &AccountId,
-        _approval_id: &ApprovalId,
-    ) {
-    }
-
-    /// Called before a token approval is revoked.
-    fn before_nft_revoke(&self, _token_id: &TokenId, _account_id: &AccountId) {}
-    /// Called after a token approval is revoked.
-    fn after_nft_revoke(&mut self, _token_id: &TokenId, _account_id: &AccountId) {}
-
-    /// Called before all approvals for a token are revoked.
-    fn before_nft_revoke_all(&self, _token_id: &TokenId) {}
-    /// Called after all approvals for a token are revoked.
-    fn after_nft_revoke_all(&mut self, _token_id: &TokenId) {}
-}
-
-impl<T: SimpleNep178Hook> Nep178Hook<Self> for T {
-    type NftApproveState = ();
-
-    type NftRevokeState = ();
-
-    type NftRevokeAllState = ();
-
-    fn before_nft_approve(contract: &Self, token_id: &TokenId, account_id: &AccountId) {
-        <T as SimpleNep178Hook>::before_nft_approve(contract, token_id, account_id);
-    }
-
-    fn after_nft_approve(
-        contract: &mut Self,
-        token_id: &TokenId,
-        account_id: &AccountId,
-        approval_id: &ApprovalId,
-        _: (),
-    ) {
-        <T as SimpleNep178Hook>::after_nft_approve(contract, token_id, account_id, approval_id);
-    }
-
-    fn before_nft_revoke(contract: &Self, token_id: &TokenId, account_id: &AccountId) {
-        <T as SimpleNep178Hook>::before_nft_revoke(contract, token_id, account_id);
-    }
-
-    fn after_nft_revoke(contract: &mut Self, token_id: &TokenId, account_id: &AccountId, _: ()) {
-        <T as SimpleNep178Hook>::after_nft_revoke(contract, token_id, account_id);
-    }
-
-    fn before_nft_revoke_all(contract: &Self, token_id: &TokenId) {
-        <T as SimpleNep178Hook>::before_nft_revoke_all(contract, token_id);
-    }
-
-    fn after_nft_revoke_all(contract: &mut Self, token_id: &TokenId, _: ()) {
-        <T as SimpleNep178Hook>::after_nft_revoke_all(contract, token_id);
     }
 }
 

@@ -138,7 +138,6 @@ use near_sdk::{
 use near_sdk_contract_tools::nft::*;
 
 #[derive(BorshSerialize, BorshDeserialize, PanicOnDefault, NonFungibleToken)]
-#[non_fungible_token(no_approval_hooks)]
 #[near_bindgen]
 pub struct MyNft {}
 ```

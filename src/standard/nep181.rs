@@ -17,16 +17,22 @@ pub use ext::*;
 /// Extension hook for [`Nep171Controller`].
 pub struct TokenEnumeration;
 
-impl<C: Nep171Controller + Nep181Controller> Hook<C, Nep171Mint<'_>> for TokenEnumeration {
-    fn hook<R>(contract: &mut C, args: &Nep171Mint<'_>, f: impl FnOnce(&mut C) -> R) -> R {
+impl<C: Nep171Controller + Nep181Controller> Hook<C, action::Nep171Mint<'_>> for TokenEnumeration {
+    fn hook<R>(contract: &mut C, args: &action::Nep171Mint<'_>, f: impl FnOnce(&mut C) -> R) -> R {
         let r = f(contract);
         contract.add_tokens_to_enumeration(args.token_ids, args.receiver_id);
         r
     }
 }
 
-impl<C: Nep171Controller + Nep181Controller> Hook<C, Nep171Transfer<'_>> for TokenEnumeration {
-    fn hook<R>(contract: &mut C, args: &Nep171Transfer<'_>, f: impl FnOnce(&mut C) -> R) -> R {
+impl<C: Nep171Controller + Nep181Controller> Hook<C, action::Nep171Transfer<'_>>
+    for TokenEnumeration
+{
+    fn hook<R>(
+        contract: &mut C,
+        args: &action::Nep171Transfer<'_>,
+        f: impl FnOnce(&mut C) -> R,
+    ) -> R {
         let r = f(contract);
         let owner_id = match args.authorization {
             Nep171TransferAuthorization::Owner => Cow::Borrowed(args.sender_id),
@@ -44,8 +50,8 @@ impl<C: Nep171Controller + Nep181Controller> Hook<C, Nep171Transfer<'_>> for Tok
     }
 }
 
-impl<C: Nep171Controller + Nep181Controller> Hook<C, Nep171Burn<'_>> for TokenEnumeration {
-    fn hook<R>(contract: &mut C, args: &Nep171Burn<'_>, f: impl FnOnce(&mut C) -> R) -> R {
+impl<C: Nep171Controller + Nep181Controller> Hook<C, action::Nep171Burn<'_>> for TokenEnumeration {
+    fn hook<R>(contract: &mut C, args: &action::Nep171Burn<'_>, f: impl FnOnce(&mut C) -> R) -> R {
         let r = f(contract);
         contract.remove_tokens_from_enumeration(args.token_ids, args.owner_id);
         r

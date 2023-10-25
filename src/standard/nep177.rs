@@ -16,9 +16,8 @@ use crate::{
     slot::Slot,
     standard::{
         nep171::{
-            self,
             error::TokenDoesNotExistError,
-            event::{NftContractMetadataUpdateLog, NftMetadataUpdateLog},
+            event::{Nep171Event, NftContractMetadataUpdateLog, NftMetadataUpdateLog},
             *,
         },
         nep297::Event,
@@ -322,7 +321,7 @@ impl<T: Nep177ControllerInternal + Nep171Controller> Nep177Controller for T {
         metadata: TokenMetadata,
     ) -> Result<(), Nep171MintError> {
         let token_ids = [token_id];
-        let action = Nep171Mint {
+        let action = action::Nep171Mint {
             token_ids: &token_ids,
             receiver_id: &owner_id,
             memo: None,
@@ -339,7 +338,7 @@ impl<T: Nep177ControllerInternal + Nep171Controller> Nep177Controller for T {
         owner_id: &AccountId,
     ) -> Result<(), Nep171BurnError> {
         let token_ids = [token_id];
-        let action = Nep171Burn {
+        let action = action::Nep171Burn {
             token_ids: &token_ids,
             owner_id,
             memo: None,
@@ -352,7 +351,7 @@ impl<T: Nep177ControllerInternal + Nep171Controller> Nep177Controller for T {
 
     fn set_token_metadata_unchecked(&mut self, token_id: TokenId, metadata: Option<TokenMetadata>) {
         <Self as Nep177ControllerInternal>::slot_token_metadata(&token_id).set(metadata.as_ref());
-        nep171::Nep171Event::NftMetadataUpdate(vec![NftMetadataUpdateLog {
+        Nep171Event::NftMetadataUpdate(vec![NftMetadataUpdateLog {
             token_ids: vec![token_id],
             memo: None,
         }])

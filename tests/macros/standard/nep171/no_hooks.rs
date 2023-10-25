@@ -2,7 +2,7 @@ use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
     env, near_bindgen, PanicOnDefault,
 };
-use near_sdk_contract_tools::{nft::*, standard::nep171::Nep171Mint};
+use near_sdk_contract_tools::nft::*;
 
 #[derive(BorshSerialize, BorshDeserialize, PanicOnDefault, Nep171)]
 #[near_bindgen]

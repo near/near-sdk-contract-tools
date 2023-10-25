@@ -44,12 +44,12 @@ use near_sdk::{
     serde::{Deserialize, Serialize},
     AccountId, BorshStorageKey, Gas,
 };
-use near_sdk_contract_tools_macros::event;
 use thiserror::Error;
 
-use crate::{hook::Hook, slot::Slot, DefaultStorageKey};
+use crate::{hook::Hook, slot::Slot, standard::nep297::Event, DefaultStorageKey};
 
-use super::nep297::Event;
+pub mod action;
+use action::*;
 
 pub mod error;
 pub mod event;
@@ -66,28 +66,6 @@ pub const INSUFFICIENT_GAS_MESSAGE: &str = "More gas is required";
 
 /// NFT token IDs.
 pub type TokenId = String;
-
-/// NEP-171 standard events.
-#[event(
-    crate = "crate",
-    macros = "crate",
-    serde = "serde",
-    standard = "nep171",
-    version = "1.2.0"
-)]
-#[derive(Debug, Clone)]
-pub enum Nep171Event {
-    /// Emitted when a token is newly minted.
-    NftMint(Vec<event::NftMintLog>),
-    /// Emitted when a token is transferred between two parties.
-    NftTransfer(Vec<event::NftTransferLog>),
-    /// Emitted when a token is burned.
-    NftBurn(Vec<event::NftBurnLog>),
-    /// Emitted when the metadata associated with an NFT contract is updated.
-    NftMetadataUpdate(Vec<event::NftMetadataUpdateLog>),
-    /// Emitted when the metadata associated with an NFT contract is updated.
-    ContractMetadataUpdate(Vec<event::NftContractMetadataUpdateLog>),
-}
 
 #[derive(BorshSerialize, BorshStorageKey)]
 enum StorageKey<'a> {
@@ -238,46 +216,6 @@ pub trait Nep171Controller {
     fn load_token(&self, token_id: &TokenId) -> Option<Token>;
 }
 
-/// NEP-171 mint action.
-pub struct Nep171Mint<'a> {
-    /// Token IDs to mint.
-    pub token_ids: &'a [TokenId],
-    /// Account ID of the receiver.
-    pub receiver_id: &'a AccountId,
-    /// Optional memo string.
-    pub memo: Option<&'a str>,
-}
-
-/// NEP-171 burn action.
-pub struct Nep171Burn<'a> {
-    /// Token IDs to burn.
-    pub token_ids: &'a [TokenId],
-    /// Account ID of the owner.
-    pub owner_id: &'a AccountId,
-    /// Optional memo string.
-    pub memo: Option<&'a str>,
-}
-
-/// Transfer metadata generic over both types of transfer (`nft_transfer` and
-/// `nft_transfer_call`).
-#[derive(Serialize, BorshSerialize, PartialEq, Eq, Clone, Debug, Hash)]
-pub struct Nep171Transfer<'a> {
-    /// Why is this sender allowed to perform this transfer?
-    pub authorization: Nep171TransferAuthorization,
-    /// Sending account ID.
-    pub sender_id: &'a AccountId,
-    /// Receiving account ID.
-    pub receiver_id: &'a AccountId,
-    /// Token ID.
-    pub token_id: &'a TokenId,
-    /// Optional memo string.
-    pub memo: Option<&'a str>,
-    /// Message passed to contract located at `receiver_id` in the case of `nft_transfer_call`.
-    pub msg: Option<&'a str>,
-    /// `true` if the transfer is a revert for a `nft_transfer_call`.
-    pub revert: bool,
-}
-
 /// Authorization for a transfer.
 #[derive(Serialize, BorshSerialize, PartialEq, Eq, Clone, Debug, Hash)]
 pub enum Nep171TransferAuthorization {
@@ -363,7 +301,7 @@ impl<T: Nep171ControllerInternal> Nep171Controller for T {
                         transfer.receiver_id,
                     );
 
-                    Nep171Event::NftTransfer(vec![event::NftTransferLog {
+                    event::Nep171Event::NftTransfer(vec![event::NftTransferLog {
                         authorized_id: None,
                         old_owner_id: current_owner_id,
                         new_owner_id: transfer.receiver_id.clone(),
@@ -411,7 +349,7 @@ impl<T: Nep171ControllerInternal> Nep171Controller for T {
         Self::MintHook::hook(self, action, |contract| {
             contract.mint_unchecked(action.token_ids, action.receiver_id);
 
-            Nep171Event::NftMint(vec![event::NftMintLog {
+            event::Nep171Event::NftMint(vec![event::NftMintLog {
                 token_ids: action.token_ids.iter().map(ToString::to_string).collect(),
                 owner_id: action.receiver_id.clone(),
                 memo: action.memo.map(ToString::to_string),
@@ -448,7 +386,7 @@ impl<T: Nep171ControllerInternal> Nep171Controller for T {
         Self::BurnHook::hook(self, action, |contract| {
             contract.burn_unchecked(action.token_ids);
 
-            Nep171Event::NftBurn(vec![event::NftBurnLog {
+            event::Nep171Event::NftBurn(vec![event::NftBurnLog {
                 token_ids: action.token_ids.iter().map(ToString::to_string).collect(),
                 owner_id: action.owner_id.clone(),
                 authorized_id: None,

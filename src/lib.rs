@@ -75,9 +75,9 @@ pub mod nft {
                 StorageBalance, StorageBalanceBounds,
             },
             nep171::{
-                self, ext_nep171, ext_nep171_receiver, ext_nep171_resolver, Nep171,
-                Nep171Controller, Nep171ControllerInternal, Nep171Receiver, Nep171Resolver,
-                Nep171Transfer, Token, TokenId,
+                self, action::*, ext_nep171, ext_nep171_receiver, ext_nep171_resolver, Nep171,
+                Nep171Controller, Nep171ControllerInternal, Nep171Receiver, Nep171Resolver, Token,
+                TokenId,
             },
             nep177::{
                 self, ext_nep177, ContractMetadata, Nep177, Nep177Controller,
@@ -85,8 +85,7 @@ pub mod nft {
             },
             nep178::{
                 self, ext_nep178, ext_nep178_receiver, ApprovalId, Nep178, Nep178Controller,
-                Nep178ControllerInternal, Nep178Hook, Nep178Receiver, SimpleNep178Hook,
-                TokenApprovals,
+                Nep178ControllerInternal, Nep178Receiver, TokenApprovals,
             },
             nep181::{
                 self, ext_nep181, Nep181, Nep181Controller, Nep181ControllerInternal,

@@ -23,16 +23,16 @@ use near_sdk_contract_tools::{
     check_external_transfer = "nep178::TokenApprovals",
     token_data = "(nep177::TokenMetadata, nep178::TokenApprovals)"
 )]
-#[nep178(no_hooks)]
+#[nep178()]
 #[near_bindgen]
 pub struct Contract {
     next_token_id: u32,
 }
 
-impl Hook<Contract, Nep171Transfer<'_>> for Contract {
+impl Hook<Contract, action::Nep171Transfer<'_>> for Contract {
     fn hook<R>(
         contract: &mut Contract,
-        _args: &Nep171Transfer<'_>,
+        _args: &action::Nep171Transfer<'_>,
         f: impl FnOnce(&mut Contract) -> R,
     ) -> R {
         Contract::require_unpaused();

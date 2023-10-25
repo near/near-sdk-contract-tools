@@ -1,4 +1,4 @@
-use darling::{util::Flag, FromDeriveInput};
+use darling::FromDeriveInput;
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{parse_quote, Expr, Type};
@@ -23,7 +23,9 @@ pub struct NonFungibleTokenMeta {
 
     // NEP-178 fields
     pub approval_storage_key: Option<Expr>,
-    pub no_approval_hooks: Flag,
+    pub approve_hook: Option<Type>,
+    pub revoke_hook: Option<Type>,
+    pub revoke_all_hook: Option<Type>,
 
     // NEP-181 fields
     pub enumeration_storage_key: Option<Expr>,
@@ -51,7 +53,9 @@ pub fn expand(meta: NonFungibleTokenMeta) -> Result<TokenStream, darling::Error>
         metadata_storage_key,
 
         approval_storage_key,
-        no_approval_hooks,
+        approve_hook,
+        revoke_hook,
+        revoke_all_hook,
 
         enumeration_storage_key,
 
@@ -97,7 +101,11 @@ pub fn expand(meta: NonFungibleTokenMeta) -> Result<TokenStream, darling::Error>
 
     let expand_nep178 = nep178::expand(nep178::Nep178Meta {
         storage_key: approval_storage_key,
-        no_hooks: no_approval_hooks,
+        all_hooks,
+        approve_hook,
+        revoke_hook,
+        revoke_all_hook,
+
         generics: generics.clone(),
         ident: ident.clone(),
         me: me.clone(),

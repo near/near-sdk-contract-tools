@@ -14,10 +14,10 @@ use near_sdk_contract_tools::{hook::Hook, standard::nep171::*, Nep171};
 #[near_bindgen]
 pub struct Contract {}
 
-impl Hook<Contract, Nep171Transfer<'_>> for Contract {
+impl Hook<Contract, action::Nep171Transfer<'_>> for Contract {
     fn hook<R>(
         contract: &mut Contract,
-        args: &Nep171Transfer<'_>,
+        args: &action::Nep171Transfer<'_>,
         f: impl FnOnce(&mut Contract) -> R,
     ) -> R {
         log!("before_nft_transfer({})", args.token_id);
@@ -35,7 +35,7 @@ impl Contract {
     }
 
     pub fn mint(&mut self, token_ids: Vec<TokenId>) {
-        let action = Nep171Mint {
+        let action = action::Nep171Mint {
             token_ids: &token_ids,
             receiver_id: &env::predecessor_account_id(),
             memo: None,

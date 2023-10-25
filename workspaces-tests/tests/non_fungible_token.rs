@@ -4,7 +4,11 @@ use std::collections::HashMap;
 
 use near_sdk::{json_types::U128, serde_json::json};
 use near_sdk_contract_tools::standard::{
-    nep171::{self, event::NftTransferLog, Nep171Event, Token},
+    nep171::{
+        self,
+        event::{Nep171Event, NftTransferLog},
+        Token,
+    },
     nep177::{self, TokenMetadata},
     nep178,
     nep297::Event,
