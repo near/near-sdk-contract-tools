@@ -21,8 +21,8 @@ impl<C: Nep141Controller + Nep141ControllerInternal> Hook<C, Nep145ForceUnregist
         contract
             .burn(&Nep141Burn {
                 amount: balance,
-                account_id: args.account_id.clone(),
-                memo: Some("storage forced unregistration".to_string()),
+                account_id: args.account_id,
+                memo: Some("storage forced unregistration"),
             })
             .unwrap_or_else(|e| {
                 near_sdk::env::panic_str(&format!(

@@ -427,7 +427,7 @@ mod pausable_fungible_token {
     #[derive(Default)]
     struct TransferHook;
 
-    impl Hook<Contract, Nep141Transfer> for TransferHook {
+    impl Hook<Contract, Nep141Transfer<'_>> for TransferHook {
         fn hook<R>(
             contract: &mut Contract,
             _args: &Nep141Transfer,

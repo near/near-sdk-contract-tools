@@ -13,8 +13,8 @@
 //!
 //! pub struct MyTransferHook;
 //!
-//! impl Hook<MyContract, Nep141Transfer> for MyTransferHook {
-//!     fn hook<R>(contract: &mut MyContract, transfer: &Nep141Transfer, f: impl FnOnce(&mut MyContract) -> R) -> R {
+//! impl Hook<MyContract, Nep141Transfer<'_>> for MyTransferHook {
+//!     fn hook<R>(contract: &mut MyContract, transfer: &Nep141Transfer<'_>, f: impl FnOnce(&mut MyContract) -> R) -> R {
 //!         // Log, check preconditions, save state, etc.
 //!         log!("NEP-141 transfer from {} to {} of {} tokens", transfer.sender_id, transfer.receiver_id, transfer.amount);
 //!

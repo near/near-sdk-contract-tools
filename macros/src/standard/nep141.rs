@@ -84,10 +84,10 @@ pub fn expand(meta: Nep141Meta) -> Result<TokenStream, darling::Error> {
                 let amount: u128 = amount.into();
 
                 let transfer = Nep141Transfer {
-                    sender_id: sender_id.clone(),
-                    receiver_id: receiver_id.clone(),
+                    sender_id: &sender_id,
+                    receiver_id: &receiver_id,
                     amount,
-                    memo,
+                    memo: memo.as_deref(),
                     msg: None,
                     revert: false,
                 };
@@ -118,11 +118,11 @@ pub fn expand(meta: Nep141Meta) -> Result<TokenStream, darling::Error> {
                 let amount: u128 = amount.into();
 
                 let transfer = Nep141Transfer {
-                    sender_id,
-                    receiver_id,
+                    sender_id: &sender_id,
+                    receiver_id: &receiver_id,
                     amount,
-                    memo,
-                    msg: Some(msg.clone()),
+                    memo: memo.as_deref(),
+                    msg: Some(&msg),
                     revert: false,
                 };
 
@@ -137,7 +137,7 @@ pub fn expand(meta: Nep141Meta) -> Result<TokenStream, darling::Error> {
                 // Initiating receiver's call and the callback
                 ext_nep141_receiver::ext(transfer.receiver_id.clone())
                     .with_static_gas(receiver_gas.into())
-                    .ft_on_transfer(transfer.sender_id.clone(), transfer.amount.into(), msg)
+                    .ft_on_transfer(transfer.sender_id.clone(), transfer.amount.into(), msg.clone())
                     .then(
                         ext_nep141_resolver::ext(#near_sdk::env::current_account_id())
                             .with_static_gas(GAS_FOR_RESOLVE_TRANSFER)
@@ -191,8 +191,8 @@ pub fn expand(meta: Nep141Meta) -> Result<TokenStream, darling::Error> {
                     if receiver_balance > 0 {
                         let refund_amount = std::cmp::min(receiver_balance, unused_amount);
                         let transfer = Nep141Transfer {
-                            sender_id: receiver_id,
-                            receiver_id: sender_id,
+                            sender_id: &receiver_id,
+                            receiver_id: &sender_id,
                             amount: refund_amount,
                             memo: None,
                             msg: None,

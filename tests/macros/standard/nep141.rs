@@ -13,14 +13,14 @@ use near_sdk_contract_tools::{hook::Hook, standard::nep141::*, Nep141};
 #[nep141(transfer_hook = "TransferHook")]
 #[near_bindgen]
 struct FungibleToken {
-    pub transfers: Vector<Nep141Transfer>,
+    pub transfers: Vector<Vec<u8>>,
     pub hooks: Vector<String>,
 }
 
 #[derive(Default)]
 struct TransferHook;
 
-impl Hook<FungibleToken, Nep141Transfer> for TransferHook {
+impl Hook<FungibleToken, Nep141Transfer<'_>> for TransferHook {
     fn hook<R>(
         contract: &mut FungibleToken,
         args: &Nep141Transfer,
@@ -30,7 +30,9 @@ impl Hook<FungibleToken, Nep141Transfer> for TransferHook {
         contract.hooks.push(&"before_transfer".to_string());
         let r = f(contract);
         contract.hooks.push(&"after_transfer".to_string());
-        contract.transfers.push(args);
+        contract
+            .transfers
+            .push(&BorshSerialize::try_to_vec(&args).unwrap());
         let storage_usage_end = env::storage_usage();
         println!("Storage delta: {}", storage_usage_end - storage_usage_start);
         r
@@ -94,14 +96,18 @@ fn nep141_transfer() {
 
     assert_eq!(
         ft.transfers.pop(),
-        Some(Nep141Transfer {
-            sender_id: alice.clone(),
-            receiver_id: bob.clone(),
-            amount: 50,
-            memo: None,
-            msg: None,
-            revert: false,
-        })
+        Some(
+            Nep141Transfer {
+                sender_id: &alice,
+                receiver_id: &bob,
+                amount: 50,
+                memo: None,
+                msg: None,
+                revert: false,
+            }
+            .try_to_vec()
+            .unwrap()
+        )
     );
 
     let expected_hook_execution_order = vec!["before_transfer", "after_transfer"];
