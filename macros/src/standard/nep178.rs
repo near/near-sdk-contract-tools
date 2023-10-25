@@ -78,7 +78,7 @@ pub fn expand(meta: Nep178Meta) -> Result<TokenStream, darling::Error> {
 
                 let predecessor = #near_sdk::env::predecessor_account_id();
 
-                let action = Nep178Approve {
+                let action = action::Nep178Approve {
                     token_id: &token_id,
                     current_owner_id: &predecessor,
                     account_id: &account_id,
@@ -106,7 +106,7 @@ pub fn expand(meta: Nep178Meta) -> Result<TokenStream, darling::Error> {
 
                 let predecessor = #near_sdk::env::predecessor_account_id();
 
-                let action = Nep178Revoke {
+                let action = action::Nep178Revoke {
                     token_id: &token_id,
                     current_owner_id: &predecessor,
                     account_id: &account_id,
@@ -124,7 +124,7 @@ pub fn expand(meta: Nep178Meta) -> Result<TokenStream, darling::Error> {
 
                 let predecessor = #near_sdk::env::predecessor_account_id();
 
-                let action = Nep178RevokeAll {
+                let action = action::Nep178RevokeAll {
                     token_id: &token_id,
                     current_owner_id: &predecessor,
                 };

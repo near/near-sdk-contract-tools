@@ -84,8 +84,8 @@ pub mod nft {
                 Nep177ControllerInternal, TokenMetadata,
             },
             nep178::{
-                self, ext_nep178, ext_nep178_receiver, ApprovalId, Nep178, Nep178Controller,
-                Nep178ControllerInternal, Nep178Receiver, TokenApprovals,
+                self, action::*, ext_nep178, ext_nep178_receiver, ApprovalId, Nep178,
+                Nep178Controller, Nep178ControllerInternal, Nep178Receiver, TokenApprovals,
             },
             nep181::{
                 self, ext_nep181, Nep181, Nep181Controller, Nep181ControllerInternal,

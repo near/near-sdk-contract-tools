@@ -10,7 +10,6 @@ use near_sdk::{
 use near_sdk_contract_tools::{
     hook::Hook,
     nft::*,
-    standard::nep178::{Nep178Approve, Nep178Revoke, Nep178RevokeAll},
 };
 
 #[derive(PanicOnDefault, BorshSerialize, BorshDeserialize, NonFungibleToken)]

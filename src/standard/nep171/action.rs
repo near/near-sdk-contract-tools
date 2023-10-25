@@ -1,3 +1,8 @@
+//! NEP-171 actions.
+//!
+//! Used when calling various functions on [`Nep171Controller`]. Also used when
+//! implementing [`Hook`]s for the NEP-171 component.
+
 use super::*;
 use near_sdk::{
     borsh::{self, BorshSerialize},
