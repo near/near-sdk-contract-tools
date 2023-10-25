@@ -4,9 +4,15 @@ use std::collections::HashMap;
 
 use near_sdk::{json_types::U128, serde_json::json};
 use near_sdk_contract_tools::standard::{
-    nep171::{self, event::NftTransferLog, Nep171Event, Token},
+    nep171::{
+        self,
+        event::{Nep171Event, NftTransferLog},
+        Token,
+    },
     nep177::{self, TokenMetadata},
-    nep178,
+    nep178::error::{
+        AccountAlreadyApprovedError, Nep178ApproveError, TooManyApprovalsError, UnauthorizedError,
+    },
     nep297::Event,
 };
 use near_workspaces::{operations::Function, types::Gas};
@@ -949,10 +955,10 @@ async fn transfer_approval_double_approval_fail() {
 
     let expected_error = format!(
         "Smart contract panicked: {}",
-        nep178::Nep178ApproveError::AccountAlreadyApproved {
+        Nep178ApproveError::AccountAlreadyApproved(AccountAlreadyApprovedError {
             account_id: bob.id().parse().unwrap(),
             token_id: "token_0".to_string(),
-        },
+        }),
     );
 
     expect_execution_error(&result, expected_error);
@@ -978,10 +984,10 @@ async fn transfer_approval_unauthorized_approval_fail() {
 
     let expected_error = format!(
         "Smart contract panicked: {}",
-        nep178::Nep178ApproveError::Unauthorized {
+        Nep178ApproveError::Unauthorized(UnauthorizedError {
             account_id: bob.id().parse().unwrap(),
             token_id: "token_0".to_string(),
-        },
+        }),
     );
 
     expect_execution_error(&result, expected_error);
@@ -1029,9 +1035,9 @@ async fn transfer_approval_too_many_approvals_fail() {
 
     let expected_error = format!(
         "Smart contract panicked: {}",
-        nep178::Nep178ApproveError::TooManyApprovals {
+        Nep178ApproveError::TooManyApprovals(TooManyApprovalsError {
             token_id: "token_0".to_string(),
-        },
+        }),
     );
 
     expect_execution_error(&result, expected_error);
@@ -1071,12 +1077,14 @@ async fn transfer_approval_approved_but_wrong_approval_id_fail() {
 
     let expected_error = format!(
         "Smart contract panicked: {}",
-        nep171::Nep171TransferError::SenderNotApproved(nep171::error::SenderNotApprovedError {
-            sender_id: bob.id().parse().unwrap(),
-            owner_id: alice.id().parse().unwrap(),
-            token_id: "token_0".to_string(),
-            approval_id: 1,
-        }),
+        nep171::error::Nep171TransferError::SenderNotApproved(
+            nep171::error::SenderNotApprovedError {
+                sender_id: bob.id().parse().unwrap(),
+                owner_id: alice.id().parse().unwrap(),
+                token_id: "token_0".to_string(),
+                approval_id: 1,
+            }
+        ),
     );
 
     expect_execution_error(&result, expected_error);

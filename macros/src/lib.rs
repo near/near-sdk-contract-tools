@@ -30,6 +30,10 @@ fn default_serde() -> syn::Path {
     syn::parse_str("::serde").unwrap()
 }
 
+fn unitify(ty: Option<syn::Type>) -> syn::Type {
+    ty.unwrap_or_else(|| syn::parse_quote! { () })
+}
+
 fn make_derive<T>(
     input: TokenStream,
     expand: fn(T) -> Result<proc_macro2::TokenStream, darling::Error>,
@@ -132,27 +136,22 @@ pub fn derive_nep145(input: TokenStream) -> TokenStream {
 }
 
 /// Adds NEP-148 fungible token metadata functionality to a contract. Metadata
-/// is hardcoded into the contract code, and is therefore not stored in storage.
+/// must be initialized during contract creation using `Nep148Controller::set_metadata`.
 ///
-/// Specify metadata using the `#[nep148(...)]` attribute.
-///
-/// Fields:
-///  - `name`
-///  - `symbol`
-///  - `decimals`
-///  - `spec` (optional)
-///  - `icon` (optional)
-///  - `reference` (optional)
-///  - `reference_hash` (optional)
+/// The storage key prefix for the fields can be optionally specified (default:
+/// `"~$148"`) using `#[nep148(storage_key = "<expression>")]`.
 #[proc_macro_derive(Nep148, attributes(nep148))]
 pub fn derive_nep148(input: TokenStream) -> TokenStream {
     make_derive(input, standard::nep148::expand)
 }
 
-/// Implements NEP-141 and NEP-148 functionality, like
-/// `#[derive(Nep141, Nep148)]`.
+/// Implements NEP-141, NEP-145, and NEP-148 functionality, like
+/// `#[derive(Nep141, Nep145, Nep148)]`. This is the recommended way to
+/// implement a fungible token, as it also ensures that all of the standards
+/// integrate with each other correctly.
 ///
-/// Attributes are the union of those for the constituent derive macros.
+/// Attributes are generally the union of those from the constituent derive
+/// macros.
 /// Specify attributes with `#[fungible_token(...)]`.
 #[proc_macro_derive(FungibleToken, attributes(fungible_token))]
 pub fn derive_fungible_token(input: TokenStream) -> TokenStream {

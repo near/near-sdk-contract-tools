@@ -13,29 +13,29 @@ use near_sdk_contract_tools::{hook::Hook, standard::nep141::*, Nep141};
 #[nep141(transfer_hook = "TransferHook")]
 #[near_bindgen]
 struct FungibleToken {
-    pub transfers: Vector<Nep141Transfer>,
+    pub transfers: Vector<Vec<u8>>,
     pub hooks: Vector<String>,
 }
 
 #[derive(Default)]
-struct TransferHook {
-    pub storage_usage_start: u64,
-}
+struct TransferHook;
 
-impl Hook<FungibleToken, Nep141Transfer> for TransferHook {
-    fn before(_contract: &FungibleToken, _transfer: &Nep141Transfer) -> Self {
-        Self {
-            storage_usage_start: env::storage_usage(),
-        }
-    }
-
-    fn after(contract: &mut FungibleToken, transfer: &Nep141Transfer, state: Self) {
+impl Hook<FungibleToken, Nep141Transfer<'_>> for TransferHook {
+    fn hook<R>(
+        contract: &mut FungibleToken,
+        args: &Nep141Transfer,
+        f: impl FnOnce(&mut FungibleToken) -> R,
+    ) -> R {
+        let storage_usage_start = env::storage_usage();
+        contract.hooks.push(&"before_transfer".to_string());
+        let r = f(contract);
         contract.hooks.push(&"after_transfer".to_string());
-        contract.transfers.push(transfer);
-        println!(
-            "Storage delta: {}",
-            env::storage_usage() - state.storage_usage_start
-        );
+        contract
+            .transfers
+            .push(&BorshSerialize::try_to_vec(&args).unwrap());
+        let storage_usage_end = env::storage_usage();
+        println!("Storage delta: {}", storage_usage_end - storage_usage_start);
+        r
     }
 }
 
@@ -96,17 +96,21 @@ fn nep141_transfer() {
 
     assert_eq!(
         ft.transfers.pop(),
-        Some(Nep141Transfer {
-            sender_id: alice.clone(),
-            receiver_id: bob.clone(),
-            amount: 50,
-            memo: None,
-            msg: None,
-            revert: false,
-        })
+        Some(
+            Nep141Transfer {
+                sender_id: &alice,
+                receiver_id: &bob,
+                amount: 50,
+                memo: None,
+                msg: None,
+                revert: false,
+            }
+            .try_to_vec()
+            .unwrap()
+        )
     );
 
-    let expected_hook_execution_order = vec!["after_transfer"];
+    let expected_hook_execution_order = vec!["before_transfer", "after_transfer"];
     let actual_hook_execution_order = ft.hooks.to_vec();
     assert_eq!(expected_hook_execution_order, actual_hook_execution_order);
 

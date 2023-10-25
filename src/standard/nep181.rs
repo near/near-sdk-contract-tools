@@ -10,45 +10,51 @@ use near_sdk::{
     AccountId, BorshStorageKey,
 };
 
-use crate::{slot::Slot, standard::nep171::*, DefaultStorageKey};
+use crate::{hook::Hook, slot::Slot, standard::nep171::*, DefaultStorageKey};
 
 pub use ext::*;
 
 /// Extension hook for [`Nep171Controller`].
 pub struct TokenEnumeration;
 
-impl<C: Nep171Controller + Nep181Controller> Nep171Hook<C> for TokenEnumeration {
-    type MintState = ();
-    type NftTransferState = ();
-    type BurnState = ();
-
-    fn before_mint(_contract: &C, _token_ids: &[TokenId], _owner_id: &AccountId) {}
-
-    fn after_mint(contract: &mut C, token_ids: &[TokenId], owner_id: &AccountId, _: ()) {
-        contract.add_tokens_to_enumeration(token_ids, owner_id);
+impl<C: Nep171Controller + Nep181Controller> Hook<C, action::Nep171Mint<'_>> for TokenEnumeration {
+    fn hook<R>(contract: &mut C, args: &action::Nep171Mint<'_>, f: impl FnOnce(&mut C) -> R) -> R {
+        let r = f(contract);
+        contract.add_tokens_to_enumeration(args.token_ids, args.receiver_id);
+        r
     }
+}
 
-    fn before_nft_transfer(_contract: &C, _transfer: &Nep171Transfer) {}
-
-    fn after_nft_transfer(contract: &mut C, transfer: &Nep171Transfer, _: ()) {
-        let owner_id = match transfer.authorization {
-            Nep171TransferAuthorization::Owner => Cow::Borrowed(transfer.sender_id),
-            Nep171TransferAuthorization::ApprovalId(_) => Cow::Owned(contract.token_owner(transfer.token_id).unwrap_or_else(|| {
-                env::panic_str(&format!("Inconsistent state: Enumeration reconciliation should only run after a token has been transferred, but token {} does not exist.", transfer.token_id))
+impl<C: Nep171Controller + Nep181Controller> Hook<C, action::Nep171Transfer<'_>>
+    for TokenEnumeration
+{
+    fn hook<R>(
+        contract: &mut C,
+        args: &action::Nep171Transfer<'_>,
+        f: impl FnOnce(&mut C) -> R,
+    ) -> R {
+        let r = f(contract);
+        let owner_id = match args.authorization {
+            Nep171TransferAuthorization::Owner => Cow::Borrowed(args.sender_id),
+            Nep171TransferAuthorization::ApprovalId(_) => Cow::Owned(contract.token_owner(args.token_id).unwrap_or_else(|| {
+                env::panic_str(&format!("Inconsistent state: Enumeration reconciliation should only run after a token has been transferred, but token {} does not exist.", args.token_id))
             })),
         };
 
         contract.transfer_token_enumeration(
-            std::array::from_ref(transfer.token_id),
+            std::array::from_ref(args.token_id),
             owner_id.as_ref(),
-            transfer.receiver_id,
+            args.receiver_id,
         );
+        r
     }
+}
 
-    fn before_burn(_contract: &C, _token_ids: &[TokenId], _owner_id: &AccountId) {}
-
-    fn after_burn(contract: &mut C, token_ids: &[TokenId], owner_id: &AccountId, _: ()) {
-        contract.remove_tokens_from_enumeration(token_ids, owner_id);
+impl<C: Nep171Controller + Nep181Controller> Hook<C, action::Nep171Burn<'_>> for TokenEnumeration {
+    fn hook<R>(contract: &mut C, args: &action::Nep171Burn<'_>, f: impl FnOnce(&mut C) -> R) -> R {
+        let r = f(contract);
+        contract.remove_tokens_from_enumeration(args.token_ids, args.owner_id);
+        r
     }
 }
 

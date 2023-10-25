@@ -10,17 +10,19 @@ pub struct BurnOnForceUnregisterHook;
 impl<C: Nep141Controller + Nep141ControllerInternal> Hook<C, Nep145ForceUnregister<'_>>
     for BurnOnForceUnregisterHook
 {
-    fn before(_contract: &C, _args: &Nep145ForceUnregister<'_>) -> Self {
-        Self
-    }
+    fn hook<R>(
+        contract: &mut C,
+        args: &Nep145ForceUnregister<'_>,
+        f: impl FnOnce(&mut C) -> R,
+    ) -> R {
+        let r = f(contract);
 
-    fn after(contract: &mut C, args: &Nep145ForceUnregister<'_>, _: Self) {
         let balance = contract.balance_of(args.account_id);
         contract
             .burn(&Nep141Burn {
                 amount: balance,
-                account_id: args.account_id.clone(),
-                memo: Some("storage forced unregistration".to_string()),
+                account_id: args.account_id,
+                memo: Some("storage forced unregistration"),
             })
             .unwrap_or_else(|e| {
                 near_sdk::env::panic_str(&format!(
@@ -29,5 +31,7 @@ impl<C: Nep141Controller + Nep141ControllerInternal> Hook<C, Nep145ForceUnregist
             });
 
         <C as Nep141ControllerInternal>::slot_account(args.account_id).remove();
+
+        r
     }
 }

@@ -1,7 +1,29 @@
 //! Event log metadata & associated structures.
 
-use near_sdk::AccountId;
-use serde::Serialize;
+use near_sdk::{serde::Serialize, AccountId};
+use near_sdk_contract_tools_macros::event;
+
+/// NEP-171 standard events.
+#[event(
+    crate = "crate",
+    macros = "crate",
+    serde = "serde",
+    standard = "nep171",
+    version = "1.2.0"
+)]
+#[derive(Debug, Clone)]
+pub enum Nep171Event {
+    /// Emitted when a token is newly minted.
+    NftMint(Vec<NftMintLog>),
+    /// Emitted when a token is transferred between two parties.
+    NftTransfer(Vec<NftTransferLog>),
+    /// Emitted when a token is burned.
+    NftBurn(Vec<NftBurnLog>),
+    /// Emitted when the metadata associated with an NFT contract is updated.
+    NftMetadataUpdate(Vec<NftMetadataUpdateLog>),
+    /// Emitted when the metadata associated with an NFT contract is updated.
+    ContractMetadataUpdate(Vec<NftContractMetadataUpdateLog>),
+}
 
 /// Tokens minted to a single owner.
 #[derive(Serialize, Debug, Clone)]

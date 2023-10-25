@@ -425,22 +425,21 @@ mod pausable_fungible_token {
     }
 
     #[derive(Default)]
-    struct TransferHook {
-        pub storage_usage_start: u64,
-    }
+    struct TransferHook;
 
-    impl Hook<Contract, Nep141Transfer> for TransferHook {
-        fn before(_contract: &Contract, _transfer: &Nep141Transfer) -> TransferHook {
-            TransferHook {
-                storage_usage_start: env::storage_usage(),
-            }
-        }
-
-        fn after(contract: &mut Contract, _transfer: &Nep141Transfer, state: TransferHook) {
-            let storage_delta = env::storage_usage() - state.storage_usage_start;
+    impl Hook<Contract, Nep141Transfer<'_>> for TransferHook {
+        fn hook<R>(
+            contract: &mut Contract,
+            _args: &Nep141Transfer,
+            f: impl FnOnce(&mut Contract) -> R,
+        ) -> R {
+            let state = env::storage_usage();
+            let r = f(contract);
+            let storage_delta = env::storage_usage() - state;
             println!("Storage delta: {storage_delta}");
 
             contract.storage_usage = storage_delta;
+            r
         }
     }
 

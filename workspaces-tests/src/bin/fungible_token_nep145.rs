@@ -22,13 +22,15 @@ pub struct Contract {
 
 pub struct TransferHook;
 
-impl Hook<Contract, Nep141Transfer> for TransferHook {
-    fn before(contract: &Contract, transfer: &Nep141Transfer) -> Self {
-        contract.require_registration(&transfer.receiver_id);
-        Self
+impl Hook<Contract, Nep141Transfer<'_>> for TransferHook {
+    fn hook<R>(
+        contract: &mut Contract,
+        args: &Nep141Transfer<'_>,
+        f: impl FnOnce(&mut Contract) -> R,
+    ) -> R {
+        contract.require_registration(args.receiver_id);
+        f(contract)
     }
-
-    fn after(_contract: &mut Contract, _transfer: &Nep141Transfer, _: Self) {}
 }
 
 #[near_bindgen]
@@ -53,7 +55,7 @@ impl Contract {
             self,
             &Nep141Mint {
                 amount: amount.into(),
-                account_id: env::predecessor_account_id(),
+                account_id: &env::predecessor_account_id(),
                 memo: None,
             },
         )

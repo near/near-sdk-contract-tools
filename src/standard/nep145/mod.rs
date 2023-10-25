@@ -380,11 +380,9 @@ impl<T: Nep145ControllerInternal> Nep145Controller for T {
             balance,
         };
 
-        let state = Self::ForceUnregisterHook::before(self, &action);
-
-        account_slot.remove();
-
-        Self::ForceUnregisterHook::after(self, &action, state);
+        Self::ForceUnregisterHook::hook(self, &action, |_| {
+            account_slot.remove();
+        });
 
         Ok(action.balance.available)
     }

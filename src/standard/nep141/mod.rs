@@ -2,10 +2,10 @@
 //! <https://github.com/near/NEPs/blob/master/neps/nep-0141.md>
 
 use near_sdk::{
-    borsh::{self, BorshDeserialize, BorshSerialize},
+    borsh::{self, BorshSerialize},
+    serde::Serialize,
     AccountId, BorshStorageKey, Gas,
 };
-use serde::{Deserialize, Serialize};
 
 use crate::{hook::Hook, slot::Slot, standard::nep297::*, DefaultStorageKey};
 
@@ -32,23 +32,23 @@ enum StorageKey {
 
 /// Transfer metadata generic over both types of transfer (`ft_transfer` and
 /// `ft_transfer_call`).
-#[derive(Serialize, Deserialize, BorshSerialize, BorshDeserialize, PartialEq, Eq, Clone, Debug)]
-pub struct Nep141Transfer {
+#[derive(Serialize, BorshSerialize, PartialEq, Eq, Clone, Debug)]
+pub struct Nep141Transfer<'a> {
     /// Sender's account ID.
-    pub sender_id: AccountId,
+    pub sender_id: &'a AccountId,
     /// Receiver's account ID.
-    pub receiver_id: AccountId,
+    pub receiver_id: &'a AccountId,
     /// Transferred amount.
     pub amount: u128,
     /// Optional memo string.
-    pub memo: Option<String>,
+    pub memo: Option<&'a str>,
     /// Message passed to contract located at `receiver_id`.
-    pub msg: Option<String>,
+    pub msg: Option<&'a str>,
     /// Is this transfer a revert as a result of a [`Nep141::ft_transfer_call`] -> [`Nep141Receiver::ft_on_transfer`] call?
     pub revert: bool,
 }
 
-impl Nep141Transfer {
+impl<'a> Nep141Transfer<'a> {
     /// Returns `true` if this transfer comes from a `ft_transfer_call`
     /// call, `false` otherwise.
     pub fn is_transfer_call(&self) -> bool {
@@ -58,38 +58,38 @@ impl Nep141Transfer {
 
 /// Describes a mint operation.
 #[derive(Clone, Debug, Serialize, BorshSerialize, PartialEq, Eq)]
-pub struct Nep141Mint {
+pub struct Nep141Mint<'a> {
     /// Amount to mint.
     pub amount: u128,
     /// Account ID to mint to.
-    pub account_id: AccountId,
+    pub account_id: &'a AccountId,
     /// Optional memo string.
-    pub memo: Option<String>,
+    pub memo: Option<&'a str>,
 }
 
 /// Describes a burn operation.
 #[derive(Clone, Debug, Serialize, BorshSerialize, PartialEq, Eq)]
-pub struct Nep141Burn {
+pub struct Nep141Burn<'a> {
     /// Amount to burn.
     pub amount: u128,
     /// Account ID to burn from.
-    pub account_id: AccountId,
+    pub account_id: &'a AccountId,
     /// Optional memo string.
-    pub memo: Option<String>,
+    pub memo: Option<&'a str>,
 }
 
 /// Internal functions for [`Nep141Controller`]. Using these methods may result in unexpected behavior.
 pub trait Nep141ControllerInternal {
     /// Hook for mint operations.
-    type MintHook: Hook<Self, Nep141Mint>
+    type MintHook: for<'a> Hook<Self, Nep141Mint<'a>>
     where
         Self: Sized;
     /// Hook for transfer operations.
-    type TransferHook: Hook<Self, Nep141Transfer>
+    type TransferHook: for<'a> Hook<Self, Nep141Transfer<'a>>
     where
         Self: Sized;
     /// Hook for burn operations.
-    type BurnHook: Hook<Self, Nep141Burn>
+    type BurnHook: for<'a> Hook<Self, Nep141Burn<'a>>
     where
         Self: Sized;
 
@@ -112,15 +112,15 @@ pub trait Nep141ControllerInternal {
 /// Non-public implementations of functions for managing a fungible token.
 pub trait Nep141Controller {
     /// Hook for mint operations.
-    type MintHook: Hook<Self, Nep141Mint>
+    type MintHook: for<'a> Hook<Self, Nep141Mint<'a>>
     where
         Self: Sized;
     /// Hook for transfer operations.
-    type TransferHook: Hook<Self, Nep141Transfer>
+    type TransferHook: for<'a> Hook<Self, Nep141Transfer<'a>>
     where
         Self: Sized;
     /// Hook for burn operations.
-    type BurnHook: Hook<Self, Nep141Burn>
+    type BurnHook: for<'a> Hook<Self, Nep141Burn<'a>>
     where
         Self: Sized;
 
@@ -166,21 +166,21 @@ pub trait Nep141Controller {
     /// # Panics
     ///
     /// See: [`Nep141Controller::transfer_unchecked`]
-    fn transfer(&mut self, transfer: &Nep141Transfer) -> Result<(), TransferError>;
+    fn transfer(&mut self, transfer: &Nep141Transfer<'_>) -> Result<(), TransferError>;
 
     /// Performs an NEP-141 token mint, with event emission.
     ///
     /// # Panics
     ///
     /// See: [`Nep141Controller::deposit_unchecked`]
-    fn mint(&mut self, mint: &Nep141Mint) -> Result<(), DepositError>;
+    fn mint(&mut self, mint: &Nep141Mint<'_>) -> Result<(), DepositError>;
 
     /// Performs an NEP-141 token burn, with event emission.
     ///
     /// # Panics
     ///
     /// See: [`Nep141Controller::withdraw_unchecked`]
-    fn burn(&mut self, mint: &Nep141Burn) -> Result<(), WithdrawError>;
+    fn burn(&mut self, mint: &Nep141Burn<'_>) -> Result<(), WithdrawError>;
 }
 
 impl<T: Nep141ControllerInternal> Nep141Controller for T {
@@ -295,55 +295,53 @@ impl<T: Nep141ControllerInternal> Nep141Controller for T {
         Ok(())
     }
 
-    fn transfer(&mut self, transfer: &Nep141Transfer) -> Result<(), TransferError> {
-        let state = Self::TransferHook::before(self, transfer);
+    fn transfer(&mut self, transfer: &Nep141Transfer<'_>) -> Result<(), TransferError> {
+        Self::TransferHook::hook(self, transfer, |contract| {
+            contract.transfer_unchecked(
+                transfer.sender_id,
+                transfer.receiver_id,
+                transfer.amount,
+            )?;
 
-        self.transfer_unchecked(&transfer.sender_id, &transfer.receiver_id, transfer.amount)?;
+            Nep141Event::FtTransfer(vec![FtTransferData {
+                old_owner_id: transfer.sender_id.clone(),
+                new_owner_id: transfer.receiver_id.clone(),
+                amount: transfer.amount.into(),
+                memo: transfer.memo.map(ToString::to_string),
+            }])
+            .emit();
 
-        Nep141Event::FtTransfer(vec![FtTransferData {
-            old_owner_id: transfer.sender_id.clone(),
-            new_owner_id: transfer.receiver_id.clone(),
-            amount: transfer.amount.into(),
-            memo: transfer.memo.clone(),
-        }])
-        .emit();
-
-        Self::TransferHook::after(self, transfer, state);
-
-        Ok(())
+            Ok(())
+        })
     }
 
     fn mint(&mut self, mint: &Nep141Mint) -> Result<(), DepositError> {
-        let state = Self::MintHook::before(self, mint);
+        Self::MintHook::hook(self, mint, |contract| {
+            contract.deposit_unchecked(mint.account_id, mint.amount)?;
 
-        self.deposit_unchecked(&mint.account_id, mint.amount)?;
+            Nep141Event::FtMint(vec![FtMintData {
+                owner_id: mint.account_id.clone(),
+                amount: mint.amount.into(),
+                memo: mint.memo.map(ToString::to_string),
+            }])
+            .emit();
 
-        Self::MintHook::after(self, mint, state);
-
-        Nep141Event::FtMint(vec![FtMintData {
-            owner_id: mint.account_id.clone(),
-            amount: mint.amount.into(),
-            memo: mint.memo.clone(),
-        }])
-        .emit();
-
-        Ok(())
+            Ok(())
+        })
     }
 
     fn burn(&mut self, burn: &Nep141Burn) -> Result<(), WithdrawError> {
-        let state = Self::BurnHook::before(self, burn);
+        Self::BurnHook::hook(self, burn, |contract| {
+            contract.withdraw_unchecked(burn.account_id, burn.amount)?;
 
-        self.withdraw_unchecked(&burn.account_id, burn.amount)?;
+            Nep141Event::FtBurn(vec![FtBurnData {
+                owner_id: burn.account_id.clone(),
+                amount: burn.amount.into(),
+                memo: burn.memo.map(ToString::to_string),
+            }])
+            .emit();
 
-        Self::BurnHook::after(self, burn, state);
-
-        Nep141Event::FtBurn(vec![FtBurnData {
-            owner_id: burn.account_id.clone(),
-            amount: burn.amount.into(),
-            memo: burn.memo.clone(),
-        }])
-        .emit();
-
-        Ok(())
+            Ok(())
+        })
     }
 }
