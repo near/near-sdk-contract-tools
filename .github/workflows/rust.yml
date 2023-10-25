@@ -14,8 +14,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
-      - uses: dtolnay/rust-toolchain@master
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain
         with:
           toolchain: 1.72
           components: rustfmt
@@ -27,8 +27,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
-      - uses: dtolnay/rust-toolchain@master
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain
         with:
           toolchain: 1.72
           components: clippy
@@ -36,25 +36,30 @@ jobs:
         run: cargo clippy -- -D warnings
   test:
     runs-on: ubuntu-latest
+    env:
+      CARGO_TERM_COLOR: always
 
     steps:
-      - uses: actions/checkout@v3
-      - uses: dtolnay/rust-toolchain@master
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain
         with:
           toolchain: 1.72
+      - uses: taiki-e/install-action@nextest
       - name: Run unit and integration tests
-        run: cargo test --workspace --exclude workspaces-tests
+        run: cargo nextest run --workspace --exclude workspaces-tests
   workspaces-test:
     runs-on: ubuntu-latest
+    env:
+      CARGO_TERM_COLOR: always
 
     steps:
       - uses: actions/checkout@v3
-      - uses: dtolnay/rust-toolchain@master
+      - uses: dtolnay/rust-toolchain
         with:
           toolchain: 1.72
           targets: wasm32-unknown-unknown
+      - uses: taiki-e/install-action
+        with:
+          tool: cargo-make,nextest
       - name: Run workspaces tests
-        run: >
-          cd workspaces-tests;
-          cargo install cargo-make;
-          cargo make test;
+        run: cd workspaces-tests && cargo make nextest
