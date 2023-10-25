@@ -15,6 +15,22 @@ set -e
 if [[ -n $1 ]]; then
     cargo test --package workspaces-tests --test "$1" "$2" -- --nocapture
 else
-    cargo test
+    cargo test --package workspaces-tests -- --nocapture
+fi
+"""
+
+[tasks.nextest]
+clear = true
+dependencies = ["build"]
+script = """
+#!/usr/bin/env bash
+set -e
+
+if [[ -n $2 ]]; then
+    cargo nextest run --package workspaces-tests --test "$1" -E "test($2)"
+elif [[ -n $1 ]]; then
+    cargo nextest run --package workspaces-tests --test "$1"
+else
+    cargo nextest run --package workspaces-tests
 fi
 """
