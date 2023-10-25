@@ -15,7 +15,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain
+      - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: 1.72
           components: rustfmt
@@ -28,7 +28,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain
+      - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: 1.72
           components: clippy
@@ -41,10 +41,12 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain
+      - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: 1.72
-      - uses: taiki-e/install-action@nextest
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: nextest
       - name: Run unit and integration tests
         run: cargo nextest run --workspace --exclude workspaces-tests
   workspaces-test:
@@ -54,11 +56,11 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
-      - uses: dtolnay/rust-toolchain
+      - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: 1.72
           targets: wasm32-unknown-unknown
-      - uses: taiki-e/install-action
+      - uses: taiki-e/install-action@v2
         with:
           tool: cargo-make,nextest
       - name: Run workspaces tests
