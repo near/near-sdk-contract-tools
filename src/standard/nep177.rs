@@ -16,9 +16,10 @@ use crate::{
     slot::Slot,
     standard::{
         nep171::{
-            error::TokenDoesNotExistError,
+            action::{Nep171Burn, Nep171Mint},
+            error::{Nep171BurnError, Nep171MintError, TokenDoesNotExistError},
             event::{Nep171Event, NftContractMetadataUpdateLog, NftMetadataUpdateLog},
-            *,
+            LoadTokenMetadata, Nep171Controller, TokenId,
         },
         nep297::Event,
     },
@@ -321,7 +322,7 @@ impl<T: Nep177ControllerInternal + Nep171Controller> Nep177Controller for T {
         metadata: TokenMetadata,
     ) -> Result<(), Nep171MintError> {
         let token_ids = [token_id];
-        let action = action::Nep171Mint {
+        let action = Nep171Mint {
             token_ids: &token_ids,
             receiver_id: &owner_id,
             memo: None,
@@ -338,7 +339,7 @@ impl<T: Nep177ControllerInternal + Nep171Controller> Nep177Controller for T {
         owner_id: &AccountId,
     ) -> Result<(), Nep171BurnError> {
         let token_ids = [token_id];
-        let action = action::Nep171Burn {
+        let action = Nep171Burn {
             token_ids: &token_ids,
             owner_id,
             memo: None,

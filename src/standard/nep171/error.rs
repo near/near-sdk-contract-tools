@@ -7,6 +7,44 @@ use crate::standard::nep178::ApprovalId;
 
 use super::TokenId;
 
+/// Potential errors encountered when performing a burn operation.
+#[derive(Error, Clone, Debug)]
+pub enum Nep171BurnError {
+    /// The token could not be burned because it does not exist.
+    #[error(transparent)]
+    TokenDoesNotExist(#[from] TokenDoesNotExistError),
+    /// The token could not be burned because it is not owned by the expected owner.
+    #[error(transparent)]
+    TokenNotOwnedByExpectedOwner(#[from] TokenNotOwnedByExpectedOwnerError),
+}
+
+/// Potential errors encountered when attempting to mint a new token.
+#[derive(Error, Clone, Debug)]
+pub enum Nep171MintError {
+    /// The token could not be minted because a token with the same ID already exists.
+    #[error(transparent)]
+    TokenAlreadyExists(#[from] TokenAlreadyExistsError),
+}
+
+/// Potential errors encountered when performing a token transfer.
+#[derive(Error, Clone, Debug)]
+pub enum Nep171TransferError {
+    /// The token could not be transferred because it does not exist.
+    #[error(transparent)]
+    TokenDoesNotExist(#[from] TokenDoesNotExistError),
+    /// The token could not be transferred because the sender is not allowed to perform transfers of this token on behalf of its current owner. See: NEP-178.
+    ///
+    /// NOTE: If you only implement NEP-171, approval IDs will _not work_, and this error will always be returned whenever the sender is not the current owner.
+    #[error(transparent)]
+    SenderNotApproved(#[from] SenderNotApprovedError),
+    /// The token could not be transferred because the token is being sent to the account that currently owns it. Reflexive transfers are not allowed.
+    #[error(transparent)]
+    TokenReceiverIsCurrentOwner(#[from] TokenReceiverIsCurrentOwnerError),
+    /// The token could not be transferred because it is no longer owned by the expected owner.
+    #[error(transparent)]
+    TokenNotOwnedByExpectedOwner(#[from] TokenNotOwnedByExpectedOwnerError),
+}
+
 /// Occurs when trying to create a token ID that already exists.
 /// Overwriting pre-existing token IDs is not allowed.
 #[derive(Error, Clone, Debug)]

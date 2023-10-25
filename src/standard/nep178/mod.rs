@@ -5,16 +5,28 @@ use std::{collections::HashMap, error::Error};
 
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
-    serde::Serialize,
     store::UnorderedMap,
     AccountId, BorshStorageKey,
 };
-use thiserror::Error;
 
-use crate::{hook::Hook, slot::Slot, standard::nep171::{self,*}, DefaultStorageKey};
-
+use crate::{
+    hook::Hook,
+    slot::Slot,
+    standard::nep171::{
+        action::{Nep171Burn, Nep171Mint, Nep171Transfer},
+        error::Nep171TransferError,
+        CheckExternalTransfer, DefaultCheckExternalTransfer, LoadTokenMetadata, Nep171Controller,
+        Nep171TransferAuthorization, TokenId,
+    },
+    DefaultStorageKey,
+};
 
 pub mod action;
+use action::*;
+pub mod error;
+use error::*;
+// separate module with re-export because ext_contract doesn't play well with #![warn(missing_docs)]
+mod ext;
 pub use ext::*;
 
 /// Type for approval IDs.
@@ -46,22 +58,18 @@ impl<C: Nep178Controller> LoadTokenMetadata<C> for TokenApprovals {
     }
 }
 
-impl<C: Nep178Controller> Hook<C, nep171::action::Nep171Mint<'_>> for TokenApprovals {}
+impl<C: Nep178Controller> Hook<C, Nep171Mint<'_>> for TokenApprovals {}
 
-impl<C: Nep178Controller> Hook<C, nep171::action::Nep171Transfer<'_>> for TokenApprovals {
-    fn hook<R>(
-        contract: &mut C,
-        args: &nep171::action::Nep171Transfer<'_>,
-        f: impl FnOnce(&mut C) -> R,
-    ) -> R {
+impl<C: Nep178Controller> Hook<C, Nep171Transfer<'_>> for TokenApprovals {
+    fn hook<R>(contract: &mut C, args: &Nep171Transfer<'_>, f: impl FnOnce(&mut C) -> R) -> R {
         let r = f(contract);
         contract.revoke_all_unchecked(args.token_id);
         r
     }
 }
 
-impl<C: Nep178Controller> Hook<C, nep171::action::Nep171Burn<'_>> for TokenApprovals {
-    fn hook<R>(contract: &mut C, args: &nep171::action::Nep171Burn<'_>, f: impl FnOnce(&mut C) -> R) -> R {
+impl<C: Nep178Controller> Hook<C, Nep171Burn<'_>> for TokenApprovals {
+    fn hook<R>(contract: &mut C, args: &Nep171Burn<'_>, f: impl FnOnce(&mut C) -> R) -> R {
         let r = f(contract);
         for token_id in args.token_ids {
             contract.revoke_all_unchecked(token_id);
@@ -73,7 +81,7 @@ impl<C: Nep178Controller> Hook<C, nep171::action::Nep171Burn<'_>> for TokenAppro
 impl<C: Nep171Controller + Nep178Controller> CheckExternalTransfer<C> for TokenApprovals {
     fn check_external_transfer(
         contract: &C,
-        transfer: &nep171::action::Nep171Transfer,
+        transfer: &Nep171Transfer,
     ) -> Result<AccountId, Nep171TransferError> {
         let normal_check =
             DefaultCheckExternalTransfer::check_external_transfer(contract, transfer);
@@ -106,13 +114,16 @@ enum StorageKey<'a> {
 
 /// Internal functions for [`Nep178Controller`].
 pub trait Nep178ControllerInternal {
-    type ApproveHook: for<'a> Hook<Self, action::Nep178Approve<'a>>
+    /// Hook for approve operations.
+    type ApproveHook: for<'a> Hook<Self, Nep178Approve<'a>>
     where
         Self: Sized;
-    type RevokeHook: for<'a> Hook<Self, action::Nep178Revoke<'a>>
+    /// Hook for revoke operations.
+    type RevokeHook: for<'a> Hook<Self, Nep178Revoke<'a>>
     where
         Self: Sized;
-    type RevokeAllHook: for<'a> Hook<Self, action::Nep178RevokeAll<'a>>
+    /// Hook for revoke all operations.
+    type RevokeAllHook: for<'a> Hook<Self, Nep178RevokeAll<'a>>
     where
         Self: Sized;
 
@@ -134,98 +145,37 @@ pub trait Nep178ControllerInternal {
     }
 }
 
-/// Errors that can occur when managing non-fungible token approvals.
-#[derive(Error, Debug)]
-pub enum Nep178ApproveError {
-    /// The account is not authorized to approve the token.
-    #[error("Account `{account_id}` cannot create approvals for token `{token_id}`.")]
-    Unauthorized {
-        /// The token ID.
-        token_id: TokenId,
-        /// The unauthorized account ID.
-        account_id: AccountId,
-    },
-    /// The account is already approved for the token.
-    #[error("Account {account_id} is already approved for token {token_id}.")]
-    AccountAlreadyApproved {
-        /// The token ID.
-        token_id: TokenId,
-        /// The account ID that has already been approved.
-        account_id: AccountId,
-    },
-    /// The token has too many approvals.
-    #[error(
-        "Too many approvals for token {token_id}, maximum is {}.",
-        MAX_APPROVALS
-    )]
-    TooManyApprovals {
-        /// The token ID.
-        token_id: TokenId,
-    },
-}
-
-/// Errors that can occur when revoking non-fungible token approvals.
-#[derive(Error, Debug)]
-pub enum Nep178RevokeError {
-    /// The account is not authorized to revoke approvals for the token.
-    #[error("Account `{account_id}` is cannot revoke approvals for token `{token_id}`.")]
-    Unauthorized {
-        /// The token ID.
-        token_id: TokenId,
-        /// The unauthorized account ID.
-        account_id: AccountId,
-    },
-    /// The account is not approved for the token.
-    #[error("Account {account_id} is not approved for token {token_id}")]
-    AccountNotApproved {
-        /// The token ID.
-        token_id: TokenId,
-        /// The account ID that is not approved.
-        account_id: AccountId,
-    },
-}
-
-/// Errors that can occur when revoking all approvals for a non-fungible token.
-#[derive(Error, Debug)]
-pub enum Nep178RevokeAllError {
-    /// The account is not authorized to revoke approvals for the token.
-    #[error("Account `{account_id}` is cannot revoke approvals for token `{token_id}`.")]
-    Unauthorized {
-        /// The token ID.
-        token_id: TokenId,
-        /// The unauthorized account ID.
-        account_id: AccountId,
-    },
-}
-
 /// Functions for managing non-fungible tokens with attached metadata, NEP-178.
 pub trait Nep178Controller {
-    type ApproveHook: for<'a> Hook<Self, action::Nep178Approve<'a>>
+    /// Hook for approve operations.
+    type ApproveHook: for<'a> Hook<Self, Nep178Approve<'a>>
     where
         Self: Sized;
-    type RevokeHook: for<'a> Hook<Self, action::Nep178Revoke<'a>>
+    /// Hook for revoke operations.
+    type RevokeHook: for<'a> Hook<Self, Nep178Revoke<'a>>
     where
         Self: Sized;
-    type RevokeAllHook: for<'a> Hook<Self, action::Nep178RevokeAll<'a>>
+    /// Hook for revoke all operations.
+    type RevokeAllHook: for<'a> Hook<Self, Nep178RevokeAll<'a>>
     where
         Self: Sized;
 
     /// Approve a token for transfer by a delegated account.
-    fn approve(&mut self, action: &action::Nep178Approve<'_>) -> Result<ApprovalId, Nep178ApproveError>;
+    fn approve(&mut self, action: &Nep178Approve<'_>) -> Result<ApprovalId, Nep178ApproveError>;
 
     /// Approve a token without checking if the account is already approved or
     /// if it exceeds the maximum number of approvals.
     fn approve_unchecked(&mut self, token_id: &TokenId, account_id: &AccountId) -> ApprovalId;
 
     /// Revoke approval for an account to transfer token.
-    fn revoke(&mut self, action: &action::Nep178Revoke<'_>) -> Result<(), Nep178RevokeError>;
+    fn revoke(&mut self, action: &Nep178Revoke<'_>) -> Result<(), Nep178RevokeError>;
 
     /// Revoke approval for an account to transfer token without checking if
     /// the account is approved.
     fn revoke_unchecked(&mut self, token_id: &TokenId, account_id: &AccountId);
 
     /// Revoke all approvals for a token.
-    fn revoke_all(&mut self, action: &action::Nep178RevokeAll<'_>) -> Result<(), Nep178RevokeAllError>;
+    fn revoke_all(&mut self, action: &Nep178RevokeAll<'_>) -> Result<(), Nep178RevokeAllError>;
 
     /// Revoke all approvals for a token without checking current owner.
     fn revoke_all_unchecked(&mut self, token_id: &TokenId);
@@ -257,13 +207,14 @@ impl<T: Nep178ControllerInternal + Nep171Controller> Nep178Controller for T {
         approval_id
     }
 
-    fn approve(&mut self, action: &action::Nep178Approve<'_>) -> Result<ApprovalId, Nep178ApproveError> {
+    fn approve(&mut self, action: &Nep178Approve<'_>) -> Result<ApprovalId, Nep178ApproveError> {
         // owner check
         if self.token_owner(action.token_id).as_ref() != Some(action.current_owner_id) {
-            return Err(Nep178ApproveError::Unauthorized {
+            return Err(UnauthorizedError {
                 token_id: action.token_id.clone(),
                 account_id: action.account_id.clone(),
-            });
+            }
+            .into());
         }
 
         let mut slot = Self::slot_token_approvals(action.token_id);
@@ -273,17 +224,19 @@ impl<T: Nep178ControllerInternal + Nep171Controller> Nep178Controller for T {
         });
 
         if approvals.accounts.len() >= MAX_APPROVALS {
-            return Err(Nep178ApproveError::TooManyApprovals {
+            return Err(TooManyApprovalsError {
                 token_id: action.token_id.clone(),
-            });
+            }
+            .into());
         }
 
         let approval_id = approvals.next_approval_id;
         if approvals.accounts.contains_key(action.account_id) {
-            return Err(Nep178ApproveError::AccountAlreadyApproved {
+            return Err(AccountAlreadyApprovedError {
                 token_id: action.token_id.clone(),
                 account_id: action.account_id.clone(),
-            });
+            }
+            .into());
         }
 
         Self::ApproveHook::hook(self, action, |_| {
@@ -311,28 +264,28 @@ impl<T: Nep178ControllerInternal + Nep171Controller> Nep178Controller for T {
         }
     }
 
-    fn revoke(&mut self, action: &action::Nep178Revoke<'_>) -> Result<(), Nep178RevokeError> {
+    fn revoke(&mut self, action: &Nep178Revoke<'_>) -> Result<(), Nep178RevokeError> {
         // owner check
         if self.token_owner(action.token_id).as_ref() != Some(action.current_owner_id) {
-            return Err(Nep178RevokeError::Unauthorized {
+            return Err(UnauthorizedError {
                 token_id: action.token_id.clone(),
                 account_id: action.account_id.clone(),
-            });
+            }
+            .into());
         }
 
         let mut slot = Self::slot_token_approvals(action.token_id);
-        let mut approvals = slot
-            .read()
-            .ok_or_else(|| Nep178RevokeError::AccountNotApproved {
-                token_id: action.token_id.clone(),
-                account_id: action.account_id.clone(),
-            })?;
+        let mut approvals = slot.read().ok_or_else(|| AccountNotApprovedError {
+            token_id: action.token_id.clone(),
+            account_id: action.account_id.clone(),
+        })?;
 
         if !approvals.accounts.contains_key(action.account_id) {
-            return Err(Nep178RevokeError::AccountNotApproved {
+            return Err(AccountNotApprovedError {
                 token_id: action.token_id.clone(),
                 account_id: action.account_id.clone(),
-            });
+            }
+            .into());
         }
 
         Self::RevokeHook::hook(self, action, |_| {
@@ -343,13 +296,14 @@ impl<T: Nep178ControllerInternal + Nep171Controller> Nep178Controller for T {
         })
     }
 
-    fn revoke_all(&mut self, action: &action::Nep178RevokeAll<'_>) -> Result<(), Nep178RevokeAllError> {
+    fn revoke_all(&mut self, action: &Nep178RevokeAll<'_>) -> Result<(), Nep178RevokeAllError> {
         // owner check
         if self.token_owner(action.token_id).as_ref() != Some(action.current_owner_id) {
-            return Err(Nep178RevokeAllError::Unauthorized {
+            return Err(UnauthorizedError {
                 token_id: action.token_id.clone(),
                 account_id: action.current_owner_id.clone(),
-            });
+            }
+            .into());
         }
 
         Self::RevokeAllHook::hook(self, action, |contract| {
@@ -395,54 +349,5 @@ impl<T: Nep178ControllerInternal + Nep171Controller> Nep178Controller for T {
             .into_iter()
             .map(|(k, v)| (k.clone(), *v))
             .collect()
-    }
-}
-
-// separate module with re-export because ext_contract doesn't play well with #![warn(missing_docs)]
-mod ext {
-    #![allow(missing_docs)]
-
-    use near_sdk::PromiseOrValue;
-
-    use super::*;
-
-    /// NEP-178 external interface.
-    ///
-    /// See <https://github.com/near/NEPs/blob/master/neps/nep-0178.md#interface> for more details.
-    #[near_sdk::ext_contract(ext_nep178)]
-    pub trait Nep178 {
-        fn nft_approve(
-            &mut self,
-            token_id: TokenId,
-            account_id: AccountId,
-            msg: Option<String>,
-        ) -> PromiseOrValue<()>;
-
-        fn nft_revoke(&mut self, token_id: TokenId, account_id: AccountId);
-
-        fn nft_revoke_all(&mut self, token_id: TokenId);
-
-        fn nft_is_approved(
-            &self,
-            token_id: TokenId,
-            approved_account_id: AccountId,
-            approval_id: Option<ApprovalId>,
-        ) -> bool;
-    }
-
-    /// NEP-178 receiver interface.
-    ///
-    /// Respond to notification that contract has been granted approval for a token.
-    ///
-    /// See <https://github.com/near/NEPs/blob/master/neps/nep-0178.md#approved-account-contract-interface> for more details.
-    #[near_sdk::ext_contract(ext_nep178_receiver)]
-    pub trait Nep178Receiver {
-        fn nft_on_approve(
-            &mut self,
-            token_id: TokenId,
-            owner_id: AccountId,
-            approval_id: ApprovalId,
-            msg: String,
-        );
     }
 }
