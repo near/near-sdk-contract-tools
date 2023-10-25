@@ -33,6 +33,7 @@ enum StorageKey {
 /// Transfer metadata generic over both types of transfer (`ft_transfer` and
 /// `ft_transfer_call`).
 #[derive(Serialize, BorshSerialize, PartialEq, Eq, Clone, Debug)]
+#[serde(crate = "near_sdk::serde")]
 pub struct Nep141Transfer<'a> {
     /// Sender's account ID.
     pub sender_id: &'a AccountId,
@@ -58,6 +59,7 @@ impl<'a> Nep141Transfer<'a> {
 
 /// Describes a mint operation.
 #[derive(Clone, Debug, Serialize, BorshSerialize, PartialEq, Eq)]
+#[serde(crate = "near_sdk::serde")]
 pub struct Nep141Mint<'a> {
     /// Amount to mint.
     pub amount: u128,
@@ -69,6 +71,7 @@ pub struct Nep141Mint<'a> {
 
 /// Describes a burn operation.
 #[derive(Clone, Debug, Serialize, BorshSerialize, PartialEq, Eq)]
+#[serde(crate = "near_sdk::serde")]
 pub struct Nep141Burn<'a> {
     /// Amount to burn.
     pub amount: u128,

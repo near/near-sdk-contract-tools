@@ -27,7 +27,7 @@ fn default_near_sdk() -> syn::Path {
 }
 
 fn default_serde() -> syn::Path {
-    syn::parse_str("::serde").unwrap()
+    syn::parse_str("::near_sdk::serde").unwrap()
 }
 
 fn unitify(ty: Option<syn::Type>) -> syn::Type {

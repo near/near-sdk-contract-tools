@@ -6,8 +6,7 @@ use near_sdk_contract_tools_macros::event;
 /// NEP-171 standard events.
 #[event(
     crate = "crate",
-    macros = "crate",
-    serde = "serde",
+    macros = "near_sdk_contract_tools_macros",
     standard = "nep171",
     version = "1.2.0"
 )]
@@ -27,6 +26,7 @@ pub enum Nep171Event {
 
 /// Tokens minted to a single owner.
 #[derive(Serialize, Debug, Clone)]
+#[serde(crate = "near_sdk::serde")]
 pub struct NftMintLog {
     /// To whom were the new tokens minted?
     pub owner_id: AccountId,
@@ -39,6 +39,7 @@ pub struct NftMintLog {
 
 /// Tokens are transferred from one account to another.
 #[derive(Serialize, Debug, Clone)]
+#[serde(crate = "near_sdk::serde")]
 pub struct NftTransferLog {
     /// NEP-178 authorized account ID.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -56,6 +57,7 @@ pub struct NftTransferLog {
 
 /// Tokens are burned from a single holder.
 #[derive(Serialize, Debug, Clone)]
+#[serde(crate = "near_sdk::serde")]
 pub struct NftBurnLog {
     /// What is the ID of the account from which the tokens were burned?
     pub owner_id: AccountId,
@@ -71,6 +73,7 @@ pub struct NftBurnLog {
 
 /// Token metadata update.
 #[derive(Serialize, Debug, Clone)]
+#[serde(crate = "near_sdk::serde")]
 pub struct NftMetadataUpdateLog {
     /// IDs of the updated tokens.
     pub token_ids: Vec<String>,
@@ -81,6 +84,7 @@ pub struct NftMetadataUpdateLog {
 
 /// Contract metadata update.
 #[derive(Serialize, Debug, Clone)]
+#[serde(crate = "near_sdk::serde")]
 pub struct NftContractMetadataUpdateLog {
     /// Additional update information.
     #[serde(skip_serializing_if = "Option::is_none")]

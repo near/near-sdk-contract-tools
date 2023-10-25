@@ -3,16 +3,18 @@ use near_sdk_contract_tools::standard::nep297::{Event, ToEventLog};
 use crate::macros::event::test_events::Nep171NftMintData;
 
 mod test_events {
+    use near_sdk::serde::Serialize;
     use near_sdk_contract_tools::Nep297;
-    use serde::Serialize;
 
     #[derive(Serialize)]
+    #[serde(crate = "near_sdk::serde")]
     pub struct Nep171NftMintData {
         pub owner_id: String,
         pub token_ids: Vec<String>,
     }
 
     #[derive(Nep297, Serialize)]
+    #[serde(crate = "near_sdk::serde")]
     // Required fields
     #[nep297(standard = "nep171", version = "1.0.0")]
     // Optional. Default event name is the untransformed variant name, e.g. NftMint, AnotherEvent, CustomEvent
@@ -20,14 +22,17 @@ mod test_events {
     pub struct NftMint(pub Vec<Nep171NftMintData>); // Name will be "nft_mint" because rename = snake_case
 
     #[derive(Nep297, Serialize)]
+    #[serde(crate = "near_sdk::serde")]
     #[nep297(standard = "nep171", version = "1.0.0", name = "sneaky_event")]
     pub struct AnotherEvent; // Name will be "sneaky_event"
 
     #[derive(Nep297, Serialize)]
+    #[serde(crate = "near_sdk::serde")]
     #[nep297(standard = "nep171", version = "1.0.0", rename = "SHOUTY-KEBAB-CASE")]
     pub struct CustomEvent; // Name will be "CUSTOM-EVENT"
 
     #[derive(Nep297, Serialize)]
+    #[serde(crate = "near_sdk::serde")]
     #[nep297(standard = "enum-event", version = "1.0.0")]
     #[allow(clippy::enum_variant_names)]
     pub enum EnumEvent {
@@ -45,6 +50,7 @@ mod test_events {
     }
 
     #[derive(Nep297, Serialize)]
+    #[serde(crate = "near_sdk::serde")]
     #[nep297(standard = "enum-event", version = "1.0.0", rename_all = "snake_case")]
     #[allow(clippy::enum_variant_names)]
     pub enum EnumEventRenameAll {

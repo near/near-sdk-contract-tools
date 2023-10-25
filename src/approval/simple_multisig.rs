@@ -5,9 +5,10 @@ use std::marker::PhantomData;
 
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
-    env, AccountId,
+    env,
+    serde::{Deserialize, Serialize},
+    AccountId,
 };
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use super::{ActionRequest, ApprovalConfiguration};
@@ -24,6 +25,7 @@ pub trait AccountAuthorizer {
 
 /// M (threshold) of N approval scheme
 #[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize, Clone, Debug)]
+#[serde(crate = "near_sdk::serde")]
 pub struct Configuration<Au: AccountAuthorizer> {
     /// How many approvals are required?
     pub threshold: u8,
@@ -61,6 +63,7 @@ impl<Au: AccountAuthorizer> Configuration<Au> {
 
 /// Approval state for simple multisig
 #[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize, Debug)]
+#[serde(crate = "near_sdk::serde")]
 pub struct ApprovalState {
     /// List of accounts that have approved an action thus far
     pub approved_by: Vec<AccountId>,

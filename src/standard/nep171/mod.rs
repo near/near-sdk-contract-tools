@@ -181,6 +181,7 @@ pub trait Nep171Controller {
 
 /// Authorization for a transfer.
 #[derive(Serialize, BorshSerialize, PartialEq, Eq, Clone, Debug, Hash)]
+#[serde(crate = "near_sdk::serde")]
 pub enum Nep171TransferAuthorization {
     /// The sender is the owner of the token.
     Owner,
@@ -389,6 +390,7 @@ impl<T: Nep171ControllerInternal> Nep171Controller for T {
 
 /// Token information structure.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(crate = "near_sdk::serde")]
 pub struct Token {
     /// Token ID.
     pub token_id: TokenId,

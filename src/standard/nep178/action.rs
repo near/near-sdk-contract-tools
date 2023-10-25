@@ -11,6 +11,7 @@ use near_sdk::{
 
 /// NEP-178 approve action.
 #[derive(Clone, Debug, Serialize, BorshSerialize, PartialEq, Eq)]
+#[serde(crate = "near_sdk::serde")]
 pub struct Nep178Approve<'a> {
     /// Token ID that the target account is being approved for.
     pub token_id: &'a TokenId,
@@ -23,6 +24,7 @@ pub struct Nep178Approve<'a> {
 
 /// NEP-178 revoke action.
 #[derive(Clone, Debug, Serialize, BorshSerialize, PartialEq, Eq)]
+#[serde(crate = "near_sdk::serde")]
 pub struct Nep178Revoke<'a> {
     /// Token ID that the target account will no longer be able to transfer
     /// (approval revoked).
@@ -36,6 +38,7 @@ pub struct Nep178Revoke<'a> {
 
 /// NEP-178 revoke all action.
 #[derive(Clone, Debug, Serialize, BorshSerialize, PartialEq, Eq)]
+#[serde(crate = "near_sdk::serde")]
 pub struct Nep178RevokeAll<'a> {
     /// Token ID that all approvals will be revoked from.
     pub token_id: &'a TokenId,
