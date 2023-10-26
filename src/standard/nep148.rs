@@ -5,9 +5,9 @@ use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
     env,
     json_types::Base64VecU8,
+    serde::{Deserialize, Serialize},
     BorshStorageKey,
 };
-use serde::{Deserialize, Serialize};
 
 use crate::{slot::Slot, DefaultStorageKey};
 
@@ -20,6 +20,7 @@ pub const ERR_METADATA_UNSET: &str = "NEP-148 metadata is not set";
 
 /// NEP-148-compatible metadata struct
 #[derive(BorshDeserialize, BorshSerialize, Deserialize, Serialize, Eq, PartialEq, Clone, Debug)]
+#[serde(crate = "near_sdk::serde")]
 pub struct FungibleTokenMetadata {
     /// Version of the NEP-148 spec
     pub spec: String,

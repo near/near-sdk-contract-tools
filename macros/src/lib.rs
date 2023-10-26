@@ -1,8 +1,8 @@
 //! Macros for near-sdk-contract-tools.
 
-use darling::{FromDeriveInput, FromMeta};
+use darling::{ast::NestedMeta, FromDeriveInput, FromMeta};
 use proc_macro::TokenStream;
-use syn::{parse_macro_input, AttributeArgs, DeriveInput, Item};
+use syn::{parse_macro_input, DeriveInput, Item};
 
 mod approval;
 mod escrow;
@@ -27,7 +27,7 @@ fn default_near_sdk() -> syn::Path {
 }
 
 fn default_serde() -> syn::Path {
-    syn::parse_str("::serde").unwrap()
+    syn::parse_str("::near_sdk::serde").unwrap()
 }
 
 fn unitify(ty: Option<syn::Type>) -> syn::Type {
@@ -248,7 +248,12 @@ pub fn derive_simple_multisig(input: TokenStream) -> TokenStream {
 /// See documentation on the [`derive@Nep297`] derive macro for more details.
 #[proc_macro_attribute]
 pub fn event(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let attr = parse_macro_input!(attr as AttributeArgs);
+    let attr = match NestedMeta::parse_meta_list(attr.into()) {
+        Ok(v) => v,
+        Err(e) => {
+            return TokenStream::from(darling::Error::from(e).write_errors());
+        }
+    };
     let item = parse_macro_input!(item as Item);
 
     standard::event::EventAttributeMeta::from_list(&attr)

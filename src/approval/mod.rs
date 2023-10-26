@@ -2,9 +2,10 @@
 
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
-    env, require, AccountId, BorshStorageKey,
+    env, require,
+    serde::{Deserialize, Serialize},
+    AccountId, BorshStorageKey,
 };
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::{slot::Slot, DefaultStorageKey};
@@ -64,6 +65,7 @@ pub trait ApprovalConfiguration<A, S> {
 /// An action request is composed of an action that will be executed when the
 /// associated approval state is satisfied
 #[derive(Serialize, Deserialize, BorshSerialize, BorshDeserialize, Debug)]
+#[serde(crate = "near_sdk::serde")]
 pub struct ActionRequest<A, S> {
     /// The action that will be executed when the approval state is
     /// fulfilled
@@ -336,11 +338,11 @@ mod tests {
     use near_sdk::{
         borsh::{self, BorshDeserialize, BorshSerialize},
         near_bindgen,
+        serde::Serialize,
         test_utils::VMContextBuilder,
         testing_env, AccountId, BorshStorageKey,
     };
     use near_sdk_contract_tools_macros::Rbac;
-    use serde::Serialize;
 
     use crate::{rbac::Rbac, slot::Slot};
 
@@ -405,6 +407,7 @@ mod tests {
     }
 
     #[derive(BorshSerialize, BorshDeserialize, Serialize, Default, Debug)]
+    #[serde(crate = "near_sdk::serde")]
     struct MultisigApprovalState {
         pub approved_by: Vec<AccountId>,
     }

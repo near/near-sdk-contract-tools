@@ -72,6 +72,7 @@ enum StorageKey<'a> {
 
 /// Describes a force unregister action.
 #[derive(Clone, Debug, Serialize, BorshSerialize, PartialEq, Eq)]
+#[serde(crate = "near_sdk::serde")]
 pub struct Nep145ForceUnregister<'a> {
     /// The account to be unregistered.
     pub account_id: &'a AccountId,

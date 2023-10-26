@@ -6,7 +6,6 @@ use near_sdk_contract_tools_macros::event;
 #[event(
     crate = "crate",
     macros = "crate",
-    serde = "serde",
     standard = "nep141",
     version = "1.0.0"
 )]
@@ -24,11 +23,11 @@ pub enum Nep141Event {
     /// Decrease in total_supply.
     FtBurn(Vec<FtBurnData>),
 }
-use near_sdk::{json_types::U128, AccountId};
-use serde::Serialize;
+use near_sdk::{json_types::U128, serde::Serialize, AccountId};
 
 /// Individual mint metadata
 #[derive(Serialize, Debug, Clone)]
+#[serde(crate = "near_sdk::serde")]
 pub struct FtMintData {
     /// Address to which new tokens were minted
     pub owner_id: AccountId,
@@ -41,6 +40,7 @@ pub struct FtMintData {
 
 /// Individual transfer metadata
 #[derive(Serialize, Debug, Clone)]
+#[serde(crate = "near_sdk::serde")]
 pub struct FtTransferData {
     /// Account ID of the sender
     pub old_owner_id: AccountId,
@@ -55,6 +55,7 @@ pub struct FtTransferData {
 
 /// Individual burn metadata
 #[derive(Serialize, Debug, Clone)]
+#[serde(crate = "near_sdk::serde")]
 pub struct FtBurnData {
     /// Account ID from which tokens were burned
     pub owner_id: AccountId,

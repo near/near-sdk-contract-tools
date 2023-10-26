@@ -11,6 +11,7 @@ use near_sdk::{
 
 /// NEP-171 mint action.
 #[derive(Clone, Debug, Serialize, BorshSerialize, PartialEq, Eq)]
+#[serde(crate = "near_sdk::serde")]
 pub struct Nep171Mint<'a> {
     /// Token IDs to mint.
     pub token_ids: &'a [TokenId],
@@ -22,6 +23,7 @@ pub struct Nep171Mint<'a> {
 
 /// NEP-171 burn action.
 #[derive(Clone, Debug, Serialize, BorshSerialize, PartialEq, Eq)]
+#[serde(crate = "near_sdk::serde")]
 pub struct Nep171Burn<'a> {
     /// Token IDs to burn.
     pub token_ids: &'a [TokenId],
@@ -34,6 +36,7 @@ pub struct Nep171Burn<'a> {
 /// Transfer metadata generic over both types of transfer (`nft_transfer` and
 /// `nft_transfer_call`).
 #[derive(Serialize, BorshSerialize, PartialEq, Eq, Clone, Debug, Hash)]
+#[serde(crate = "near_sdk::serde")]
 pub struct Nep171Transfer<'a> {
     /// Why is this sender allowed to perform this transfer?
     pub authorization: Nep171TransferAuthorization,

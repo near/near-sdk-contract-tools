@@ -22,11 +22,11 @@ mod pause;
 mod standard;
 
 mod my_event {
-    use near_sdk::AccountId;
+    use near_sdk::{serde::Serialize, AccountId};
     use near_sdk_contract_tools::Nep297;
-    use serde::Serialize;
 
     #[derive(Serialize, Nep297)]
+    #[serde(crate = "near_sdk::serde")]
     #[nep297(standard = "x-myevent", version = "1.0.0", rename = "snake_case")]
     pub struct ValueChanged {
         pub from: u32,
@@ -34,6 +34,7 @@ mod my_event {
     }
 
     #[derive(Serialize, Nep297)]
+    #[serde(crate = "near_sdk::serde")]
     #[nep297(standard = "x-myevent", version = "1.0.0", rename = "snake_case")]
     pub struct PermissionGranted {
         pub to: AccountId,
