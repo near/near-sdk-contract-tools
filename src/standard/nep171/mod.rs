@@ -57,6 +57,7 @@ use event::*;
 // separate module with re-export because ext_contract doesn't play well with #![warn(missing_docs)]
 mod ext;
 pub use ext::*;
+pub mod hooks;
 
 /// Minimum required gas for [`Nep171Resolver::nft_resolve_transfer`] call in promise chain during [`Nep171::nft_transfer_call`].
 pub const GAS_FOR_RESOLVE_TRANSFER: Gas = Gas(5_000_000_000_000);

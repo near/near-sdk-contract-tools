@@ -2,16 +2,9 @@
 
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
-    env, near_bindgen, store, AccountId,
+    env, near_bindgen, store, AccountId, ONE_NEAR,
 };
-use near_sdk_contract_tools::{
-    hook::Hook,
-    standard::{
-        nep171::*,
-        nep177::{Nep177Controller, TokenMetadata},
-    },
-    Nep171, NonFungibleToken,
-};
+use near_sdk_contract_tools::{hook::Hook, nft::*};
 
 mod hooks;
 mod manual_integration;
@@ -48,26 +41,12 @@ fn t() {
     };
 
     let token_id = "token1".to_string();
+    let alice: AccountId = "alice".parse().unwrap();
 
-    n.mint_with_metadata(
-        token_id.clone(),
-        "alice".parse().unwrap(),
-        TokenMetadata {
-            title: Some("Title".to_string()),
-            description: None,
-            media: None,
-            media_hash: None,
-            copies: None,
-            issued_at: None,
-            expires_at: None,
-            starts_at: None,
-            updated_at: None,
-            extra: None,
-            reference: None,
-            reference_hash: None,
-        },
-    )
-    .unwrap();
+    Nep145Controller::deposit_to_storage_account(&mut n, &alice, ONE_NEAR.into()).unwrap();
+
+    n.mint_with_metadata(token_id.clone(), alice, TokenMetadata::new().title("Title"))
+        .unwrap();
 
     let nft_tok = n.nft_token(token_id);
     dbg!(nft_tok);
@@ -81,10 +60,10 @@ struct NonFungibleToken {
     pub after_nft_transfer_balance_record: store::Vector<Option<TokenRecord>>,
 }
 
-impl Hook<NonFungibleToken, action::Nep171Transfer<'_>> for NonFungibleToken {
+impl Hook<NonFungibleToken, Nep171Transfer<'_>> for NonFungibleToken {
     fn hook<R>(
         contract: &mut NonFungibleToken,
-        args: &action::Nep171Transfer<'_>,
+        args: &Nep171Transfer<'_>,
         f: impl FnOnce(&mut NonFungibleToken) -> R,
     ) -> R {
         let before_nft_transfer = contract.nft_token(args.token_id.clone()).map(Into::into);
@@ -111,7 +90,7 @@ impl NonFungibleToken {
     }
 
     pub fn mint(&mut self, token_id: TokenId, receiver_id: AccountId) {
-        let action = action::Nep171Mint {
+        let action = Nep171Mint {
             token_ids: &[token_id],
             receiver_id: &receiver_id,
             memo: None,

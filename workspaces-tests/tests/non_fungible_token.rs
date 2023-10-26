@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use near_sdk::{json_types::U128, serde_json::json};
+use near_sdk::{json_types::U128, serde_json::json, ONE_NEAR};
 use near_sdk_contract_tools::standard::{
     nep171::{
         self,
@@ -53,13 +53,23 @@ async fn setup_balances(
     wasm: &[u8],
     num_accounts: usize,
     token_ids: impl Fn(usize) -> Vec<String>,
+    storage_deposit: bool,
 ) -> Setup {
     let s = setup(wasm, num_accounts).await;
 
     for (i, account) in s.accounts.iter().enumerate() {
-        account
-            .call(s.contract.id(), "mint")
-            .args_json(json!({ "token_ids": token_ids(i) }))
+        let batch = if storage_deposit {
+            account.batch(s.contract.id()).call(
+                Function::new("storage_deposit")
+                    .args_json(json!({}))
+                    .deposit(ONE_NEAR / 100),
+            )
+        } else {
+            account.batch(s.contract.id())
+        };
+
+        batch
+            .call(Function::new("mint").args_json(json!({ "token_ids": token_ids(i) })))
             .transact()
             .await
             .unwrap()
@@ -72,7 +82,7 @@ async fn setup_balances(
 #[tokio::test]
 async fn create_and_mint() {
     let Setup { contract, accounts } =
-        setup_balances(WASM_171_ONLY, 3, |i| vec![format!("token_{i}")]).await;
+        setup_balances(WASM_171_ONLY, 3, |i| vec![format!("token_{i}")], false).await;
     let alice = &accounts[0];
     let bob = &accounts[1];
     let charlie = &accounts[2];
@@ -115,7 +125,7 @@ async fn create_and_mint() {
 #[tokio::test]
 async fn create_and_mint_with_metadata_and_enumeration() {
     let Setup { contract, accounts } =
-        setup_balances(WASM_FULL, 3, |i| vec![format!("token_{i}")]).await;
+        setup_balances(WASM_FULL, 3, |i| vec![format!("token_{i}")], true).await;
     let alice = &accounts[0];
     let bob = &accounts[1];
     let charlie = &accounts[2];
@@ -302,7 +312,7 @@ async fn create_and_mint_with_metadata_and_enumeration() {
 #[tokio::test]
 async fn transfer_success() {
     let Setup { contract, accounts } =
-        setup_balances(WASM_171_ONLY, 3, |i| vec![format!("token_{i}")]).await;
+        setup_balances(WASM_171_ONLY, 3, |i| vec![format!("token_{i}")], false).await;
     let alice = &accounts[0];
     let bob = &accounts[1];
     let charlie = &accounts[2];
@@ -370,18 +380,18 @@ async fn transfer_success() {
 #[tokio::test]
 #[should_panic = "Smart contract panicked: Requires attached deposit of exactly 1 yoctoNEAR"]
 async fn transfer_fail_no_deposit_full() {
-    transfer_fail_no_deposit(WASM_FULL).await;
+    transfer_fail_no_deposit(WASM_FULL, true).await;
 }
 
 #[tokio::test]
 #[should_panic = "Smart contract panicked: Requires attached deposit of exactly 1 yoctoNEAR"]
 async fn transfer_fail_no_deposit_171() {
-    transfer_fail_no_deposit(WASM_171_ONLY).await;
+    transfer_fail_no_deposit(WASM_171_ONLY, false).await;
 }
 
-async fn transfer_fail_no_deposit(wasm: &[u8]) {
+async fn transfer_fail_no_deposit(wasm: &[u8], storage_deposit: bool) {
     let Setup { contract, accounts } =
-        setup_balances(wasm, 2, |i| vec![format!("token_{i}")]).await;
+        setup_balances(wasm, 2, |i| vec![format!("token_{i}")], storage_deposit).await;
     let alice = &accounts[0];
     let bob = &accounts[1];
 
@@ -400,18 +410,18 @@ async fn transfer_fail_no_deposit(wasm: &[u8]) {
 #[tokio::test]
 #[should_panic = "Smart contract panicked: Token `token_5` does not exist"]
 async fn transfer_fail_token_dne_full() {
-    transfer_fail_token_dne(WASM_FULL).await;
+    transfer_fail_token_dne(WASM_FULL, true).await;
 }
 
 #[tokio::test]
 #[should_panic = "Smart contract panicked: Token `token_5` does not exist"]
 async fn transfer_fail_token_dne_171() {
-    transfer_fail_token_dne(WASM_171_ONLY).await;
+    transfer_fail_token_dne(WASM_171_ONLY, false).await;
 }
 
-async fn transfer_fail_token_dne(wasm: &[u8]) {
+async fn transfer_fail_token_dne(wasm: &[u8], storage_deposit: bool) {
     let Setup { contract, accounts } =
-        setup_balances(wasm, 2, |i| vec![format!("token_{i}")]).await;
+        setup_balances(wasm, 2, |i| vec![format!("token_{i}")], storage_deposit).await;
     let alice = &accounts[0];
     let bob = &accounts[1];
 
@@ -430,17 +440,17 @@ async fn transfer_fail_token_dne(wasm: &[u8]) {
 
 #[tokio::test]
 async fn transfer_fail_not_owner_full() {
-    transfer_fail_not_owner(WASM_FULL).await;
+    transfer_fail_not_owner(WASM_FULL, true).await;
 }
 
 #[tokio::test]
 async fn transfer_fail_not_owner_171() {
-    transfer_fail_not_owner(WASM_171_ONLY).await;
+    transfer_fail_not_owner(WASM_171_ONLY, false).await;
 }
 
-async fn transfer_fail_not_owner(wasm: &[u8]) {
+async fn transfer_fail_not_owner(wasm: &[u8], storage_deposit: bool) {
     let Setup { contract, accounts } =
-        setup_balances(wasm, 3, |i| vec![format!("token_{i}")]).await;
+        setup_balances(wasm, 3, |i| vec![format!("token_{i}")], storage_deposit).await;
     let alice = &accounts[0];
     let bob = &accounts[1];
     let charlie = &accounts[2];
@@ -468,17 +478,17 @@ async fn transfer_fail_not_owner(wasm: &[u8]) {
 
 #[tokio::test]
 async fn transfer_fail_reflexive_transfer_full() {
-    transfer_fail_reflexive_transfer(WASM_FULL).await;
+    transfer_fail_reflexive_transfer(WASM_FULL, true).await;
 }
 
 #[tokio::test]
 async fn transfer_fail_reflexive_transfer_171() {
-    transfer_fail_reflexive_transfer(WASM_171_ONLY).await;
+    transfer_fail_reflexive_transfer(WASM_171_ONLY, false).await;
 }
 
-async fn transfer_fail_reflexive_transfer(wasm: &[u8]) {
+async fn transfer_fail_reflexive_transfer(wasm: &[u8], storage_deposit: bool) {
     let Setup { contract, accounts } =
-        setup_balances(wasm, 2, |i| vec![format!("token_{i}")]).await;
+        setup_balances(wasm, 2, |i| vec![format!("token_{i}")], storage_deposit).await;
     let alice = &accounts[0];
 
     let result = alice
@@ -498,7 +508,7 @@ async fn transfer_fail_reflexive_transfer(wasm: &[u8]) {
 #[tokio::test]
 async fn transfer_call_success() {
     let Setup { contract, accounts } =
-        setup_balances(WASM_171_ONLY, 2, |i| vec![format!("token_{i}")]).await;
+        setup_balances(WASM_171_ONLY, 2, |i| vec![format!("token_{i}")], false).await;
     let alice = &accounts[0];
     let bob = &accounts[1];
 
@@ -557,7 +567,7 @@ async fn transfer_call_success() {
 #[tokio::test]
 async fn transfer_call_return_success() {
     let Setup { contract, accounts } =
-        setup_balances(WASM_171_ONLY, 2, |i| vec![format!("token_{i}")]).await;
+        setup_balances(WASM_171_ONLY, 2, |i| vec![format!("token_{i}")], false).await;
     let alice = &accounts[0];
     let bob = &accounts[1];
 
@@ -626,7 +636,7 @@ async fn transfer_call_return_success() {
 #[tokio::test]
 async fn transfer_call_receiver_panic() {
     let Setup { contract, accounts } =
-        setup_balances(WASM_171_ONLY, 2, |i| vec![format!("token_{i}")]).await;
+        setup_balances(WASM_171_ONLY, 2, |i| vec![format!("token_{i}")], false).await;
     let alice = &accounts[0];
     let bob = &accounts[1];
 
@@ -695,7 +705,7 @@ async fn transfer_call_receiver_panic() {
 #[tokio::test]
 async fn transfer_call_receiver_send_return() {
     let Setup { contract, accounts } =
-        setup_balances(WASM_171_ONLY, 3, |i| vec![format!("token_{i}")]).await;
+        setup_balances(WASM_171_ONLY, 3, |i| vec![format!("token_{i}")], false).await;
     let alice = &accounts[0];
     let bob = &accounts[1];
     let charlie = &accounts[2];
@@ -769,7 +779,7 @@ async fn transfer_call_receiver_send_return() {
 #[tokio::test]
 async fn transfer_approval_success() {
     let Setup { contract, accounts } =
-        setup_balances(WASM_FULL, 3, |i| vec![format!("token_{i}")]).await;
+        setup_balances(WASM_FULL, 3, |i| vec![format!("token_{i}")], true).await;
     let alice = &accounts[0];
     let bob = &accounts[1];
     let charlie = &accounts[2];
@@ -847,7 +857,7 @@ async fn transfer_approval_success() {
 #[tokio::test]
 async fn transfer_approval_unapproved_fail() {
     let Setup { contract, accounts } =
-        setup_balances(WASM_FULL, 4, |i| vec![format!("token_{i}")]).await;
+        setup_balances(WASM_FULL, 4, |i| vec![format!("token_{i}")], true).await;
     let alice = &accounts[0];
     let bob = &accounts[1];
     let charlie = &accounts[2];
@@ -907,7 +917,7 @@ async fn transfer_approval_unapproved_fail() {
 #[should_panic = "Attached deposit must be greater than zero"]
 async fn transfer_approval_no_deposit_fail() {
     let Setup { contract, accounts } =
-        setup_balances(WASM_FULL, 2, |i| vec![format!("token_{i}")]).await;
+        setup_balances(WASM_FULL, 2, |i| vec![format!("token_{i}")], true).await;
     let alice = &accounts[0];
     let bob = &accounts[1];
 
@@ -926,7 +936,7 @@ async fn transfer_approval_no_deposit_fail() {
 #[tokio::test]
 async fn transfer_approval_double_approval_fail() {
     let Setup { contract, accounts } =
-        setup_balances(WASM_FULL, 2, |i| vec![format!("token_{i}")]).await;
+        setup_balances(WASM_FULL, 2, |i| vec![format!("token_{i}")], true).await;
     let alice = &accounts[0];
     let bob = &accounts[1];
 
@@ -967,7 +977,7 @@ async fn transfer_approval_double_approval_fail() {
 #[tokio::test]
 async fn transfer_approval_unauthorized_approval_fail() {
     let Setup { contract, accounts } =
-        setup_balances(WASM_FULL, 2, |i| vec![format!("token_{i}")]).await;
+        setup_balances(WASM_FULL, 2, |i| vec![format!("token_{i}")], true).await;
     let _alice = &accounts[0];
     let bob = &accounts[1];
 
@@ -996,7 +1006,7 @@ async fn transfer_approval_unauthorized_approval_fail() {
 #[tokio::test]
 async fn transfer_approval_too_many_approvals_fail() {
     let Setup { contract, accounts } =
-        setup_balances(WASM_FULL, 2, |i| vec![format!("token_{i}")]).await;
+        setup_balances(WASM_FULL, 2, |i| vec![format!("token_{i}")], true).await;
     let alice = &accounts[0];
     let bob = &accounts[1];
 
@@ -1046,7 +1056,7 @@ async fn transfer_approval_too_many_approvals_fail() {
 #[tokio::test]
 async fn transfer_approval_approved_but_wrong_approval_id_fail() {
     let Setup { contract, accounts } =
-        setup_balances(WASM_FULL, 3, |i| vec![format!("token_{i}")]).await;
+        setup_balances(WASM_FULL, 3, |i| vec![format!("token_{i}")], true).await;
     let alice = &accounts[0];
     let bob = &accounts[1];
     let charlie = &accounts[2];
@@ -1088,4 +1098,24 @@ async fn transfer_approval_approved_but_wrong_approval_id_fail() {
     );
 
     expect_execution_error(&result, expected_error);
+}
+
+#[tokio::test]
+#[should_panic = "Account this_account_is_not_registered.near is not registered"]
+async fn transfer_fail_not_registered_nep145() {
+    let Setup { contract, accounts } =
+        setup_balances(WASM_FULL, 1, |i| vec![format!("token_{i}")], true).await;
+    let alice = &accounts[0];
+
+    alice
+        .call(contract.id(), "nft_transfer")
+        .args_json(json!({
+            "token_id": "token_0",
+            "receiver_id": "this_account_is_not_registered.near",
+        }))
+        .deposit(1)
+        .transact()
+        .await
+        .unwrap()
+        .unwrap();
 }

@@ -34,7 +34,7 @@ pub type ApprovalId = u32;
 /// Maximum number of approvals per token.
 pub const MAX_APPROVALS: ApprovalId = 32;
 
-/// Non-fungible token metadata.
+/// NFT token approvals. Hooks are implemented on this struct.
 #[derive(BorshSerialize, BorshDeserialize, Debug)]
 pub struct TokenApprovals {
     /// The next approval ID to use. Only incremented.
@@ -145,7 +145,7 @@ pub trait Nep178ControllerInternal {
     }
 }
 
-/// Functions for managing non-fungible tokens with attached metadata, NEP-178.
+/// Functions for managing token approvals, NEP-178.
 pub trait Nep178Controller {
     /// Hook for approve operations.
     type ApproveHook: for<'a> Hook<Self, Nep178Approve<'a>>
@@ -243,6 +243,7 @@ impl<T: Nep178ControllerInternal + Nep171Controller> Nep178Controller for T {
             approvals
                 .accounts
                 .insert(action.account_id.clone(), approval_id);
+            approvals.accounts.flush();
             approvals.next_approval_id += 1; // overflow unrealistic
             slot.write(&approvals);
 
@@ -290,6 +291,7 @@ impl<T: Nep178ControllerInternal + Nep171Controller> Nep178Controller for T {
 
         Self::RevokeHook::hook(self, action, |_| {
             approvals.accounts.remove(action.account_id);
+            approvals.accounts.flush();
             slot.write(&approvals);
 
             Ok(())
@@ -322,6 +324,7 @@ impl<T: Nep178ControllerInternal + Nep171Controller> Nep178Controller for T {
 
         if !approvals.accounts.is_empty() {
             approvals.accounts.clear();
+            approvals.accounts.flush();
             slot.write(&approvals);
         }
     }
