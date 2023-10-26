@@ -5,10 +5,10 @@ use crate::{hook::Hook, standard::nep145::Nep145ForceUnregister};
 use super::{Nep141Burn, Nep141Controller, Nep141ControllerInternal};
 
 /// Hook that burns all tokens on NEP-145 force unregister.
-pub struct BurnOnForceUnregisterHook;
+pub struct BurnNep141OnForceUnregisterHook;
 
 impl<C: Nep141Controller + Nep141ControllerInternal> Hook<C, Nep145ForceUnregister<'_>>
-    for BurnOnForceUnregisterHook
+    for BurnNep141OnForceUnregisterHook
 {
     fn hook<R>(
         contract: &mut C,
@@ -21,7 +21,7 @@ impl<C: Nep141Controller + Nep141ControllerInternal> Hook<C, Nep145ForceUnregist
         contract
             .burn(&Nep141Burn {
                 amount: balance,
-                account_id: args.account_id,
+                owner_id: args.account_id,
                 memo: Some("storage forced unregistration"),
             })
             .unwrap_or_else(|e| {

@@ -34,7 +34,7 @@ pub type ApprovalId = u32;
 /// Maximum number of approvals per token.
 pub const MAX_APPROVALS: ApprovalId = 32;
 
-/// Non-fungible token metadata.
+/// NFT token approvals. Hooks are implemented on this struct.
 #[derive(BorshSerialize, BorshDeserialize, Debug)]
 pub struct TokenApprovals {
     /// The next approval ID to use. Only incremented.
@@ -145,7 +145,7 @@ pub trait Nep178ControllerInternal {
     }
 }
 
-/// Functions for managing non-fungible tokens with attached metadata, NEP-178.
+/// Functions for managing token approvals, NEP-178.
 pub trait Nep178Controller {
     /// Hook for approve operations.
     type ApproveHook: for<'a> Hook<Self, Nep178Approve<'a>>

@@ -1,10 +1,13 @@
-//! Hooks to integrate NEP-145 with other standards.
+//! Hooks to integrate NEP-145 with other components.
 
 use near_sdk::{env, AccountId};
 
 use crate::{
     hook::Hook,
-    standard::nep141::{Nep141Burn, Nep141Mint, Nep141Transfer},
+    standard::{
+        nep141::{Nep141Burn, Nep141Mint, Nep141Transfer},
+        nep171::action::{Nep171Burn, Nep171Mint, Nep171Transfer},
+    },
 };
 
 use super::Nep145Controller;
@@ -46,7 +49,7 @@ pub struct Nep141StorageAccountingHook;
 
 impl<C: Nep145Controller> Hook<C, Nep141Mint<'_>> for Nep141StorageAccountingHook {
     fn hook<R>(contract: &mut C, action: &Nep141Mint<'_>, f: impl FnOnce(&mut C) -> R) -> R {
-        apply_storage_accounting_hook(contract, action.account_id, f)
+        apply_storage_accounting_hook(contract, action.receiver_id, f)
     }
 }
 
@@ -57,7 +60,28 @@ impl<C: Nep145Controller> Hook<C, Nep141Transfer<'_>> for Nep141StorageAccountin
 }
 
 impl<C: Nep145Controller> Hook<C, Nep141Burn<'_>> for Nep141StorageAccountingHook {
-    fn hook<R>(contract: &mut C, action: &Nep141Burn<'_>, f: impl FnOnce(&mut C) -> R) -> R {
-        apply_storage_accounting_hook(contract, action.account_id, f)
+    fn hook<R>(contract: &mut C, _action: &Nep141Burn<'_>, f: impl FnOnce(&mut C) -> R) -> R {
+        f(contract)
+    }
+}
+
+/// NEP-171 support for NEP-145.
+pub struct Nep171StorageAccountingHook;
+
+impl<C: Nep145Controller> Hook<C, Nep171Mint<'_>> for Nep171StorageAccountingHook {
+    fn hook<R>(contract: &mut C, action: &Nep171Mint<'_>, f: impl FnOnce(&mut C) -> R) -> R {
+        apply_storage_accounting_hook(contract, action.receiver_id, f)
+    }
+}
+
+impl<C: Nep145Controller> Hook<C, Nep171Transfer<'_>> for Nep171StorageAccountingHook {
+    fn hook<R>(contract: &mut C, action: &Nep171Transfer<'_>, f: impl FnOnce(&mut C) -> R) -> R {
+        apply_storage_accounting_hook(contract, action.receiver_id, f)
+    }
+}
+
+impl<C: Nep145Controller> Hook<C, Nep171Burn<'_>> for Nep171StorageAccountingHook {
+    fn hook<R>(contract: &mut C, _action: &Nep171Burn<'_>, f: impl FnOnce(&mut C) -> R) -> R {
+        f(contract)
     }
 }

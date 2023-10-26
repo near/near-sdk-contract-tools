@@ -50,6 +50,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Run unit and integration tests
         run: cargo nextest run --workspace --exclude workspaces-tests
+      - name: Run doctests
+        run: cargo test --doc
   workspaces-test:
     runs-on: ubuntu-latest
     env:

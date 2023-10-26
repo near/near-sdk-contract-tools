@@ -64,7 +64,7 @@ pub struct Nep141Mint<'a> {
     /// Amount to mint.
     pub amount: u128,
     /// Account ID to mint to.
-    pub account_id: &'a AccountId,
+    pub receiver_id: &'a AccountId,
     /// Optional memo string.
     pub memo: Option<&'a str>,
 }
@@ -76,7 +76,7 @@ pub struct Nep141Burn<'a> {
     /// Amount to burn.
     pub amount: u128,
     /// Account ID to burn from.
-    pub account_id: &'a AccountId,
+    pub owner_id: &'a AccountId,
     /// Optional memo string.
     pub memo: Option<&'a str>,
 }
@@ -134,7 +134,7 @@ pub trait Nep141Controller {
     fn total_supply(&self) -> u128;
 
     /// Removes tokens from an account and decreases total supply. No event
-    /// emission.
+    /// emission or hook invocation.
     fn withdraw_unchecked(
         &mut self,
         account_id: &AccountId,
@@ -142,7 +142,7 @@ pub trait Nep141Controller {
     ) -> Result<(), WithdrawError>;
 
     /// Increases the token balance of an account. Updates total supply. No
-    /// event emission.
+    /// event emission or hook invocation.
     fn deposit_unchecked(
         &mut self,
         account_id: &AccountId,
@@ -151,12 +151,7 @@ pub trait Nep141Controller {
 
     /// Decreases the balance of `sender_account_id` by `amount` and increases
     /// the balance of `receiver_account_id` by the same. No change to total
-    /// supply. No event emission.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the balance of `sender_account_id` < `amount` or if the
-    /// balance of `receiver_account_id` plus `amount` >= `u128::MAX`.
+    /// supply. No event emission or hook invocation.
     fn transfer_unchecked(
         &mut self,
         sender_account_id: &AccountId,
@@ -164,26 +159,17 @@ pub trait Nep141Controller {
         amount: u128,
     ) -> Result<(), TransferError>;
 
-    /// Performs an NEP-141 token transfer, with event emission.
-    ///
-    /// # Panics
-    ///
-    /// See: [`Nep141Controller::transfer_unchecked`]
+    /// Performs an NEP-141 token transfer, with event emission. Invokes
+    /// [`Nep141Controller::TransferHook`].
     fn transfer(&mut self, transfer: &Nep141Transfer<'_>) -> Result<(), TransferError>;
 
-    /// Performs an NEP-141 token mint, with event emission.
-    ///
-    /// # Panics
-    ///
-    /// See: [`Nep141Controller::deposit_unchecked`]
+    /// Performs an NEP-141 token mint, with event emission. Invokes
+    /// [`Nep141Controller::MintHook`].
     fn mint(&mut self, mint: &Nep141Mint<'_>) -> Result<(), DepositError>;
 
-    /// Performs an NEP-141 token burn, with event emission.
-    ///
-    /// # Panics
-    ///
-    /// See: [`Nep141Controller::withdraw_unchecked`]
-    fn burn(&mut self, mint: &Nep141Burn<'_>) -> Result<(), WithdrawError>;
+    /// Performs an NEP-141 token burn, with event emission. Invokes
+    /// [`Nep141Controller::BurnHook`].
+    fn burn(&mut self, burn: &Nep141Burn<'_>) -> Result<(), WithdrawError>;
 }
 
 impl<T: Nep141ControllerInternal> Nep141Controller for T {
@@ -320,10 +306,10 @@ impl<T: Nep141ControllerInternal> Nep141Controller for T {
 
     fn mint(&mut self, mint: &Nep141Mint) -> Result<(), DepositError> {
         Self::MintHook::hook(self, mint, |contract| {
-            contract.deposit_unchecked(mint.account_id, mint.amount)?;
+            contract.deposit_unchecked(mint.receiver_id, mint.amount)?;
 
             Nep141Event::FtMint(vec![FtMintData {
-                owner_id: mint.account_id.clone(),
+                owner_id: mint.receiver_id.clone(),
                 amount: mint.amount.into(),
                 memo: mint.memo.map(ToString::to_string),
             }])
@@ -335,10 +321,10 @@ impl<T: Nep141ControllerInternal> Nep141Controller for T {
 
     fn burn(&mut self, burn: &Nep141Burn) -> Result<(), WithdrawError> {
         Self::BurnHook::hook(self, burn, |contract| {
-            contract.withdraw_unchecked(burn.account_id, burn.amount)?;
+            contract.withdraw_unchecked(burn.owner_id, burn.amount)?;
 
             Nep141Event::FtBurn(vec![FtBurnData {
-                owner_id: burn.account_id.clone(),
+                owner_id: burn.owner_id.clone(),
                 amount: burn.amount.into(),
                 memo: burn.memo.map(ToString::to_string),
             }])

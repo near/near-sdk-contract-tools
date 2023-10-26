@@ -5,12 +5,16 @@ use syn::{parse_quote, Expr, Type};
 
 use crate::unitify;
 
-use super::{nep171, nep177, nep178, nep181};
+use super::{nep145, nep171, nep177, nep178, nep181};
 
 #[derive(Debug, FromDeriveInput)]
 #[darling(attributes(non_fungible_token), supports(struct_named))]
 pub struct NonFungibleTokenMeta {
     pub all_hooks: Option<Type>,
+
+    // NEP-145 fields
+    pub storage_management_storage_key: Option<Expr>,
+    pub force_unregister_hook: Option<Type>,
 
     // NEP-171 fields
     pub core_storage_key: Option<Expr>,
@@ -45,7 +49,10 @@ pub fn expand(meta: NonFungibleTokenMeta) -> Result<TokenStream, darling::Error>
     let NonFungibleTokenMeta {
         all_hooks,
 
-        core_storage_key: storage_key,
+        storage_management_storage_key,
+        force_unregister_hook,
+
+        core_storage_key,
         mint_hook,
         transfer_hook,
         burn_hook,
@@ -67,11 +74,33 @@ pub fn expand(meta: NonFungibleTokenMeta) -> Result<TokenStream, darling::Error>
     } = meta;
 
     let all_hooks_inner = unitify(all_hooks.clone());
+    let force_unregister_hook = unitify(force_unregister_hook);
+
+    let expand_nep145 = nep145::expand(nep145::Nep145Meta {
+        storage_key: storage_management_storage_key,
+        all_hooks: Some(all_hooks_inner.clone()),
+        force_unregister_hook: Some(
+            parse_quote! { (#force_unregister_hook, #me::standard::nep171::hooks::BurnNep171OnForceUnregisterHook) },
+        ),
+        generics: generics.clone(),
+        ident: ident.clone(),
+        me: me.clone(),
+        near_sdk: near_sdk.clone(),
+    });
 
     let expand_nep171 = nep171::expand(nep171::Nep171Meta {
-        storage_key,
+        storage_key: core_storage_key,
         all_hooks: Some(
-            parse_quote! { (#all_hooks_inner, (#me::standard::nep178::TokenApprovals, #me::standard::nep181::TokenEnumeration)) },
+            parse_quote! { (
+                #all_hooks_inner,
+                (
+                    #me::standard::nep145::hooks::Nep171StorageAccountingHook,
+                    (
+                        #me::standard::nep178::TokenApprovals,
+                        #me::standard::nep181::TokenEnumeration,
+                    ),
+                ),
+            ) },
         ),
         mint_hook,
         transfer_hook,
@@ -122,12 +151,14 @@ pub fn expand(meta: NonFungibleTokenMeta) -> Result<TokenStream, darling::Error>
 
     let mut e = darling::Error::accumulator();
 
+    let nep145 = e.handle(expand_nep145);
     let nep171 = e.handle(expand_nep171);
     let nep177 = e.handle(expand_nep177);
     let nep178 = e.handle(expand_nep178);
     let nep181 = e.handle(expand_nep181);
 
     e.finish_with(quote! {
+        #nep145
         #nep171
         #nep177
         #nep178

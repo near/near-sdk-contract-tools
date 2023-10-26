@@ -79,7 +79,7 @@ pub fn expand(meta: FungibleTokenMeta) -> Result<TokenStream, darling::Error> {
         storage_key: storage_management_storage_key,
         all_hooks,
         force_unregister_hook: Some(
-            syn::parse_quote! { (#force_unregister_hook_or_unit, #me::standard::nep141::hooks::BurnOnForceUnregisterHook) },
+            syn::parse_quote! { (#force_unregister_hook_or_unit, #me::standard::nep141::hooks::BurnNep141OnForceUnregisterHook) },
         ),
         generics: generics.clone(),
         ident: ident.clone(),
