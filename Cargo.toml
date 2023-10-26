@@ -20,12 +20,12 @@ authors = ["Jacob Lindahl <jacob.lindahl@near.org>"]
 edition = "2021"
 license = "GPL-3.0"
 repository = "https://github.com/near/near-sdk-contract-tools"
-version = "1.1.0"
+version = "2.0.0"
 
 [workspace.dependencies]
 # normal dependencies
 near-sdk = { version = "4.1.1", default-features = false }
-near-sdk-contract-tools-macros = { version = "=1.1.0", path = "./macros" }
+near-sdk-contract-tools-macros = { version = "=2.0.0", path = "./macros" }
 thiserror = "1"
 
 darling = "0.20"
