@@ -90,18 +90,16 @@ pub fn expand(meta: NonFungibleTokenMeta) -> Result<TokenStream, darling::Error>
 
     let expand_nep171 = nep171::expand(nep171::Nep171Meta {
         storage_key: core_storage_key,
-        all_hooks: Some(
-            parse_quote! { (
-                #all_hooks_inner,
+        all_hooks: Some(parse_quote! { (
+            #all_hooks_inner,
+            (
+                #me::standard::nep145::hooks::Nep171StorageAccountingHook,
                 (
-                    #me::standard::nep145::hooks::Nep171StorageAccountingHook,
-                    (
-                        #me::standard::nep178::TokenApprovals,
-                        #me::standard::nep181::TokenEnumeration,
-                    ),
+                    #me::standard::nep178::TokenApprovals,
+                    #me::standard::nep181::TokenEnumeration,
                 ),
-            ) },
-        ),
+            ),
+        ) }),
         mint_hook,
         transfer_hook,
         burn_hook,
