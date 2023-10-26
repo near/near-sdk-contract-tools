@@ -62,7 +62,7 @@ pub fn expand(meta: FungibleTokenMeta) -> Result<TokenStream, darling::Error> {
     let expand_nep141 = nep141::expand(nep141::Nep141Meta {
         storage_key: core_storage_key,
         all_hooks: Some(
-            syn::parse_quote! { (#all_hooks_or_unit, #me::standard::nep145::hooks::PredecessorStorageAccountingHook) },
+            syn::parse_quote! { (#all_hooks_or_unit, #me::standard::nep145::hooks::Nep141StorageAccountingHook) },
         ),
         mint_hook,
         transfer_hook,

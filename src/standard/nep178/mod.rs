@@ -243,6 +243,7 @@ impl<T: Nep178ControllerInternal + Nep171Controller> Nep178Controller for T {
             approvals
                 .accounts
                 .insert(action.account_id.clone(), approval_id);
+            approvals.accounts.flush();
             approvals.next_approval_id += 1; // overflow unrealistic
             slot.write(&approvals);
 
@@ -290,6 +291,7 @@ impl<T: Nep178ControllerInternal + Nep171Controller> Nep178Controller for T {
 
         Self::RevokeHook::hook(self, action, |_| {
             approvals.accounts.remove(action.account_id);
+            approvals.accounts.flush();
             slot.write(&approvals);
 
             Ok(())
@@ -322,6 +324,7 @@ impl<T: Nep178ControllerInternal + Nep171Controller> Nep178Controller for T {
 
         if !approvals.accounts.is_empty() {
             approvals.accounts.clear();
+            approvals.accounts.flush();
             slot.write(&approvals);
         }
     }
