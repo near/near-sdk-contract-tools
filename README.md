@@ -1,12 +1,75 @@
 # near-sdk-contract-tools
 
-> Helpful functions and macros for developing smart contracts on NEAR Protocol.
+## NFT
+
+```diff
+use near_sdk::{
+    borsh::{self, BorshDeserialize, BorshSerialize},
+    near_bindgen, PanicOnDefault,
+};
++ use near_sdk_contract_tools::nft::*;
+
+#[derive(BorshSerialize, BorshDeserialize, PanicOnDefault)]
++ #[derive(NonFungibleToken)]
+#[near_bindgen]
+pub struct MyNftContract {}
+
+#[near_bindgen]
+impl MyNftContract {
+    #[init]
+    pub fn new() -> Self {
+        let mut contract = Self {};
+
++         contract.set_contract_metadata(ContractMetadata::new(
++             "My NFT".to_string(),
++             "MNFT".to_string(),
++             None,
++         ));
+
+        contract
+    }
+}
+```
+
+## FT
+
+```diff
+use near_sdk::{
+    borsh::{self, BorshDeserialize, BorshSerialize},
+    near_bindgen, PanicOnDefault,
+};
++ use near_sdk_contract_tools::ft::*;
+
+#[derive(BorshSerialize, BorshDeserialize, PanicOnDefault)]
++ #[derive(FungibleToken)]
+#[near_bindgen]
+pub struct MyFtContract {}
+
+#[near_bindgen]
+impl MyFtContract {
+    #[init]
+    pub fn new() -> Self {
+        let mut contract = Self {};
+
++         contract.set_metadata(&FungibleTokenMetadata::new(
++             "My Fungible Token".into(),
++             "MYFT".into(),
++             24,
++         ));
+
+        contract
+    }
+}
+```
+
+## What is it?
 
 This package is a collection of common tools and patterns in NEAR smart contract development:
 
 - Storage fee management.
-- Owner pattern + derive macro.
-- Pause pattern + derive macro.
+- Escrow pattern and derive macro.
+- Owner pattern and derive macro.
+- Pause pattern and derive macro.
 - Role-based access control.
 - Derive macros for NEP standards:
   - [NEP-141][nep141] (fungible token), extension [NEP-148][nep148].
@@ -18,7 +81,7 @@ Not to be confused with [`near-contract-standards`](https://crates.io/crates/nea
 
 You can think of this collection of common tools and patterns (mostly in the form of [derive macros](https://doc.rust-lang.org/reference/procedural-macros.html#derive-macros)) as a sort of [OpenZeppelin](https://docs.openzeppelin.com/contracts/4.x/) for NEAR.
 
-**WARNING:** This is still early software, and there may be breaking changes between versions. I'll try my best to keep the docs & changelogs up-to-date. Don't hesitate to create an issue if find anything wrong.
+Pro tip: Use the [contract wizard](https://near.org/contractwizard.near/widget/ContractWizardUI) to generate starter code for your next project.
 
 ## Installation
 
@@ -225,20 +288,21 @@ Run `git config core.hooksPath hooks/` to set up commit hooks.
 Install `cargo-make` if it is not installed already:
 
 ```text
-cargo install cargo-make
+cargo install cargo-make cargo-nextest
 ```
 
 Run tests:
 
 ```text
-cargo test
+cargo nextest run
+cargo test --doc
 cd workspaces-tests
-cargo make test
+cargo make nextest
 ```
 
 ## Audit
 
-This library has been [audited](./documents/NEAR%20Contract%20Tools%20-%20Final%20-%2005.05.2023.pdf) by [Kudelski Security](https://www.kudelskisecurity.com/).
+Version 1.0.0 of this library has been [audited](./documents/NEAR%20Contract%20Tools%20-%20Final%20-%2005.05.2023.pdf) by [Kudelski Security](https://www.kudelskisecurity.com/). (May 2023)
 
 ## Authors
 
