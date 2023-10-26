@@ -71,9 +71,7 @@ async fn setup_balances(num_accounts: usize, amount: impl Fn(usize) -> U128) -> 
 #[tokio::test]
 async fn start_empty() {
     let Setup {
-        contract,
-        accounts,
-        worker: _,
+        contract, accounts, ..
     } = setup(3).await;
 
     // All accounts must start with 0 balance
@@ -85,9 +83,7 @@ async fn start_empty() {
 #[tokio::test]
 async fn mint() {
     let Setup {
-        contract,
-        accounts,
-        worker: _,
+        contract, accounts, ..
     } = setup_balances(3, |i| 10u128.pow(3 - i as u32).into()).await;
     let alice = &accounts[0];
     let bob = &accounts[1];
@@ -102,9 +98,7 @@ async fn mint() {
 #[tokio::test]
 async fn transfer_normal() {
     let Setup {
-        contract,
-        accounts,
-        worker: _,
+        contract, accounts, ..
     } = setup_balances(3, |i| 10u128.pow(3 - i as u32).into()).await;
     let alice = &accounts[0];
     let bob = &accounts[1];
@@ -129,9 +123,7 @@ async fn transfer_normal() {
 #[tokio::test]
 async fn transfer_zero() {
     let Setup {
-        contract,
-        accounts,
-        worker: _,
+        contract, accounts, ..
     } = setup_balances(3, |i| 10u128.pow(3 - i as u32).into()).await;
     let alice = &accounts[0];
     let bob = &accounts[1];
@@ -157,9 +149,7 @@ async fn transfer_zero() {
 #[should_panic(expected = "invalid digit found in string")]
 async fn transfer_negative() {
     let Setup {
-        contract,
-        accounts,
-        worker: _,
+        contract, accounts, ..
     } = setup_balances(3, |i| 10u128.pow(3 - i as u32).into()).await;
     let alice = &accounts[0];
     let bob = &accounts[1];
@@ -181,9 +171,7 @@ async fn transfer_negative() {
 #[should_panic(expected = "Requires attached deposit of exactly 1 yoctoNEAR")]
 async fn transfer_no_deposit() {
     let Setup {
-        contract,
-        accounts,
-        worker: _,
+        contract, accounts, ..
     } = setup_balances(3, |i| 10u128.pow(3 - i as u32).into()).await;
     let alice = &accounts[0];
     let bob = &accounts[1];
@@ -204,9 +192,7 @@ async fn transfer_no_deposit() {
 #[should_panic(expected = "Balance of the sender is insufficient")]
 async fn transfer_more_than_balance() {
     let Setup {
-        contract,
-        accounts,
-        worker: _,
+        contract, accounts, ..
     } = setup_balances(3, |i| 10u128.pow(3 - i as u32).into()).await;
     let alice = &accounts[0];
     let bob = &accounts[1];
@@ -228,9 +214,7 @@ async fn transfer_more_than_balance() {
 #[should_panic(expected = "TotalSupplyOverflowError")]
 async fn transfer_overflow_u128() {
     let Setup {
-        contract,
-        accounts,
-        worker: _,
+        contract, accounts, ..
     } = setup_balances(2, |_| (u128::MAX / 2).into()).await;
     let alice = &accounts[0];
 
@@ -278,9 +262,7 @@ async fn transfer_fail_not_registered() {
 #[tokio::test]
 async fn fail_run_out_of_space() {
     let Setup {
-        contract,
-        accounts,
-        worker: _,
+        contract, accounts, ..
     } = setup_balances(2, |i| 10u128.pow(3 - i as u32).into()).await;
     let alice = &accounts[0];
 
