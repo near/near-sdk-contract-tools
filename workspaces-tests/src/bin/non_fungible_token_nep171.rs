@@ -7,19 +7,23 @@ use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
     env, log, near_bindgen, PanicOnDefault,
 };
-use near_sdk_contract_tools::{standard::nep171::*, Nep171};
+use near_sdk_contract_tools::{hook::Hook, standard::nep171::*, Nep171};
 
 #[derive(PanicOnDefault, BorshSerialize, BorshDeserialize, Nep171)]
+#[nep171(transfer_hook = "Self")]
 #[near_bindgen]
 pub struct Contract {}
 
-impl SimpleNep171Hook for Contract {
-    fn before_nft_transfer(&self, transfer: &Nep171Transfer) {
-        log!("before_nft_transfer({})", transfer.token_id);
-    }
-
-    fn after_nft_transfer(&mut self, transfer: &Nep171Transfer) {
-        log!("after_nft_transfer({})", transfer.token_id);
+impl Hook<Contract, action::Nep171Transfer<'_>> for Contract {
+    fn hook<R>(
+        contract: &mut Contract,
+        args: &action::Nep171Transfer<'_>,
+        f: impl FnOnce(&mut Contract) -> R,
+    ) -> R {
+        log!("before_nft_transfer({})", args.token_id);
+        let r = f(contract);
+        log!("after_nft_transfer({})", args.token_id);
+        r
     }
 }
 
@@ -31,7 +35,12 @@ impl Contract {
     }
 
     pub fn mint(&mut self, token_ids: Vec<TokenId>) {
-        Nep171Controller::mint(self, &token_ids, &env::predecessor_account_id(), None)
+        let action = action::Nep171Mint {
+            token_ids: &token_ids,
+            receiver_id: &env::predecessor_account_id(),
+            memo: None,
+        };
+        Nep171Controller::mint(self, &action)
             .unwrap_or_else(|e| env::panic_str(&format!("Failed to mint: {:#?}", e)));
     }
 }

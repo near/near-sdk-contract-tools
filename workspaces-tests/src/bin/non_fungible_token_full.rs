@@ -5,52 +5,63 @@ pub fn main() {}
 
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
-    env, log, near_bindgen, AccountId, PanicOnDefault,
+    env, log, near_bindgen, PanicOnDefault,
 };
-use near_sdk_contract_tools::nft::*;
+use near_sdk_contract_tools::{hook::Hook, nft::*};
 
 #[derive(PanicOnDefault, BorshSerialize, BorshDeserialize, NonFungibleToken)]
 #[near_bindgen]
 pub struct Contract {}
 
-impl SimpleNep178Hook for Contract {
-    fn before_nft_approve(&self, token_id: &TokenId, _account_id: &AccountId) {
-        log!("before_nft_approve({})", token_id);
-    }
-
-    fn after_nft_approve(
-        &mut self,
-        token_id: &TokenId,
-        _account_id: &AccountId,
-        _approval_id: &ApprovalId,
-    ) {
-        log!("after_nft_approve({})", token_id);
-    }
-
-    fn before_nft_revoke(&self, token_id: &TokenId, _account_id: &AccountId) {
-        log!("before_nft_revoke({})", token_id);
-    }
-
-    fn after_nft_revoke(&mut self, token_id: &TokenId, _account_id: &AccountId) {
-        log!("after_nft_revoke({})", token_id);
-    }
-
-    fn before_nft_revoke_all(&self, token_id: &TokenId) {
-        log!("before_nft_revoke_all({})", token_id);
-    }
-
-    fn after_nft_revoke_all(&mut self, token_id: &TokenId) {
-        log!("after_nft_revoke_all({})", token_id);
+impl Hook<Contract, Nep178Approve<'_>> for Contract {
+    fn hook<R>(
+        contract: &mut Contract,
+        args: &Nep178Approve<'_>,
+        f: impl FnOnce(&mut Contract) -> R,
+    ) -> R {
+        log!("before_nft_approve({})", args.token_id);
+        let r = f(contract);
+        log!("after_nft_approve({})", args.token_id);
+        r
     }
 }
 
-impl SimpleNep171Hook for Contract {
-    fn before_nft_transfer(&self, transfer: &Nep171Transfer) {
-        log!("before_nft_transfer({})", transfer.token_id);
+impl Hook<Contract, Nep178Revoke<'_>> for Contract {
+    fn hook<R>(
+        contract: &mut Contract,
+        args: &Nep178Revoke<'_>,
+        f: impl FnOnce(&mut Contract) -> R,
+    ) -> R {
+        log!("before_nft_revoke({})", args.token_id);
+        let r = f(contract);
+        log!("after_nft_revoke({})", args.token_id);
+        r
     }
+}
 
-    fn after_nft_transfer(&mut self, transfer: &Nep171Transfer) {
-        log!("after_nft_transfer({})", transfer.token_id);
+impl Hook<Contract, Nep178RevokeAll<'_>> for Contract {
+    fn hook<R>(
+        contract: &mut Contract,
+        args: &Nep178RevokeAll<'_>,
+        f: impl FnOnce(&mut Contract) -> R,
+    ) -> R {
+        log!("before_nft_revoke_all({})", args.token_id);
+        let r = f(contract);
+        log!("after_nft_revoke_all({})", args.token_id);
+        r
+    }
+}
+
+impl Hook<Contract, Nep171Transfer<'_>> for Contract {
+    fn hook<R>(
+        contract: &mut Contract,
+        args: &Nep171Transfer<'_>,
+        f: impl FnOnce(&mut Contract) -> R,
+    ) -> R {
+        log!("before_nft_transfer({})", args.token_id);
+        let r = f(contract);
+        log!("after_nft_transfer({})", args.token_id);
+        r
     }
 }
 

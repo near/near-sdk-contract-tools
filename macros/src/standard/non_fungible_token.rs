@@ -1,23 +1,35 @@
-use darling::{util::Flag, FromDeriveInput};
+use darling::FromDeriveInput;
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::Expr;
+use syn::{parse_quote, Expr, Type};
 
-use super::{nep171, nep177, nep178, nep181};
+use crate::unitify;
+
+use super::{nep145, nep171, nep177, nep178, nep181};
 
 #[derive(Debug, FromDeriveInput)]
 #[darling(attributes(non_fungible_token), supports(struct_named))]
 pub struct NonFungibleTokenMeta {
+    pub all_hooks: Option<Type>,
+
+    // NEP-145 fields
+    pub storage_management_storage_key: Option<Expr>,
+    pub force_unregister_hook: Option<Type>,
+
     // NEP-171 fields
     pub core_storage_key: Option<Expr>,
-    pub no_core_hooks: Flag,
+    pub mint_hook: Option<Type>,
+    pub transfer_hook: Option<Type>,
+    pub burn_hook: Option<Type>,
 
     // NEP-177 fields
     pub metadata_storage_key: Option<Expr>,
 
     // NEP-178 fields
     pub approval_storage_key: Option<Expr>,
-    pub no_approval_hooks: Flag,
+    pub approve_hook: Option<Type>,
+    pub revoke_hook: Option<Type>,
+    pub revoke_all_hook: Option<Type>,
 
     // NEP-181 fields
     pub enumeration_storage_key: Option<Expr>,
@@ -35,13 +47,22 @@ pub struct NonFungibleTokenMeta {
 
 pub fn expand(meta: NonFungibleTokenMeta) -> Result<TokenStream, darling::Error> {
     let NonFungibleTokenMeta {
-        core_storage_key: storage_key,
-        no_core_hooks: no_hooks,
+        all_hooks,
+
+        storage_management_storage_key,
+        force_unregister_hook,
+
+        core_storage_key,
+        mint_hook,
+        transfer_hook,
+        burn_hook,
 
         metadata_storage_key,
 
         approval_storage_key,
-        no_approval_hooks,
+        approve_hook,
+        revoke_hook,
+        revoke_all_hook,
 
         enumeration_storage_key,
 
@@ -52,12 +73,36 @@ pub fn expand(meta: NonFungibleTokenMeta) -> Result<TokenStream, darling::Error>
         near_sdk,
     } = meta;
 
-    let expand_nep171 = nep171::expand(nep171::Nep171Meta {
-        storage_key,
-        no_hooks,
-        extension_hooks: Some(
-            syn::parse_quote! { (#me::standard::nep178::TokenApprovals, #me::standard::nep181::TokenEnumeration) },
+    let all_hooks_inner = unitify(all_hooks.clone());
+    let force_unregister_hook = unitify(force_unregister_hook);
+
+    let expand_nep145 = nep145::expand(nep145::Nep145Meta {
+        storage_key: storage_management_storage_key,
+        all_hooks: Some(all_hooks_inner.clone()),
+        force_unregister_hook: Some(
+            parse_quote! { (#force_unregister_hook, #me::standard::nep171::hooks::BurnNep171OnForceUnregisterHook) },
         ),
+        generics: generics.clone(),
+        ident: ident.clone(),
+        me: me.clone(),
+        near_sdk: near_sdk.clone(),
+    });
+
+    let expand_nep171 = nep171::expand(nep171::Nep171Meta {
+        storage_key: core_storage_key,
+        all_hooks: Some(parse_quote! { (
+            #all_hooks_inner,
+            (
+                #me::standard::nep145::hooks::Nep171StorageAccountingHook,
+                (
+                    #me::standard::nep178::TokenApprovals,
+                    #me::standard::nep181::TokenEnumeration,
+                ),
+            ),
+        ) }),
+        mint_hook,
+        transfer_hook,
+        burn_hook,
         check_external_transfer: Some(syn::parse_quote! { #me::standard::nep178::TokenApprovals }),
 
         token_data: Some(
@@ -83,7 +128,11 @@ pub fn expand(meta: NonFungibleTokenMeta) -> Result<TokenStream, darling::Error>
 
     let expand_nep178 = nep178::expand(nep178::Nep178Meta {
         storage_key: approval_storage_key,
-        no_hooks: no_approval_hooks,
+        all_hooks,
+        approve_hook,
+        revoke_hook,
+        revoke_all_hook,
+
         generics: generics.clone(),
         ident: ident.clone(),
         me: me.clone(),
@@ -100,12 +149,14 @@ pub fn expand(meta: NonFungibleTokenMeta) -> Result<TokenStream, darling::Error>
 
     let mut e = darling::Error::accumulator();
 
+    let nep145 = e.handle(expand_nep145);
     let nep171 = e.handle(expand_nep171);
     let nep177 = e.handle(expand_nep177);
     let nep178 = e.handle(expand_nep178);
     let nep181 = e.handle(expand_nep181);
 
     e.finish_with(quote! {
+        #nep145
         #nep171
         #nep177
         #nep178

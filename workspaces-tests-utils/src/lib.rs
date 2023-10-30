@@ -1,8 +1,9 @@
 #![allow(missing_docs)]
 #![cfg(not(windows))]
 
-use near_sdk::{serde::de::DeserializeOwned, serde_json::json};
-use workspaces::{result::ExecutionFinalResult, Account, Contract};
+use near_sdk::{json_types::U128, serde::de::DeserializeOwned, serde_json::json};
+use near_workspaces::{result::ExecutionFinalResult, Account, AccountId, Contract};
+use pretty_assertions::assert_eq;
 
 pub async fn nft_token<T: DeserializeOwned>(contract: &Contract, token_id: &str) -> Option<T> {
     contract
@@ -14,6 +15,17 @@ pub async fn nft_token<T: DeserializeOwned>(contract: &Contract, token_id: &str)
         .unwrap()
 }
 
+pub async fn ft_balance_of(contract: &Contract, account: &AccountId) -> u128 {
+    contract
+        .view("ft_balance_of")
+        .args_json(json!({ "account_id": account }))
+        .await
+        .unwrap()
+        .json::<U128>()
+        .map(u128::from)
+        .unwrap()
+}
+
 pub struct Setup {
     pub contract: Contract,
     pub accounts: Vec<Account>,
@@ -21,7 +33,7 @@ pub struct Setup {
 
 /// Setup for individual tests
 pub async fn setup(wasm: &[u8], num_accounts: usize) -> Setup {
-    let worker = workspaces::sandbox().await.unwrap();
+    let worker = near_workspaces::sandbox().await.unwrap();
 
     // Initialize contract
     let contract = worker.dev_deploy(wasm).await.unwrap();

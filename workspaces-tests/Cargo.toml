@@ -1,6 +1,6 @@
 [package]
 autobins = false
-edition = "2021"
+edition.workspace = true
 name = "workspaces-tests"
 publish = false
 version = "0.1.0"
@@ -13,6 +13,9 @@ name = "counter_multisig"
 
 [[bin]]
 name = "cross_target"
+
+[[bin]]
+name = "escrow"
 
 [[bin]]
 name = "fungible_token"
@@ -56,20 +59,18 @@ name = "upgrade_old_multisig"
 [[bin]]
 name = "upgrade_old_raw"
 
-[[bin]]
-name = "escrow"
-
 [dependencies]
 near-sdk.workspace = true
 near-sdk-contract-tools = { path = "../", features = ["unstable"] }
-strum = "0.24.1"
-strum_macros = "0.24.3"
+strum.workspace = true
+strum_macros.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
-near-crypto = "0.15.0"
-tokio = "1.21.1"
+near-crypto.workspace = true
+tokio.workspace = true
+pretty_assertions.workspace = true
 
 [target.'cfg(not(windows))'.dev-dependencies]
-workspaces = "0.7"
+near-workspaces.workspace = true
 workspaces-tests-utils = { path = "../workspaces-tests-utils" }

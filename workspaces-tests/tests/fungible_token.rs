@@ -1,30 +1,30 @@
 #![cfg(not(windows))]
 
-use near_sdk::{json_types::U128, serde_json::json};
-use workspaces::{Account, AccountId, Contract};
+use near_sdk::{
+    json_types::{Base64VecU8, U128},
+    serde_json::json,
+    ONE_NEAR,
+};
+use near_sdk_contract_tools::{
+    nft::StorageBalance, standard::nep145::error::InsufficientBalanceError,
+};
+use near_workspaces::{network::Sandbox, operations::Function, Account, Contract, Worker};
+use pretty_assertions::assert_eq;
+use tokio::task::JoinSet;
+use workspaces_tests_utils::{expect_execution_error, ft_balance_of};
 
 const WASM: &[u8] =
     include_bytes!("../../target/wasm32-unknown-unknown/release/fungible_token.wasm");
 
-async fn balance(contract: &Contract, account: &AccountId) -> u128 {
-    contract
-        .view("ft_balance_of")
-        .args_json(json!({ "account_id": account }))
-        .await
-        .unwrap()
-        .json::<U128>()
-        .map(u128::from)
-        .unwrap()
-}
-
 struct Setup {
     pub contract: Contract,
     pub accounts: Vec<Account>,
+    pub worker: Worker<Sandbox>,
 }
 
 /// Setup for individual tests
 async fn setup(num_accounts: usize) -> Setup {
-    let worker = workspaces::sandbox().await.unwrap();
+    let worker = near_workspaces::sandbox().await.unwrap();
 
     // Initialize contract
     let contract = worker.dev_deploy(WASM).await.unwrap();
@@ -36,51 +36,70 @@ async fn setup(num_accounts: usize) -> Setup {
         accounts.push(worker.dev_create_account().await.unwrap());
     }
 
-    Setup { contract, accounts }
+    Setup {
+        contract,
+        accounts,
+        worker,
+    }
 }
 
-async fn setup_balances(num_accounts: usize, balance: impl Fn(usize) -> U128) -> Setup {
-    let s = setup(num_accounts).await;
+async fn setup_balances(num_accounts: usize, amount: impl Fn(usize) -> U128) -> Setup {
+    let setup = setup(num_accounts).await;
 
-    for (i, account) in s.accounts.iter().enumerate() {
-        account
-            .call(s.contract.id(), "mint")
-            .args_json(json!({ "amount": balance(i) }))
-            .transact()
-            .await
-            .unwrap()
-            .unwrap();
+    let mut transaction_set = JoinSet::new();
+
+    for (i, account) in setup.accounts.iter().enumerate() {
+        let transaction = account
+            .batch(setup.contract.id())
+            .call(
+                Function::new("storage_deposit")
+                    .args_json(json!({}))
+                    .deposit(ONE_NEAR / 100),
+            )
+            .call(Function::new("mint").args_json(json!({ "amount": amount(i) })))
+            .transact();
+        transaction_set.spawn(async move {
+            transaction.await.unwrap().unwrap();
+        });
     }
 
-    s
+    while transaction_set.join_next().await.is_some() {}
+
+    setup
 }
 
 #[tokio::test]
 async fn start_empty() {
-    let Setup { contract, accounts } = setup(3).await;
+    let Setup {
+        contract, accounts, ..
+    } = setup(3).await;
 
     // All accounts must start with 0 balance
     for account in accounts.iter() {
-        assert_eq!(balance(&contract, account.id()).await, 0);
+        assert_eq!(ft_balance_of(&contract, account.id()).await, 0);
     }
 }
 
 #[tokio::test]
 async fn mint() {
-    let Setup { contract, accounts } = setup_balances(3, |i| 10u128.pow(3 - i as u32).into()).await;
+    let Setup {
+        contract, accounts, ..
+    } = setup_balances(3, |i| 10u128.pow(3 - i as u32).into()).await;
     let alice = &accounts[0];
     let bob = &accounts[1];
     let charlie = &accounts[2];
 
     // Verify issued balances
-    assert_eq!(balance(&contract, alice.id()).await, 1000);
-    assert_eq!(balance(&contract, bob.id()).await, 100);
-    assert_eq!(balance(&contract, charlie.id()).await, 10);
+    assert_eq!(ft_balance_of(&contract, alice.id()).await, 1000);
+    assert_eq!(ft_balance_of(&contract, bob.id()).await, 100);
+    assert_eq!(ft_balance_of(&contract, charlie.id()).await, 10);
 }
 
 #[tokio::test]
 async fn transfer_normal() {
-    let Setup { contract, accounts } = setup_balances(3, |i| 10u128.pow(3 - i as u32).into()).await;
+    let Setup {
+        contract, accounts, ..
+    } = setup_balances(3, |i| 10u128.pow(3 - i as u32).into()).await;
     let alice = &accounts[0];
     let bob = &accounts[1];
     let charlie = &accounts[2];
@@ -96,14 +115,16 @@ async fn transfer_normal() {
         .await
         .unwrap()
         .unwrap();
-    assert_eq!(balance(&contract, alice.id()).await, 990);
-    assert_eq!(balance(&contract, bob.id()).await, 110);
-    assert_eq!(balance(&contract, charlie.id()).await, 10);
+    assert_eq!(ft_balance_of(&contract, alice.id()).await, 990);
+    assert_eq!(ft_balance_of(&contract, bob.id()).await, 110);
+    assert_eq!(ft_balance_of(&contract, charlie.id()).await, 10);
 }
 
 #[tokio::test]
 async fn transfer_zero() {
-    let Setup { contract, accounts } = setup_balances(3, |i| 10u128.pow(3 - i as u32).into()).await;
+    let Setup {
+        contract, accounts, ..
+    } = setup_balances(3, |i| 10u128.pow(3 - i as u32).into()).await;
     let alice = &accounts[0];
     let bob = &accounts[1];
     let charlie = &accounts[2];
@@ -119,15 +140,17 @@ async fn transfer_zero() {
         .await
         .unwrap()
         .unwrap();
-    assert_eq!(balance(&contract, alice.id()).await, 1000);
-    assert_eq!(balance(&contract, bob.id()).await, 100);
-    assert_eq!(balance(&contract, charlie.id()).await, 10);
+    assert_eq!(ft_balance_of(&contract, alice.id()).await, 1000);
+    assert_eq!(ft_balance_of(&contract, bob.id()).await, 100);
+    assert_eq!(ft_balance_of(&contract, charlie.id()).await, 10);
 }
 
 #[tokio::test]
 #[should_panic(expected = "invalid digit found in string")]
 async fn transfer_negative() {
-    let Setup { contract, accounts } = setup_balances(3, |i| 10u128.pow(3 - i as u32).into()).await;
+    let Setup {
+        contract, accounts, ..
+    } = setup_balances(3, |i| 10u128.pow(3 - i as u32).into()).await;
     let alice = &accounts[0];
     let bob = &accounts[1];
 
@@ -147,7 +170,9 @@ async fn transfer_negative() {
 #[tokio::test]
 #[should_panic(expected = "Requires attached deposit of exactly 1 yoctoNEAR")]
 async fn transfer_no_deposit() {
-    let Setup { contract, accounts } = setup_balances(3, |i| 10u128.pow(3 - i as u32).into()).await;
+    let Setup {
+        contract, accounts, ..
+    } = setup_balances(3, |i| 10u128.pow(3 - i as u32).into()).await;
     let alice = &accounts[0];
     let bob = &accounts[1];
 
@@ -161,4 +186,113 @@ async fn transfer_no_deposit() {
         .await
         .unwrap()
         .unwrap();
+}
+
+#[tokio::test]
+#[should_panic(expected = "Balance of the sender is insufficient")]
+async fn transfer_more_than_balance() {
+    let Setup {
+        contract, accounts, ..
+    } = setup_balances(3, |i| 10u128.pow(3 - i as u32).into()).await;
+    let alice = &accounts[0];
+    let bob = &accounts[1];
+
+    alice
+        .call(contract.id(), "ft_transfer")
+        .args_json(json!({
+            "receiver_id": bob.id(),
+            "amount": "1000000",
+        }))
+        .deposit(1)
+        .transact()
+        .await
+        .unwrap()
+        .unwrap();
+}
+
+#[tokio::test]
+#[should_panic(expected = "TotalSupplyOverflowError")]
+async fn transfer_overflow_u128() {
+    let Setup {
+        contract, accounts, ..
+    } = setup_balances(2, |_| (u128::MAX / 2).into()).await;
+    let alice = &accounts[0];
+
+    alice
+        .call(contract.id(), "mint")
+        .args_json(json!({
+            "amount": "2",
+        }))
+        .transact()
+        .await
+        .unwrap()
+        .unwrap();
+}
+
+#[tokio::test]
+async fn transfer_fail_not_registered() {
+    let Setup {
+        contract,
+        accounts,
+        worker,
+    } = setup_balances(2, |i| 10u128.pow(3 - i as u32).into()).await;
+    let alice = &accounts[0];
+    let charlie = worker.dev_create_account().await.unwrap();
+
+    let result = alice
+        .call(contract.id(), "ft_transfer")
+        .deposit(1)
+        .args_json(json!({
+            "receiver_id": charlie.id(),
+            "amount": "10",
+        }))
+        .transact()
+        .await
+        .unwrap();
+
+    expect_execution_error(
+        &result,
+        format!(
+            "Smart contract panicked: Account {} is not registered",
+            charlie.id(),
+        ),
+    );
+}
+
+#[tokio::test]
+async fn fail_run_out_of_space() {
+    let Setup {
+        contract, accounts, ..
+    } = setup_balances(2, |i| 10u128.pow(3 - i as u32).into()).await;
+    let alice = &accounts[0];
+
+    let balance = contract
+        .view("storage_balance_of")
+        .args_json(json!({ "account_id": alice.id() }))
+        .await
+        .unwrap()
+        .json::<Option<StorageBalance>>()
+        .unwrap()
+        .unwrap();
+
+    let result = alice
+        .call(contract.id(), "use_storage")
+        .args_json(json!({
+            "blob": Base64VecU8::from(vec![1u8; 10000]),
+        }))
+        .transact()
+        .await
+        .unwrap();
+
+    expect_execution_error(
+        &result,
+        format!(
+            "Smart contract panicked: Storage lock error: {}",
+            InsufficientBalanceError {
+                account_id: alice.id().parse().unwrap(),
+                available: balance.available,
+                attempted_to_lock: 100490000000000000000000u128.into()
+            }
+        ),
+    );
 }

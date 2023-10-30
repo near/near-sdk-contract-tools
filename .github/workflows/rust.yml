@@ -14,10 +14,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.69
+          toolchain: 1.72
           components: rustfmt
       - name: Check formatting
         run: >
@@ -27,34 +27,45 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.69
+          toolchain: 1.72
           components: clippy
       - name: Run linter
         run: cargo clippy -- -D warnings
   test:
     runs-on: ubuntu-latest
+    env:
+      CARGO_TERM_COLOR: always
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.69
+          toolchain: 1.72
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: nextest
+      - uses: Swatinem/rust-cache@v2
       - name: Run unit and integration tests
-        run: cargo test --workspace --exclude workspaces-tests
+        run: cargo nextest run --workspace --exclude workspaces-tests
+      - name: Run doctests
+        run: cargo test --doc
   workspaces-test:
     runs-on: ubuntu-latest
+    env:
+      CARGO_TERM_COLOR: always
 
     steps:
       - uses: actions/checkout@v3
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.69
+          toolchain: 1.72
           targets: wasm32-unknown-unknown
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-make,nextest
+      - uses: Swatinem/rust-cache@v2
       - name: Run workspaces tests
-        run: >
-          cd workspaces-tests;
-          cargo install cargo-make;
-          cargo make test;
+        run: cd workspaces-tests && cargo make nextest

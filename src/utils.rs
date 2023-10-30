@@ -85,7 +85,6 @@ pub fn assert_nonzero_deposit() {
         "Attached deposit must be greater than zero"
     );
 }
-
 #[cfg(test)]
 mod tests {
     use super::prefix_key;

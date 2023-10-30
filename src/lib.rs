@@ -11,6 +11,10 @@ pub enum DefaultStorageKey {
     ApprovalManager,
     /// Default storage key for [`standard::nep141::Nep141ControllerInternal::root`].
     Nep141,
+    /// Default storage key for [`standard::nep145::Nep145ControllerInternal::root`]
+    Nep145,
+    /// Default storage key for [`standard::nep148::Nep148ControllerInternal::root`].
+    Nep148,
     /// Default storage key for [`standard::nep171::Nep171ControllerInternal::root`].
     Nep171,
     /// Default storage key for [`standard::nep177::Nep177ControllerInternal::root`].
@@ -25,7 +29,7 @@ pub enum DefaultStorageKey {
     Pause,
     /// Default storage key for [`rbac::RbacInternal::root`].
     Rbac,
-    /// Default storage key for [`escrow::Escrow::root`]
+    /// Default storage key for [`escrow::EscrowInternal::root`]
     Escrow,
 }
 
@@ -34,6 +38,8 @@ impl IntoStorageKey for DefaultStorageKey {
         match self {
             DefaultStorageKey::ApprovalManager => b"~am".to_vec(),
             DefaultStorageKey::Nep141 => b"~$141".to_vec(),
+            DefaultStorageKey::Nep145 => b"~$145".to_vec(),
+            DefaultStorageKey::Nep148 => b"~$148".to_vec(),
             DefaultStorageKey::Nep171 => b"~$171".to_vec(),
             DefaultStorageKey::Nep177 => b"~$177".to_vec(),
             DefaultStorageKey::Nep178 => b"~$178".to_vec(),
@@ -51,6 +57,7 @@ pub mod standard;
 pub mod approval;
 pub mod escrow;
 pub mod fast_account_id;
+pub mod hook;
 pub mod migrate;
 pub mod owner;
 pub mod pause;
@@ -62,7 +69,51 @@ pub mod utils;
 /// Re-exports of the NFT standard traits.
 pub mod nft {
     pub use crate::{
-        standard::{nep171::*, nep177::*, nep178::*, nep181::*},
+        standard::{
+            nep145::{
+                self, ext_nep145, Nep145, Nep145Controller, Nep145ControllerInternal,
+                StorageBalance, StorageBalanceBounds,
+            },
+            nep171::{
+                self, action::*, ext_nep171, ext_nep171_receiver, ext_nep171_resolver, Nep171,
+                Nep171Controller, Nep171ControllerInternal, Nep171Receiver, Nep171Resolver, Token,
+                TokenId,
+            },
+            nep177::{
+                self, ext_nep177, ContractMetadata, Nep177, Nep177Controller,
+                Nep177ControllerInternal, TokenMetadata,
+            },
+            nep178::{
+                self, action::*, ext_nep178, ext_nep178_receiver, ApprovalId, Nep178,
+                Nep178Controller, Nep178ControllerInternal, Nep178Receiver, TokenApprovals,
+            },
+            nep181::{
+                self, ext_nep181, Nep181, Nep181Controller, Nep181ControllerInternal,
+                TokenEnumeration,
+            },
+        },
         Nep171, Nep177, Nep178, Nep181, NonFungibleToken,
+    };
+}
+
+/// Re-exports of the FT standard traits.
+pub mod ft {
+    pub use crate::{
+        standard::{
+            nep141::{
+                self, ext_nep141, ext_nep141_receiver, ext_nep141_resolver, Nep141, Nep141Burn,
+                Nep141Controller, Nep141ControllerInternal, Nep141Mint, Nep141Receiver,
+                Nep141Resolver, Nep141Transfer,
+            },
+            nep145::{
+                self, ext_nep145, Nep145, Nep145Controller, Nep145ControllerInternal,
+                StorageBalance, StorageBalanceBounds,
+            },
+            nep148::{
+                self, ext_nep148, FungibleTokenMetadata, Nep148, Nep148Controller,
+                Nep148ControllerInternal,
+            },
+        },
+        FungibleToken, Nep141, Nep145, Nep148,
     };
 }

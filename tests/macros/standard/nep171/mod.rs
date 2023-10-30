@@ -2,15 +2,9 @@
 
 use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
-    env, near_bindgen, store, AccountId,
+    env, near_bindgen, store, AccountId, ONE_NEAR,
 };
-use near_sdk_contract_tools::{
-    standard::{
-        nep171::*,
-        nep177::{Nep177Controller, TokenMetadata},
-    },
-    Nep171, NonFungibleToken,
-};
+use near_sdk_contract_tools::{hook::Hook, nft::*};
 
 mod hooks;
 mod manual_integration;
@@ -33,7 +27,6 @@ impl From<Token> for TokenRecord {
 }
 
 #[derive(NonFungibleToken, BorshDeserialize, BorshSerialize)]
-#[non_fungible_token(no_core_hooks, no_approval_hooks)]
 #[near_bindgen]
 struct NonFungibleTokenNoHooks {
     pub before_nft_transfer_balance_record: store::Vector<Option<TokenRecord>>,
@@ -48,71 +41,42 @@ fn t() {
     };
 
     let token_id = "token1".to_string();
+    let alice: AccountId = "alice".parse().unwrap();
 
-    n.mint_with_metadata(
-        token_id.clone(),
-        "alice".parse().unwrap(),
-        TokenMetadata {
-            title: Some("Title".to_string()),
-            description: None,
-            media: None,
-            media_hash: None,
-            copies: None,
-            issued_at: None,
-            expires_at: None,
-            starts_at: None,
-            updated_at: None,
-            extra: None,
-            reference: None,
-            reference_hash: None,
-        },
-    )
-    .unwrap();
+    Nep145Controller::deposit_to_storage_account(&mut n, &alice, ONE_NEAR.into()).unwrap();
+
+    n.mint_with_metadata(token_id.clone(), alice, TokenMetadata::new().title("Title"))
+        .unwrap();
 
     let nft_tok = n.nft_token(token_id);
     dbg!(nft_tok);
 }
 
 #[derive(Nep171, BorshDeserialize, BorshSerialize)]
+#[nep171(transfer_hook = "Self")]
 #[near_bindgen]
 struct NonFungibleToken {
     pub before_nft_transfer_balance_record: store::Vector<Option<TokenRecord>>,
     pub after_nft_transfer_balance_record: store::Vector<Option<TokenRecord>>,
 }
 
-impl Nep171Hook for NonFungibleToken {
-    type NftTransferState = Option<TokenRecord>;
-
-    fn before_nft_transfer(contract: &Self, transfer: &Nep171Transfer) -> Option<TokenRecord> {
-        let token = Nep171::nft_token(contract, transfer.token_id.clone());
-        token.map(Into::into)
-    }
-
-    fn after_nft_transfer(
-        contract: &mut Self,
-        transfer: &Nep171Transfer,
-        before_nft_transfer: Option<TokenRecord>,
-    ) {
-        let token = Nep171::nft_token(contract, transfer.token_id.clone());
+impl Hook<NonFungibleToken, Nep171Transfer<'_>> for NonFungibleToken {
+    fn hook<R>(
+        contract: &mut NonFungibleToken,
+        args: &Nep171Transfer<'_>,
+        f: impl FnOnce(&mut NonFungibleToken) -> R,
+    ) -> R {
+        let before_nft_transfer = contract.nft_token(args.token_id.clone()).map(Into::into);
         contract
             .before_nft_transfer_balance_record
             .push(before_nft_transfer);
+        let r = f(contract);
+        let after_nft_transfer = contract.nft_token(args.token_id.clone()).map(Into::into);
         contract
             .after_nft_transfer_balance_record
-            .push(token.map(Into::into));
+            .push(after_nft_transfer);
+        r
     }
-
-    type MintState = ();
-
-    fn before_mint(_contract: &Self, _token_ids: &[TokenId], _owner_id: &AccountId) {}
-
-    fn after_mint(_contract: &mut Self, _token_ids: &[TokenId], _owner_id: &AccountId, _: ()) {}
-
-    type BurnState = ();
-
-    fn before_burn(_contract: &Self, _token_ids: &[TokenId], _owner_id: &AccountId) {}
-
-    fn after_burn(_contract: &mut Self, _token_ids: &[TokenId], _owner_id: &AccountId, _: ()) {}
 }
 
 #[near_bindgen]
@@ -125,8 +89,13 @@ impl NonFungibleToken {
         }
     }
 
-    pub fn mint(&mut self, token_id: TokenId, owner_id: AccountId) {
-        Nep171Controller::mint(self, &[token_id], &owner_id, None).unwrap_or_else(|e| {
+    pub fn mint(&mut self, token_id: TokenId, receiver_id: AccountId) {
+        let action = Nep171Mint {
+            token_ids: &[token_id],
+            receiver_id: &receiver_id,
+            memo: None,
+        };
+        Nep171Controller::mint(self, &action).unwrap_or_else(|e| {
             env::panic_str(&format!("Mint failed: {e:?}"));
         });
     }
@@ -137,9 +106,15 @@ mod tests {
         test_utils::{get_logs, VMContextBuilder},
         testing_env, AccountId,
     };
-    use near_sdk_contract_tools::standard::{nep171::Nep171, nep297::Event};
+    use near_sdk_contract_tools::standard::{
+        nep171::{
+            event::{Nep171Event, NftTransferLog},
+            Nep171,
+        },
+        nep297::Event,
+    };
 
-    use super::NonFungibleToken;
+    use super::*;
 
     #[test]
     fn hook_execution_success() {
@@ -170,7 +145,7 @@ mod tests {
 
         assert_eq!(
             contract.before_nft_transfer_balance_record.get(0),
-            Some(&Some(super::TokenRecord {
+            Some(&Some(TokenRecord {
                 owner_id: account_alice.clone(),
                 token_id: token_id.to_string(),
             })),
@@ -178,7 +153,7 @@ mod tests {
         );
         assert_eq!(
             contract.after_nft_transfer_balance_record.get(0),
-            Some(&Some(super::TokenRecord {
+            Some(&Some(TokenRecord {
                 owner_id: account_bob.clone(),
                 token_id: token_id.to_string(),
             })),
@@ -187,16 +162,14 @@ mod tests {
 
         assert_eq!(
             get_logs(),
-            vec![
-                super::Nep171Event::NftTransfer(vec![super::event::NftTransferLog {
-                    memo: None,
-                    authorized_id: None,
-                    old_owner_id: account_alice.clone(),
-                    new_owner_id: account_bob.clone(),
-                    token_ids: vec![token_id.to_string()]
-                }])
-                .to_event_string()
-            ]
+            vec![Nep171Event::NftTransfer(vec![NftTransferLog {
+                memo: None,
+                authorized_id: None,
+                old_owner_id: account_alice.clone(),
+                new_owner_id: account_bob.clone(),
+                token_ids: vec![token_id.to_string()]
+            }])
+            .to_event_string()]
         );
     }
 }

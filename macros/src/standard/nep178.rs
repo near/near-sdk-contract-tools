@@ -1,13 +1,18 @@
-use darling::{util::Flag, FromDeriveInput};
+use darling::FromDeriveInput;
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::Expr;
+use syn::{Expr, Type};
+
+use crate::unitify;
 
 #[derive(Debug, FromDeriveInput)]
 #[darling(attributes(nep178), supports(struct_named))]
 pub struct Nep178Meta {
     pub storage_key: Option<Expr>,
-    pub no_hooks: Flag,
+    pub all_hooks: Option<Type>,
+    pub approve_hook: Option<Type>,
+    pub revoke_hook: Option<Type>,
+    pub revoke_all_hook: Option<Type>,
 
     pub generics: syn::Generics,
     pub ident: syn::Ident,
@@ -22,7 +27,10 @@ pub struct Nep178Meta {
 pub fn expand(meta: Nep178Meta) -> Result<TokenStream, darling::Error> {
     let Nep178Meta {
         storage_key,
-        no_hooks,
+        all_hooks,
+        approve_hook,
+        revoke_hook,
+        revoke_all_hook,
 
         generics,
         ident,
@@ -33,11 +41,6 @@ pub fn expand(meta: Nep178Meta) -> Result<TokenStream, darling::Error> {
 
     let (imp, ty, wher) = generics.split_for_impl();
 
-    let hook = no_hooks
-        .is_present()
-        .then(|| quote! { () })
-        .unwrap_or_else(|| quote! { Self });
-
     let root = storage_key.map(|storage_key| {
         quote! {
             fn root() -> #me::slot::Slot<()> {
@@ -46,9 +49,16 @@ pub fn expand(meta: Nep178Meta) -> Result<TokenStream, darling::Error> {
         }
     });
 
+    let all_hooks = unitify(all_hooks);
+    let approve_hook = unitify(approve_hook);
+    let revoke_hook = unitify(revoke_hook);
+    let revoke_all_hook = unitify(revoke_all_hook);
+
     Ok(quote! {
         impl #imp #me::standard::nep178::Nep178ControllerInternal for #ident #ty #wher {
-            type Hook = #hook;
+            type ApproveHook = (#approve_hook, #all_hooks);
+            type RevokeHook = (#revoke_hook, #all_hooks);
+            type RevokeAllHook = (#revoke_all_hook, #all_hooks);
 
             #root
         }
@@ -62,20 +72,23 @@ pub fn expand(meta: Nep178Meta) -> Result<TokenStream, darling::Error> {
                 account_id: #near_sdk::AccountId,
                 msg: Option<String>,
             ) -> #near_sdk::PromiseOrValue<()> {
+                use #me::standard::nep178::*;
+
                 #me::utils::assert_nonzero_deposit();
 
                 let predecessor = #near_sdk::env::predecessor_account_id();
 
-                let approval_id = #me::standard::nep178::Nep178Controller::approve(
-                    self,
-                    &token_id,
-                    &predecessor,
-                    &account_id,
-                )
-                .unwrap_or_else(|e| #near_sdk::env::panic_str(&e.to_string()));
+                let action = action::Nep178Approve {
+                    token_id: &token_id,
+                    current_owner_id: &predecessor,
+                    account_id: &account_id,
+                };
+
+                let approval_id = Nep178Controller::approve(self, &action)
+                    .unwrap_or_else(|e| #near_sdk::env::panic_str(&e.to_string()));
 
                 msg.map_or(#near_sdk::PromiseOrValue::Value(()), |msg| {
-                    #me::standard::nep178::ext_nep178_receiver::ext(account_id)
+                    ext_nep178_receiver::ext(account_id)
                         .nft_on_approve(token_id, predecessor, approval_id, msg)
                         .into()
                 })
@@ -87,31 +100,37 @@ pub fn expand(meta: Nep178Meta) -> Result<TokenStream, darling::Error> {
                 token_id: #me::standard::nep171::TokenId,
                 account_id: #near_sdk::AccountId,
             ) {
+                use #me::standard::nep178::*;
+
                 #near_sdk::assert_one_yocto();
 
                 let predecessor = #near_sdk::env::predecessor_account_id();
 
-                #me::standard::nep178::Nep178Controller::revoke(
-                    self,
-                    &token_id,
-                    &predecessor,
-                    &account_id,
-                )
-                .unwrap_or_else(|e| #near_sdk::env::panic_str(&e.to_string()));
+                let action = action::Nep178Revoke {
+                    token_id: &token_id,
+                    current_owner_id: &predecessor,
+                    account_id: &account_id,
+                };
+
+                Nep178Controller::revoke(self, &action)
+                    .unwrap_or_else(|e| #near_sdk::env::panic_str(&e.to_string()));
             }
 
             #[payable]
             fn nft_revoke_all(&mut self, token_id: #me::standard::nep171::TokenId) {
+                use #me::standard::nep178::*;
+
                 #near_sdk::assert_one_yocto();
 
                 let predecessor = #near_sdk::env::predecessor_account_id();
 
-                #me::standard::nep178::Nep178Controller::revoke_all(
-                    self,
-                    &token_id,
-                    &predecessor,
-                )
-                .unwrap_or_else(|e| #near_sdk::env::panic_str(&e.to_string()));
+                let action = action::Nep178RevokeAll {
+                    token_id: &token_id,
+                    current_owner_id: &predecessor,
+                };
+
+                Nep178Controller::revoke_all(self, &action)
+                    .unwrap_or_else(|e| #near_sdk::env::panic_str(&e.to_string()));
             }
 
             fn nft_is_approved(

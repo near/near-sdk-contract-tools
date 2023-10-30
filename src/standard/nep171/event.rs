@@ -1,10 +1,32 @@
 //! Event log metadata & associated structures.
 
-use near_sdk::AccountId;
-use serde::Serialize;
+use near_sdk::{serde::Serialize, AccountId};
+use near_sdk_contract_tools_macros::event;
+
+/// NEP-171 standard events.
+#[event(
+    crate = "crate",
+    macros = "near_sdk_contract_tools_macros",
+    standard = "nep171",
+    version = "1.2.0"
+)]
+#[derive(Debug, Clone)]
+pub enum Nep171Event {
+    /// Emitted when a token is newly minted.
+    NftMint(Vec<NftMintLog>),
+    /// Emitted when a token is transferred between two parties.
+    NftTransfer(Vec<NftTransferLog>),
+    /// Emitted when a token is burned.
+    NftBurn(Vec<NftBurnLog>),
+    /// Emitted when the metadata associated with an NFT contract is updated.
+    NftMetadataUpdate(Vec<NftMetadataUpdateLog>),
+    /// Emitted when the metadata associated with an NFT contract is updated.
+    ContractMetadataUpdate(Vec<NftContractMetadataUpdateLog>),
+}
 
 /// Tokens minted to a single owner.
 #[derive(Serialize, Debug, Clone)]
+#[serde(crate = "near_sdk::serde")]
 pub struct NftMintLog {
     /// To whom were the new tokens minted?
     pub owner_id: AccountId,
@@ -17,6 +39,7 @@ pub struct NftMintLog {
 
 /// Tokens are transferred from one account to another.
 #[derive(Serialize, Debug, Clone)]
+#[serde(crate = "near_sdk::serde")]
 pub struct NftTransferLog {
     /// NEP-178 authorized account ID.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -34,6 +57,7 @@ pub struct NftTransferLog {
 
 /// Tokens are burned from a single holder.
 #[derive(Serialize, Debug, Clone)]
+#[serde(crate = "near_sdk::serde")]
 pub struct NftBurnLog {
     /// What is the ID of the account from which the tokens were burned?
     pub owner_id: AccountId,
@@ -49,6 +73,7 @@ pub struct NftBurnLog {
 
 /// Token metadata update.
 #[derive(Serialize, Debug, Clone)]
+#[serde(crate = "near_sdk::serde")]
 pub struct NftMetadataUpdateLog {
     /// IDs of the updated tokens.
     pub token_ids: Vec<String>,
@@ -59,6 +84,7 @@ pub struct NftMetadataUpdateLog {
 
 /// Contract metadata update.
 #[derive(Serialize, Debug, Clone)]
+#[serde(crate = "near_sdk::serde")]
 pub struct NftContractMetadataUpdateLog {
     /// Additional update information.
     #[serde(skip_serializing_if = "Option::is_none")]

@@ -2,19 +2,18 @@ use near_sdk::{
     borsh::{self, BorshDeserialize, BorshSerialize},
     env, near_bindgen, PanicOnDefault,
 };
-use near_sdk_contract_tools::{nft::*, owner::Owner, pause::Pause, Owner, Pause};
+use near_sdk_contract_tools::{
+    nft::*,
+    owner::Owner,
+    pause::{hooks::PausableHook, Pause},
+    Owner, Pause,
+};
 
 #[derive(BorshSerialize, BorshDeserialize, PanicOnDefault, NonFungibleToken, Pause, Owner)]
-#[non_fungible_token(no_approval_hooks)]
+#[non_fungible_token(transfer_hook = "PausableHook")]
 #[near_bindgen]
 pub struct Contract {
     next_token_id: u32,
-}
-
-impl SimpleNep171Hook for Contract {
-    fn before_nft_transfer(&self, _transfer: &Nep171Transfer) {
-        Self::require_unpaused();
-    }
 }
 
 #[near_bindgen]

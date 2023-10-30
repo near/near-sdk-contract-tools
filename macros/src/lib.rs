@@ -1,8 +1,8 @@
 //! Macros for near-sdk-contract-tools.
 
-use darling::{FromDeriveInput, FromMeta};
+use darling::{ast::NestedMeta, FromDeriveInput, FromMeta};
 use proc_macro::TokenStream;
-use syn::{parse_macro_input, AttributeArgs, DeriveInput, Item};
+use syn::{parse_macro_input, DeriveInput, Item};
 
 mod approval;
 mod escrow;
@@ -27,7 +27,11 @@ fn default_near_sdk() -> syn::Path {
 }
 
 fn default_serde() -> syn::Path {
-    syn::parse_str("::serde").unwrap()
+    syn::parse_str("::near_sdk::serde").unwrap()
+}
+
+fn unitify(ty: Option<syn::Type>) -> syn::Type {
+    ty.unwrap_or_else(|| syn::parse_quote! { () })
 }
 
 fn make_derive<T>(
@@ -120,28 +124,34 @@ pub fn derive_nep141(input: TokenStream) -> TokenStream {
     make_derive(input, standard::nep141::expand)
 }
 
+/// Adds NEP-145 fungible token core functionality to a contract. Exposes
+/// `storage_*` functions to the public blockchain, implements internal
+/// controller functionality.
+///
+/// The storage key prefix for the fields can be optionally specified (default:
+/// `"~$145"`) using `#[nep145(storage_key = "<expression>")]`.
+#[proc_macro_derive(Nep145, attributes(nep145))]
+pub fn derive_nep145(input: TokenStream) -> TokenStream {
+    make_derive(input, standard::nep145::expand)
+}
+
 /// Adds NEP-148 fungible token metadata functionality to a contract. Metadata
-/// is hardcoded into the contract code, and is therefore not stored in storage.
+/// must be initialized during contract creation using `Nep148Controller::set_metadata`.
 ///
-/// Specify metadata using the `#[nep148(...)]` attribute.
-///
-/// Fields:
-///  - `name`
-///  - `symbol`
-///  - `decimals`
-///  - `spec` (optional)
-///  - `icon` (optional)
-///  - `reference` (optional)
-///  - `reference_hash` (optional)
+/// The storage key prefix for the fields can be optionally specified (default:
+/// `"~$148"`) using `#[nep148(storage_key = "<expression>")]`.
 #[proc_macro_derive(Nep148, attributes(nep148))]
 pub fn derive_nep148(input: TokenStream) -> TokenStream {
     make_derive(input, standard::nep148::expand)
 }
 
-/// Implements NEP-141 and NEP-148 functionality, like
-/// `#[derive(Nep141, Nep148)]`.
+/// Implements NEP-141, NEP-145, and NEP-148 functionality, like
+/// `#[derive(Nep141, Nep145, Nep148)]`. This is the recommended way to
+/// implement a fungible token, as it also ensures that all of the standards
+/// integrate with each other correctly.
 ///
-/// Attributes are the union of those for the constituent derive macros.
+/// Attributes are generally the union of those from the constituent derive
+/// macros.
 /// Specify attributes with `#[fungible_token(...)]`.
 #[proc_macro_derive(FungibleToken, attributes(fungible_token))]
 pub fn derive_fungible_token(input: TokenStream) -> TokenStream {
@@ -238,7 +248,12 @@ pub fn derive_simple_multisig(input: TokenStream) -> TokenStream {
 /// See documentation on the [`derive@Nep297`] derive macro for more details.
 #[proc_macro_attribute]
 pub fn event(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let attr = parse_macro_input!(attr as AttributeArgs);
+    let attr = match NestedMeta::parse_meta_list(attr.into()) {
+        Ok(v) => v,
+        Err(e) => {
+            return TokenStream::from(darling::Error::from(e).write_errors());
+        }
+    };
     let item = parse_macro_input!(item as Item);
 
     standard::event::EventAttributeMeta::from_list(&attr)

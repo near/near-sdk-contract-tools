@@ -5,7 +5,6 @@ use near_sdk::{
 use near_sdk_contract_tools::nft::*;
 
 #[derive(BorshSerialize, BorshDeserialize, PanicOnDefault, Nep171)]
-#[nep171(no_hooks)]
 #[near_bindgen]
 pub struct Contract {
     pub next_token_id: u32,
@@ -16,13 +15,18 @@ impl Contract {
     pub fn mint(&mut self) -> TokenId {
         let token_id = format!("token_{}", self.next_token_id);
         self.next_token_id += 1;
-        Nep171Controller::mint(
-            self,
-            &[token_id.clone()],
-            &env::predecessor_account_id(),
-            None,
-        )
-        .unwrap_or_else(|e| env::panic_str(&format!("Minting failed: {e}")));
+
+        let token_ids = [token_id];
+        let action = Nep171Mint {
+            token_ids: &token_ids,
+            receiver_id: &env::predecessor_account_id(),
+            memo: None,
+        };
+        Nep171Controller::mint(self, &action)
+            .unwrap_or_else(|e| env::panic_str(&format!("Minting failed: {e}")));
+
+        let [token_id] = token_ids;
+
         token_id
     }
 }

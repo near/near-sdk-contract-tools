@@ -1,8 +1,6 @@
 use darling::{FromDeriveInput, FromMeta};
-use once_cell::sync::OnceCell;
 use proc_macro2::TokenStream;
 use quote::quote;
-use regex::Regex;
 use syn::Expr;
 
 #[derive(Debug, Clone)]
@@ -19,23 +17,21 @@ impl FromMeta for HookBody {
     }
 
     fn from_string(value: &str) -> darling::Result<Self> {
-        static REGEX: OnceCell<Regex> = OnceCell::new();
-
         if value == "empty" {
             Ok(HookBody::Empty)
         } else if value == "owner" {
             Ok(HookBody::Owner)
+        } else if let Some(b) = value
+            .strip_prefix("role(")
+            .and_then(|s| s.strip_suffix(')'))
+            .and_then(|s| syn::parse_str::<Expr>(s).ok())
+            .map(|e| HookBody::Role(Box::new(e)))
+        {
+            Ok(b)
         } else {
-            let r = REGEX.get_or_init(|| Regex::new(r"^role\((.+)\)$").unwrap());
-            r.captures(value)
-                .and_then(|c| c.get(1))
-                .and_then(|s| syn::parse_str::<Expr>(s.as_str()).ok())
-                .map(|e| HookBody::Role(Box::new(e)))
-                .ok_or_else(|| {
-                    darling::Error::custom(format!(
-                        r#"Invalid value "{value}", expected "empty", "owner", or "role(...)""#,
-                    ))
-                })
+            Err(darling::Error::custom(format!(
+                r#"Invalid value "{value}", expected "empty", "owner", or "role(...)""#,
+            )))
         }
     }
 }

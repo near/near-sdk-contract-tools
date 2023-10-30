@@ -1,6 +1,6 @@
 //! Helpers for `#[derive(near_sdk_contract_tools::Nep297)]`
 
-use near_sdk::serde::Serialize;
+use near_sdk::{serde::Serialize, serde_json};
 
 /// Emit events according to the [NEP-297 event standard](https://nomicon.io/Standards/EventsFormat).
 ///
@@ -41,7 +41,17 @@ where
     fn to_event_string(&self) -> String {
         format!(
             "EVENT_JSON:{}",
-            serde_json::to_string(&self.to_event_log()).unwrap_or_else(|_| near_sdk::env::abort()),
+            serde_json::to_string(&self.to_event_log()).unwrap_or_else(|e| {
+                #[cfg(not(target_arch = "wasm32"))]
+                {
+                    panic!("Failed to serialize event: {e}")
+                }
+
+                #[cfg(target_arch = "wasm32")]
+                {
+                    near_sdk::env::panic_str(&format!("Failed to serialize event: {e}"))
+                }
+            }),
         )
     }
 
@@ -62,6 +72,7 @@ pub trait ToEventLog {
 /// NEP-297 Event Log Data
 /// <https://github.com/near/NEPs/blob/master/neps/nep-0297.md#specification>
 #[derive(Serialize, Clone, Debug)]
+#[serde(crate = "near_sdk::serde")]
 pub struct EventLog<T> {
     /// Name of the event standard, e.g. "nep171"
     pub standard: &'static str,

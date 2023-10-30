@@ -1,23 +1,87 @@
 # near-sdk-contract-tools
 
-> Helpful functions and macros for developing smart contracts on NEAR Protocol.
+## NFT
+
+```diff
+use near_sdk::{
+    borsh::{self, BorshDeserialize, BorshSerialize},
+    near_bindgen, PanicOnDefault,
+};
++ use near_sdk_contract_tools::nft::*;
+
+#[derive(BorshSerialize, BorshDeserialize, PanicOnDefault)]
++ #[derive(NonFungibleToken)]
+#[near_bindgen]
+pub struct MyNftContract {}
+
+#[near_bindgen]
+impl MyNftContract {
+    #[init]
+    pub fn new() -> Self {
+        let mut contract = Self {};
+
++         contract.set_contract_metadata(ContractMetadata::new(
++             "My NFT".to_string(),
++             "MNFT".to_string(),
++             None,
++         ));
+
+        contract
+    }
+}
+```
+
+## FT
+
+```diff
+use near_sdk::{
+    borsh::{self, BorshDeserialize, BorshSerialize},
+    near_bindgen, PanicOnDefault,
+};
++ use near_sdk_contract_tools::ft::*;
+
+#[derive(BorshSerialize, BorshDeserialize, PanicOnDefault)]
++ #[derive(FungibleToken)]
+#[near_bindgen]
+pub struct MyFtContract {}
+
+#[near_bindgen]
+impl MyFtContract {
+    #[init]
+    pub fn new() -> Self {
+        let mut contract = Self {};
+
++         contract.set_metadata(&FungibleTokenMetadata::new(
++             "My Fungible Token".into(),
++             "MYFT".into(),
++             24,
++         ));
+
+        contract
+    }
+}
+```
+
+## What is it?
 
 This package is a collection of common tools and patterns in NEAR smart contract development:
 
-- Storage fee management
-- Owner pattern + derive macro
-- Pause pattern + derive macro
-- Role-based access control
+- Storage fee management.
+- Escrow pattern and derive macro.
+- Owner pattern and derive macro.
+- Pause pattern and derive macro.
+- Role-based access control.
 - Derive macros for NEP standards:
-  - [NEP-297](https://nomicon.io/Standards/EventsFormat) (events)
-  - [NEP-141](https://nomicon.io/Standards/Tokens/FungibleToken/Core) (fungible token), extension [NEP-148](https://nomicon.io/Standards/Tokens/FungibleToken/Metadata)
-  - [NEP-171](https://nomicon.io/Standards/NonFungibleToken/NonFungibleToken) (non-fungible token), extensions [NEP-177](https://nomicon.io/Standards/Tokens/NonFungibleToken/Metadata), [NEP-178](https://nomicon.io/Standards/Tokens/NonFungibleToken/ApprovalManagement), [NEP-181](https://nomicon.io/Standards/Tokens/NonFungibleToken/Enumeration)
+  - [NEP-141][nep141] (fungible token), extension [NEP-148][nep148].
+  - [NEP-145][nep145] (storage management), and integrations for the fungible token and non-fungible token standards.
+  - [NEP-171][nep171] (non-fungible token), extensions [NEP-177][nep177], [NEP-178][nep178], [NEP-181][nep181].
+  - [NEP-297][nep297] (events).
 
 Not to be confused with [`near-contract-standards`](https://crates.io/crates/near-contract-standards), which contains official implementations of standardized NEPs. This crate is intended to be a complement to `near-contract-standards`.
 
 You can think of this collection of common tools and patterns (mostly in the form of [derive macros](https://doc.rust-lang.org/reference/procedural-macros.html#derive-macros)) as a sort of [OpenZeppelin](https://docs.openzeppelin.com/contracts/4.x/) for NEAR.
 
-**WARNING:** This is still early software, and there may be breaking changes between versions. I'll try my best to keep the docs & changelogs up-to-date. Don't hesitate to create an issue if find anything wrong.
+Pro tip: Use the [contract wizard](https://near.org/contractwizard.near/widget/ContractWizardUI) to generate starter code for your next project.
 
 ## Installation
 
@@ -96,22 +160,30 @@ e.emit();
 
 ### Fungible Token
 
-To create a contract that is compatible with the NEP-141 and NEP-148 standards, that emits standard-compliant (NEP-141, NEP-297) events.
+To create a contract that is compatible with the [NEP-141][nep141], [NEP-145][nep145], and [NEP-148][nep148] standards, that emits standard-compliant ([NEP-297][nep297]) events.
 
 ```rust
-use near_sdk_contract_tools::FungibleToken;
+use near_sdk_contract_tools::ft::*;
 use near_sdk::near_bindgen;
 
 #[derive(FungibleToken)]
-#[fungible_token(
-    name = "My Fungible Token",
-    symbol = "MYFT",
-    decimals = 18,
-    no_hooks
-)]
 #[near_bindgen]
-struct FungibleToken {
-    // ...
+struct MyFt {}
+
+#[near_bindgen]
+impl MyFt {
+    #[init]
+    pub fn new() -> Self {
+        let mut contract = Self {};
+
+        contract.set_metadata(&FungibleTokenMetadata::new(
+            "My Fungible Token".to_string(),
+            "MYFT".to_string(),
+            24,
+        ));
+
+        contract
+    }
 }
 ```
 
@@ -119,7 +191,7 @@ Standalone macros for each individual standard also exist.
 
 ### Non-fungible Token
 
-Use the `NonFungibleToken` derive macro to implement NEP-171, NEP-177, NEP-178, and NEP-181, with NEP-297 events.
+Use the `NonFungibleToken` derive macro to implement [NEP-145][nep145], [NEP-171][nep171], [NEP-177][nep177], [NEP-178][nep178], and [NEP-181][nep181], with [NEP-297][nep297] events.
 
 ```rust
 use near_sdk::{
@@ -130,7 +202,6 @@ use near_sdk::{
 use near_sdk_contract_tools::nft::*;
 
 #[derive(BorshSerialize, BorshDeserialize, PanicOnDefault, NonFungibleToken)]
-#[non_fungible_token(no_core_hooks, no_approval_hooks)]
 #[near_bindgen]
 pub struct MyNft {}
 ```
@@ -141,25 +212,21 @@ One may wish to combine the features of multiple macros in one contract. All of 
 
 ```rust
 use near_sdk_contract_tools::{
-    pause::Pause,
-    standard::nep141::{Nep141Hook, Nep141Transfer},
-    FungibleToken, Pause,
+    ft::*,
+    pause::{*, hooks::PausableHook},
+    Pause,
 };
-use near_sdk::near_bindgen;
+use near_sdk::{
+    borsh::{self, BorshSerialize, BorshDeserialize},
+    PanicOnDefault,
+    near_bindgen,
+};
 
-#[derive(FungibleToken, Pause)]
-#[fungible_token(name = "Pausable Fungible Token", symbol = "PFT", decimals = 18)]
+#[derive(BorshSerialize, BorshDeserialize, PanicOnDefault, FungibleToken, Pause)]
+#[fungible_token(all_hooks = "PausableHook")]
 #[near_bindgen]
 struct Contract {}
-
-impl Nep141Hook for Contract {
-    fn before_transfer(&mut self, _transfer: &Nep141Transfer) {
-        Contract::require_unpaused();
-    }
-}
 ```
-
-Note: Hooks can be disabled using `#[nep141(no_hooks)]` or `#[fungible_token(no_hooks)]`.
 
 ### Custom Crates
 
@@ -221,20 +288,21 @@ Run `git config core.hooksPath hooks/` to set up commit hooks.
 Install `cargo-make` if it is not installed already:
 
 ```text
-cargo install cargo-make
+cargo install cargo-make cargo-nextest
 ```
 
 Run tests:
 
 ```text
-cargo test
+cargo nextest run
+cargo test --doc
 cd workspaces-tests
-cargo make test
+cargo make nextest
 ```
 
 ## Audit
 
-This library has been [audited](./documents/NEAR%20Contract%20Tools%20-%20Final%20-%2005.05.2023.pdf) by [Kudelski Security](https://www.kudelskisecurity.com/).
+Version 1.0.0 of this library has been [audited](./documents/NEAR%20Contract%20Tools%20-%20Final%20-%2005.05.2023.pdf) by [Kudelski Security](https://www.kudelskisecurity.com/). (May 2023)
 
 ## Authors
 
@@ -243,3 +311,12 @@ This library has been [audited](./documents/NEAR%20Contract%20Tools%20-%20Final%
 ---
 
 (Formerly known as [`near-contract-tools`](https://crates.io/crates/near-contract-tools).)
+
+[nep145]: https://nomicon.io/Standards/StorageManagement
+[nep141]: https://nomicon.io/Standards/Tokens/FungibleToken/Core
+[nep148]: https://nomicon.io/Standards/Tokens/FungibleToken/Metadata
+[nep171]: https://nomicon.io/Standards/NonFungibleToken/NonFungibleToken
+[nep177]: https://nomicon.io/Standards/Tokens/NonFungibleToken/Metadata
+[nep178]: https://nomicon.io/Standards/Tokens/NonFungibleToken/ApprovalManagement
+[nep181]: https://nomicon.io/Standards/Tokens/NonFungibleToken/Enumeration
+[nep297]: https://nomicon.io/Standards/EventsFormat

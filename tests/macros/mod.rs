@@ -4,8 +4,8 @@ use near_sdk::{
     test_utils::VMContextBuilder,
     testing_env, AccountId, BorshStorageKey,
 };
-use near_sdk_contract_tools::escrow::Escrow;
 use near_sdk_contract_tools::{
+    escrow::Escrow,
     migrate::{MigrateExternal, MigrateHook},
     owner::Owner,
     pause::Pause,
@@ -22,11 +22,11 @@ mod pause;
 mod standard;
 
 mod my_event {
-    use near_sdk::AccountId;
+    use near_sdk::{serde::Serialize, AccountId};
     use near_sdk_contract_tools::Nep297;
-    use serde::Serialize;
 
     #[derive(Serialize, Nep297)]
+    #[serde(crate = "near_sdk::serde")]
     #[nep297(standard = "x-myevent", version = "1.0.0", rename = "snake_case")]
     pub struct ValueChanged {
         pub from: u32,
@@ -34,6 +34,7 @@ mod my_event {
     }
 
     #[derive(Serialize, Nep297)]
+    #[serde(crate = "near_sdk::serde")]
     #[nep297(standard = "x-myevent", version = "1.0.0", rename = "snake_case")]
     pub struct PermissionGranted {
         pub to: AccountId,
@@ -392,39 +393,54 @@ mod pausable_fungible_token {
         borsh::{self, BorshDeserialize, BorshSerialize},
         env, near_bindgen,
         test_utils::VMContextBuilder,
-        testing_env, AccountId,
+        testing_env, AccountId, ONE_NEAR,
     };
     use near_sdk_contract_tools::{
-        pause::Pause,
-        standard::nep141::{Nep141, Nep141Controller, Nep141Hook, Nep141Transfer},
-        FungibleToken, Pause,
+        ft::*,
+        hook::Hook,
+        pause::{hooks::PausableHook, Pause},
+        Pause,
     };
 
     #[derive(FungibleToken, Pause, BorshDeserialize, BorshSerialize)]
-    #[fungible_token(name = "Pausable Fungible Token", symbol = "PFT", decimals = 18)]
+    #[fungible_token(all_hooks = "PausableHook", transfer_hook = "TransferHook")]
     #[near_bindgen]
     struct Contract {
         pub storage_usage: u64,
     }
 
-    #[derive(Default)]
-    struct HookState {
-        pub storage_usage_start: u64,
+    #[near_bindgen]
+    impl Contract {
+        #[init]
+        pub fn new() -> Self {
+            let mut contract = Self { storage_usage: 0 };
+
+            contract.set_metadata(&FungibleTokenMetadata::new(
+                "Pausable Fungible Token".into(),
+                "PFT".into(),
+                18,
+            ));
+
+            contract
+        }
     }
 
-    impl Nep141Hook<HookState> for Contract {
-        fn before_transfer(&mut self, _transfer: &Nep141Transfer) -> HookState {
-            Contract::require_unpaused();
-            HookState {
-                storage_usage_start: env::storage_usage(),
-            }
-        }
+    #[derive(Default)]
+    struct TransferHook;
 
-        fn after_transfer(&mut self, _transfer: &Nep141Transfer, state: HookState) {
-            let storage_delta = env::storage_usage() - state.storage_usage_start;
-            println!("Storage delta: {storage_delta}",);
+    impl Hook<Contract, Nep141Transfer<'_>> for TransferHook {
+        fn hook<R>(
+            contract: &mut Contract,
+            _args: &Nep141Transfer,
+            f: impl FnOnce(&mut Contract) -> R,
+        ) -> R {
+            let state = env::storage_usage();
+            let r = f(contract);
+            let storage_delta = env::storage_usage() - state;
+            println!("Storage delta: {storage_delta}");
 
-            self.storage_usage = storage_delta;
+            contract.storage_usage = storage_delta;
+            r
         }
     }
 
@@ -433,15 +449,27 @@ mod pausable_fungible_token {
         let alice: AccountId = "alice".parse().unwrap();
         let bob: AccountId = "bob_account".parse().unwrap();
 
-        let mut c = Contract { storage_usage: 0 };
+        let mut c = Contract::new();
 
-        c.deposit_unchecked(&alice, 100);
+        let context = VMContextBuilder::new()
+            .attached_deposit(ONE_NEAR / 100)
+            .predecessor_account_id(alice.clone())
+            .build();
+        testing_env!(context);
+        c.storage_deposit(None, None);
+        let context = VMContextBuilder::new()
+            .attached_deposit(ONE_NEAR / 100)
+            .predecessor_account_id(bob.clone())
+            .build();
+        testing_env!(context);
+        c.storage_deposit(None, None);
+
+        c.deposit_unchecked(&alice, 100).unwrap();
 
         let context = VMContextBuilder::new()
             .attached_deposit(1)
             .predecessor_account_id(alice.clone())
             .build();
-
         testing_env!(context);
 
         c.ft_transfer(bob.clone(), 50.into(), None);
@@ -455,9 +483,9 @@ mod pausable_fungible_token {
         let alice: AccountId = "alice".parse().unwrap();
         let bob: AccountId = "bob_account".parse().unwrap();
 
-        let mut c = Contract { storage_usage: 0 };
+        let mut c = Contract::new();
 
-        c.deposit_unchecked(&alice, 100);
+        c.deposit_unchecked(&alice, 100).unwrap();
 
         let context = VMContextBuilder::new()
             .attached_deposit(1)

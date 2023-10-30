@@ -3,6 +3,7 @@ use near_sdk::{
     env, near_bindgen, PanicOnDefault,
 };
 use near_sdk_contract_tools::{
+    hook::Hook,
     owner::Owner,
     pause::Pause,
     standard::{
@@ -17,19 +18,25 @@ use near_sdk_contract_tools::{
     BorshSerialize, BorshDeserialize, PanicOnDefault, Nep171, Nep177, Nep178, Nep181, Pause, Owner,
 )]
 #[nep171(
-    extension_hooks = "(nep178::TokenApprovals, nep181::TokenEnumeration)",
+    all_hooks = "(nep178::TokenApprovals, nep181::TokenEnumeration)",
+    transfer_hook = "Self",
     check_external_transfer = "nep178::TokenApprovals",
     token_data = "(nep177::TokenMetadata, nep178::TokenApprovals)"
 )]
-#[nep178(no_hooks)]
+#[nep178()]
 #[near_bindgen]
 pub struct Contract {
     next_token_id: u32,
 }
 
-impl SimpleNep171Hook for Contract {
-    fn before_nft_transfer(&self, _transfer: &Nep171Transfer) {
-        Self::require_unpaused();
+impl Hook<Contract, action::Nep171Transfer<'_>> for Contract {
+    fn hook<R>(
+        contract: &mut Contract,
+        _args: &action::Nep171Transfer<'_>,
+        f: impl FnOnce(&mut Contract) -> R,
+    ) -> R {
+        Contract::require_unpaused();
+        f(contract)
     }
 }
 
