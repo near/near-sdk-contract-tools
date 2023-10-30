@@ -15,7 +15,8 @@ set -e
 if [[ -n $1 ]]; then
     cargo test --package workspaces-tests --test "$1" "$2" -- --nocapture
 else
-    cargo test --package workspaces-tests -- --nocapture
+    # don't show all output if running all tests
+    cargo test --package workspaces-tests
 fi
 """
 

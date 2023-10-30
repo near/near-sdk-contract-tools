@@ -21,6 +21,9 @@ name = "escrow"
 name = "fungible_token"
 
 [[bin]]
+name = "fungible_token_receiver"
+
+[[bin]]
 name = "native_multisig"
 
 [[bin]]
