@@ -17,12 +17,15 @@ mod ext;
 pub use ext::*;
 pub mod hooks;
 
-/// Gas value required for ft_resolve_transfer calls
+/// Gas value required for [`Nep141Resolver::ft_resolve_transfer`] call,
+/// independent of the amount of gas required for the preceding
+/// [`Nep141::ft_transfer`] call.
 pub const GAS_FOR_RESOLVE_TRANSFER: Gas = Gas(5_000_000_000_000);
-/// Gas value required for ft_transfer_call calls (includes gas for )
+/// Gas value required for [`Nep141::ft_transfer_call`] calls (includes gas for
+/// the subsequent [`Nep141Resolver::ft_resolve_transfer`] call).
 pub const GAS_FOR_FT_TRANSFER_CALL: Gas = Gas(25_000_000_000_000 + GAS_FOR_RESOLVE_TRANSFER.0);
 /// Error message for insufficient gas.
-pub const MORE_GAS_FAIL_MESSAGE: &str = "More gas is required";
+pub const MORE_GAS_FAIL_MESSAGE: &str = "Insufficient gas attached.";
 
 #[derive(BorshSerialize, BorshStorageKey)]
 enum StorageKey {

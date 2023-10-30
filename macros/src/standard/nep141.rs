@@ -131,8 +131,8 @@ pub fn expand(meta: Nep141Meta) -> Result<TokenStream, darling::Error> {
 
                 let receiver_gas = prepaid_gas
                     .0
-                    .checked_sub(GAS_FOR_FT_TRANSFER_CALL.0) // TODO: Double-check this math. Should this be GAS_FOR_RESOLVE_TRANSFER? If not, this checked_sub call is superfluous given the require!() at the top of this function.
-                    .unwrap_or_else(|| #near_sdk::env::panic_str("Prepaid gas overflow"));
+                    .checked_sub(GAS_FOR_FT_TRANSFER_CALL.0)
+                    .unwrap_or_else(|| #near_sdk::env::panic_str("Prepaid gas underflow."));
 
                 // Initiating receiver's call and the callback
                 ext_nep141_receiver::ext(transfer.receiver_id.clone())
