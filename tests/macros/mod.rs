@@ -499,3 +499,135 @@ mod pausable_fungible_token {
         c.ft_transfer(bob.clone(), 50.into(), None);
     }
 }
+
+#[cfg(test)]
+mod owned_fungible_token {
+    use near_sdk::{
+        borsh::{self, BorshDeserialize, BorshSerialize},
+        env,
+        json_types::U128,
+        near_bindgen,
+        test_utils::VMContextBuilder,
+        testing_env, AccountId, PanicOnDefault, ONE_NEAR,
+    };
+    use near_sdk_contract_tools::{
+        ft::*,
+        owner::{hooks::OnlyOwner, *},
+        Owner,
+    };
+
+    #[derive(BorshSerialize, BorshDeserialize, PanicOnDefault, Owner, FungibleToken)]
+    #[fungible_token(all_hooks = "OnlyOwner")] // only the owner can transfer, etc. the tokens
+    #[near_bindgen]
+    pub struct Contract {}
+
+    #[near_bindgen]
+    impl Contract {
+        #[init]
+        pub fn new() -> Self {
+            let mut contract = Self {};
+
+            Owner::init(&mut contract, &env::predecessor_account_id());
+
+            contract
+        }
+
+        pub fn mint(&mut self, amount: U128) {
+            Nep141Controller::mint(
+                self,
+                &Nep141Mint {
+                    amount: amount.into(),
+                    receiver_id: &env::predecessor_account_id(),
+                    memo: None,
+                },
+            )
+            .unwrap();
+        }
+    }
+
+    #[test]
+    fn mint_and_transfer() {
+        let alice: AccountId = "alice".parse().unwrap();
+        let bob: AccountId = "bob".parse().unwrap();
+        testing_env!(VMContextBuilder::new()
+            .predecessor_account_id(alice.clone())
+            .build());
+
+        let mut contract = Contract::new(); // since alice is the predecessor during init, alice is the owner
+
+        // internal method calls
+        contract
+            .deposit_to_storage_account(&alice, ONE_NEAR.into())
+            .unwrap();
+        contract
+            .deposit_to_storage_account(&bob, ONE_NEAR.into())
+            .unwrap();
+
+        // external; alice is still predecessor
+        contract.mint(U128(100));
+
+        assert_eq!(contract.ft_balance_of(alice.clone()), U128(100));
+        assert_eq!(contract.ft_balance_of(bob.clone()), U128(0));
+
+        testing_env!(VMContextBuilder::new()
+            .predecessor_account_id(alice.clone())
+            .attached_deposit(1)
+            .build());
+        contract.ft_transfer(bob.clone(), U128(10), None);
+
+        assert_eq!(contract.ft_balance_of(alice), U128(90));
+        assert_eq!(contract.ft_balance_of(bob), U128(10));
+    }
+
+    #[test]
+    #[should_panic = "Owner only"]
+    fn mint_fail_not_owner() {
+        let alice: AccountId = "alice".parse().unwrap();
+        let bob: AccountId = "bob".parse().unwrap();
+        testing_env!(VMContextBuilder::new()
+            .predecessor_account_id(alice.clone())
+            .build());
+
+        let mut contract = Contract::new(); // since alice is the predecessor during init, alice is the owner
+
+        // internal method calls
+        contract
+            .deposit_to_storage_account(&alice, ONE_NEAR.into())
+            .unwrap();
+        contract
+            .deposit_to_storage_account(&bob, ONE_NEAR.into())
+            .unwrap();
+
+        testing_env!(VMContextBuilder::new().predecessor_account_id(bob).build());
+
+        contract.mint(U128(100));
+    }
+
+    #[test]
+    #[should_panic = "Owner only"]
+    fn transfer_fail_not_owner() {
+        let alice: AccountId = "alice".parse().unwrap();
+        let bob: AccountId = "bob".parse().unwrap();
+        testing_env!(VMContextBuilder::new()
+            .predecessor_account_id(alice.clone())
+            .build());
+
+        let mut contract = Contract::new(); // since alice is the predecessor during init, alice is the owner
+
+        // internal method calls
+        contract
+            .deposit_to_storage_account(&alice, ONE_NEAR.into())
+            .unwrap();
+        contract
+            .deposit_to_storage_account(&bob, ONE_NEAR.into())
+            .unwrap();
+
+        Nep141Controller::deposit_unchecked(&mut contract, &bob, 100).unwrap();
+
+        testing_env!(VMContextBuilder::new()
+            .predecessor_account_id(bob)
+            .attached_deposit(1)
+            .build());
+        contract.ft_transfer(alice, U128(10), None);
+    }
+}
