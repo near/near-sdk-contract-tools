@@ -30,11 +30,10 @@
 //! * (ERR) Only the proposed owner can call [`Owner::accept_owner`].
 //! * (ERR) The external functions exposed in [`OwnerExternal`] call their
 //!   respective [`Owner`] methods and expect the same invariants.
-#![allow(missing_docs)] // #[ext_contract(...)] does not play nicely with clippy
 
 use near_sdk::{
     borsh::{self, BorshSerialize},
-    env, ext_contract, require, AccountId, BorshStorageKey,
+    env, require, AccountId, BorshStorageKey,
 };
 use near_sdk_contract_tools_macros::event;
 
@@ -101,21 +100,21 @@ pub trait OwnerInternal {
     }
 }
 
-/// A contract with an owner
+/// A contract with an owner.
 pub trait Owner {
-    /// Updates the current owner and emits relevant event
+    /// Updates the current owner and emits relevant event.
     fn update_owner(&mut self, new: Option<AccountId>);
 
-    /// Updates proposed owner and emits relevant event
+    /// Updates proposed owner and emits relevant event.
     fn update_proposed(&mut self, new: Option<AccountId>);
 
-    /// Updates the current owner without any checks or emitting events
+    /// Updates the current owner without any checks or emitting events.
     fn update_owner_unchecked(&mut self, new: Option<AccountId>);
 
-    /// Updates proposed owner without any checks or emitting events
+    /// Updates proposed owner without any checks or emitting events.
     fn update_proposed_unchecked(&mut self, new: Option<AccountId>);
 
-    /// Same as require_owner but as a method
+    /// Same as require_owner but as a method.
     fn assert_owner(&self);
 
     /// Initializes the contract owner. Can only be called once.
@@ -145,7 +144,7 @@ pub trait Owner {
     /// ```
     fn init(&mut self, owner_id: &AccountId);
 
-    /// Requires the predecessor to be the owner
+    /// Requires the predecessor to be the owner.
     ///
     /// # Examples
     ///
@@ -299,29 +298,57 @@ impl<T: OwnerInternal> Owner for T {
     }
 }
 
-/// Externally-accessible functions for `Owner`
-#[ext_contract(ext_owner)]
-pub trait OwnerExternal {
-    /// Returns the account ID of the current owner
-    fn own_get_owner(&self) -> Option<AccountId>;
+pub mod hooks {
+    //! Hooks for integrating the owner component with other components.
 
-    /// Returns the account ID that the current owner has proposed take over ownership
-    fn own_get_proposed_owner(&self) -> Option<AccountId>;
+    use crate::hook::Hook;
 
-    /// Current owner may call this function to renounce ownership, setting
-    /// current owner to `None`.
-    ///
-    /// **WARNING**: Once this function has been called, this implementation
-    /// does not provide a way for the contract to have an owner again!
-    fn own_renounce_owner(&mut self);
+    use super::Owner;
 
-    /// Propose a new owner. Can only be called by the current owner
-    fn own_propose_owner(&mut self, account_id: Option<AccountId>);
+    /// Hook that requires the predecessor to be the owner.
+    pub struct OnlyOwner;
 
-    /// The proposed owner may call this function to accept ownership from the
-    /// previous owner
-    fn own_accept_owner(&mut self);
+    impl<C, A> Hook<C, A> for OnlyOwner
+    where
+        C: Owner,
+    {
+        fn hook<R>(contract: &mut C, _args: &A, f: impl FnOnce(&mut C) -> R) -> R {
+            contract.assert_owner();
+            f(contract)
+        }
+    }
 }
+
+mod ext {
+    #![allow(missing_docs)] // #[ext_contract(...)] does not play nicely with clippy
+
+    use near_sdk::{ext_contract, AccountId};
+
+    /// Externally-accessible functions for `Owner`.
+    #[ext_contract(ext_owner)]
+    pub trait OwnerExternal {
+        /// Returns the account ID of the current owner.
+        fn own_get_owner(&self) -> Option<AccountId>;
+
+        /// Returns the account ID that the current owner has proposed take over ownership.
+        fn own_get_proposed_owner(&self) -> Option<AccountId>;
+
+        /// Current owner may call this function to renounce ownership, setting
+        /// current owner to `None`.
+        ///
+        /// **WARNING**: Once this function has been called, this implementation
+        /// does not provide a way for the contract to have an owner again!
+        fn own_renounce_owner(&mut self);
+
+        /// Propose a new owner. Can only be called by the current owner.
+        fn own_propose_owner(&mut self, account_id: Option<AccountId>);
+
+        /// The proposed owner may call this function to accept ownership from the
+        /// previous owner.
+        fn own_accept_owner(&mut self);
+    }
+}
+pub use ext::*;
 
 #[cfg(test)]
 mod tests {
