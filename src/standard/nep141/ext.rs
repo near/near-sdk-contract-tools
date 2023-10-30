@@ -7,9 +7,9 @@ use near_sdk::{ext_contract, json_types::U128, AccountId, Promise, PromiseOrValu
 #[ext_contract(ext_nep141_receiver)]
 pub trait Nep141Receiver {
     /// Function that is called in an `ft_transfer_call` promise chain.
-    /// Returns the number of tokens "used", that is, those that will be kept
-    /// in the receiving contract's account. (The contract will attempt to
-    /// refund the difference from `amount` to the original sender.)
+    /// Returns the number of unused tokens, that is, those that the receiver
+    /// does not wish to keep. (The contract will attempt to refund the
+    /// difference from `amount` to the original sender.)
     fn ft_on_transfer(
         &mut self,
         sender_id: AccountId,
