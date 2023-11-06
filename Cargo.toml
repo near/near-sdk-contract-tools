@@ -18,7 +18,7 @@ members = [".", "macros", "workspaces-tests", "workspaces-tests-utils"]
 [workspace.package]
 authors = ["Jacob Lindahl <jacob.lindahl@near.org>"]
 edition = "2021"
-license = "GPL-3.0"
+license = "GPL-3.0 OR Apache-2.0"
 repository = "https://github.com/near/near-sdk-contract-tools"
 version = "2.1.0"
 
