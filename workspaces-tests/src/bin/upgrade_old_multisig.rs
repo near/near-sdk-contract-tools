@@ -74,7 +74,7 @@ impl Contract {
 
         Owner::init(&mut contract, &predecessor);
 
-        contract.add_role(predecessor, &Role::Multisig);
+        contract.add_role(&predecessor, &Role::Multisig);
 
         contract
     }

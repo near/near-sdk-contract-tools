@@ -289,7 +289,7 @@ mod tests {
         }
 
         pub fn obtain_multisig_permission(&mut self) {
-            self.add_role(env::predecessor_account_id(), &Role::Multisig);
+            self.add_role(&env::predecessor_account_id(), &Role::Multisig);
         }
 
         pub fn create(&mut self, say_hello: bool) -> u32 {

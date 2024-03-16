@@ -60,7 +60,7 @@ impl Contract {
     pub fn acquire_role(&mut self, role: String) {
         let role: Role = Role::from_str(&role).expect("Invalid role identifier");
         let predecessor = env::predecessor_account_id();
-        self.add_role(predecessor, &role);
+        self.add_role(&predecessor, &role);
     }
 
     pub fn members(&self, role: String) -> Vec<AccountId> {

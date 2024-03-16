@@ -65,7 +65,7 @@ pub fn expand(meta: Nep181Meta) -> Result<TokenStream, darling::Error> {
                     let it = tokens
                         .iter()
                         .skip(from_index)
-                        .map(|token_id| Nep171Controller::load_token(self, token_id).unwrap_or_else(|| {
+                        .map(|token_id| Nep171Controller::load_token(self, &token_id).unwrap_or_else(|| {
                             #near_sdk::env::panic_str(&format!("Inconsistent state: Token `{}` is in the enumeration set but its metadata could not be loaded.", token_id))
                         }));
 
@@ -100,7 +100,7 @@ pub fn expand(meta: Nep181Meta) -> Result<TokenStream, darling::Error> {
                     let it = tokens
                         .iter()
                         .skip(from_index)
-                        .map(|token_id| Nep171Controller::load_token(self, token_id).unwrap_or_else(|| {
+                        .map(|token_id| Nep171Controller::load_token(self, &token_id).unwrap_or_else(|| {
                             #near_sdk::env::panic_str(&format!("Inconsistent state: Token `{}` is in the enumeration set but its metadata could not be loaded.", token_id))
                         }));
 

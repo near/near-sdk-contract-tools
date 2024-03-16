@@ -498,9 +498,9 @@ mod tests {
 
         let mut contract = Contract::new(2);
 
-        contract.add_role(alice.clone(), &Role::Multisig);
-        contract.add_role(bob, &Role::Multisig);
-        contract.add_role(charlie.clone(), &Role::Multisig);
+        contract.add_role(&alice, &Role::Multisig);
+        contract.add_role(&bob, &Role::Multisig);
+        contract.add_role(&charlie, &Role::Multisig);
 
         predecessor(&alice);
         let request_id = contract
@@ -529,7 +529,7 @@ mod tests {
 
         let mut contract = Contract::new(2);
 
-        contract.add_role(alice.clone(), &Role::Multisig);
+        contract.add_role(&alice, &Role::Multisig);
 
         predecessor(&alice);
         let request_id = contract
@@ -548,7 +548,7 @@ mod tests {
 
         let mut contract = Contract::new(2);
 
-        contract.add_role(alice.clone(), &Role::Multisig);
+        contract.add_role(&alice, &Role::Multisig);
 
         predecessor(&alice);
 
@@ -568,8 +568,8 @@ mod tests {
 
         let mut contract = Contract::new(2);
 
-        contract.add_role(alice.clone(), &Role::Multisig);
-        contract.add_role(bob.clone(), &Role::Multisig);
+        contract.add_role(&alice, &Role::Multisig);
+        contract.add_role(&bob, &Role::Multisig);
 
         predecessor(&alice);
 
@@ -592,9 +592,9 @@ mod tests {
 
         let mut contract = Contract::new(2);
 
-        contract.add_role(alice.clone(), &Role::Multisig);
-        contract.add_role(bob.clone(), &Role::Multisig);
-        contract.add_role(charlie.clone(), &Role::Multisig);
+        contract.add_role(&alice, &Role::Multisig);
+        contract.add_role(&bob, &Role::Multisig);
+        contract.add_role(&charlie, &Role::Multisig);
 
         predecessor(&alice);
         let request_id = contract

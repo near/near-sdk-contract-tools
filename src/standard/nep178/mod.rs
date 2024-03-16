@@ -4,7 +4,7 @@
 use std::{collections::HashMap, error::Error};
 
 compat_use_borsh!();
-use near_sdk::{store::UnorderedMap, AccountId, BorshStorageKey};
+use near_sdk::{collections::UnorderedMap, AccountId, BorshStorageKey};
 
 use crate::{
     hook::Hook,
@@ -29,7 +29,7 @@ pub use ext::*;
 /// Type for approval IDs.
 pub type ApprovalId = u32;
 /// Maximum number of approvals per token.
-pub const MAX_APPROVALS: ApprovalId = 32;
+pub const MAX_APPROVALS: u64 = 32;
 
 compat_derive_borsh! {
     /// NFT token approvals. Hooks are implemented on this struct.
@@ -200,7 +200,7 @@ impl<T: Nep178ControllerInternal + Nep171Controller> Nep178Controller for T {
             accounts: UnorderedMap::new(Self::slot_token_approvals_unordered_map(token_id)),
         });
         let approval_id = approvals.next_approval_id;
-        approvals.accounts.insert(account_id.clone(), approval_id);
+        approvals.accounts.insert(account_id, &approval_id);
         approvals.next_approval_id += 1; // overflow unrealistic
         slot.write(&approvals);
 
@@ -231,7 +231,7 @@ impl<T: Nep178ControllerInternal + Nep171Controller> Nep178Controller for T {
         }
 
         let approval_id = approvals.next_approval_id;
-        if approvals.accounts.contains_key(action.account_id) {
+        if approvals.accounts.get(action.account_id).is_some() {
             return Err(AccountAlreadyApprovedError {
                 token_id: action.token_id.clone(),
                 account_id: action.account_id.clone(),
@@ -240,10 +240,7 @@ impl<T: Nep178ControllerInternal + Nep171Controller> Nep178Controller for T {
         }
 
         Self::ApproveHook::hook(self, action, |_| {
-            approvals
-                .accounts
-                .insert(action.account_id.clone(), approval_id);
-            approvals.accounts.flush();
+            approvals.accounts.insert(action.account_id, &approval_id);
             approvals.next_approval_id += 1; // overflow unrealistic
             slot.write(&approvals);
 
@@ -281,7 +278,7 @@ impl<T: Nep178ControllerInternal + Nep171Controller> Nep178Controller for T {
             account_id: action.account_id.clone(),
         })?;
 
-        if !approvals.accounts.contains_key(action.account_id) {
+        if approvals.accounts.get(action.account_id).is_none() {
             return Err(AccountNotApprovedError {
                 token_id: action.token_id.clone(),
                 account_id: action.account_id.clone(),
@@ -291,7 +288,6 @@ impl<T: Nep178ControllerInternal + Nep171Controller> Nep178Controller for T {
 
         Self::RevokeHook::hook(self, action, |_| {
             approvals.accounts.remove(action.account_id);
-            approvals.accounts.flush();
             slot.write(&approvals);
 
             Ok(())
@@ -324,7 +320,6 @@ impl<T: Nep178ControllerInternal + Nep171Controller> Nep178Controller for T {
 
         if !approvals.accounts.is_empty() {
             approvals.accounts.clear();
-            approvals.accounts.flush();
             slot.write(&approvals);
         }
     }
@@ -337,7 +332,7 @@ impl<T: Nep178ControllerInternal + Nep171Controller> Nep178Controller for T {
         let slot = Self::slot_token_approvals(token_id);
         let approvals = slot.read()?;
 
-        approvals.accounts.get(account_id).copied()
+        approvals.accounts.get(account_id)
     }
 
     fn get_approvals_for(&self, token_id: &TokenId) -> HashMap<AccountId, ApprovalId> {
@@ -350,7 +345,7 @@ impl<T: Nep178ControllerInternal + Nep171Controller> Nep178Controller for T {
         approvals
             .accounts
             .into_iter()
-            .map(|(k, v)| (k.clone(), *v))
+            .map(|(k, v)| (k.clone(), v))
             .collect()
     }
 }

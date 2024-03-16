@@ -5,7 +5,7 @@ use std::borrow::Cow;
 
 #[cfg(feature = "near-sdk-4")]
 use near_sdk::borsh;
-use near_sdk::{borsh::BorshSerialize, env, store::UnorderedSet, AccountId, BorshStorageKey};
+use near_sdk::{borsh::BorshSerialize, env, collections::UnorderedSet, AccountId, BorshStorageKey};
 
 use crate::{hook::Hook, slot::Slot, standard::nep171::*, DefaultStorageKey};
 

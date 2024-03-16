@@ -21,7 +21,7 @@ where
         f: impl FnOnce(&mut C) -> R,
     ) -> R {
         let token_ids = contract.with_tokens_for_owner(action.account_id, |t| {
-            t.into_iter().cloned().collect::<Vec<_>>()
+            t.iter().collect::<Vec<_>>()
         });
 
         contract

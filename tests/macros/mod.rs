@@ -72,8 +72,8 @@ mod integration {
             let mut contract = Self { value: 0 };
 
             Owner::init(&mut contract, &owner_id);
-            contract.add_role(owner_id.clone(), &Role::CanSetValue);
-            contract.add_role(owner_id.clone(), &Role::CanPause);
+            contract.add_role(&owner_id, &Role::CanSetValue);
+            contract.add_role(&owner_id, &Role::CanPause);
 
             contract
         }
@@ -81,7 +81,7 @@ mod integration {
         pub fn add_value_setter(&mut self, account_id: AccountId) {
             Self::require_owner();
 
-            self.add_role(account_id.clone(), &Role::CanSetValue);
+            self.add_role(&account_id, &Role::CanSetValue);
 
             my_event::PermissionGranted { to: account_id }.emit();
         }
@@ -160,7 +160,7 @@ impl MigrateIntegration {
     pub fn add_value_setter(&mut self, account_id: AccountId) {
         Self::require_owner();
 
-        self.add_role(account_id.clone(), &Role::CanSetValue);
+        self.add_role(&account_id, &Role::CanSetValue);
 
         my_event::PermissionGranted { to: account_id }.emit();
     }
