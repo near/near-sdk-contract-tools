@@ -1,49 +1,54 @@
-use near_sdk::{
-    borsh::{self, BorshDeserialize, BorshSerialize},
-    env, near_bindgen,
-};
+compat_use_borsh!();
+use near_sdk::{env, near_bindgen};
 use near_sdk_contract_tools::{
-    migrate::{MigrateExternal, MigrateHook},
-    Migrate,
+    compat_derive_borsh, compat_use_borsh, migrate::MigrateHook, Migrate,
 };
 
-#[derive(BorshDeserialize, BorshSerialize, Debug)]
-#[near_bindgen]
-struct Old {
-    pub foo: u64,
-}
+mod old {
+    use super::*;
 
-#[near_bindgen]
-impl Old {
-    #[init]
-    pub fn new(foo: u64) -> Self {
-        Self { foo }
+    compat_derive_borsh! {
+        #[derive(Debug)]
+        #[near_bindgen]
+        pub struct Old {
+            pub foo: u64,
+        }
+    }
+
+    #[near_bindgen]
+    impl Old {
+        #[init]
+        pub fn new(foo: u64) -> Self {
+            Self { foo }
+        }
     }
 }
 
-#[derive(Migrate, BorshSerialize, BorshDeserialize)]
-#[migrate(from = "Old")]
-#[near_bindgen]
-struct MyContract {
-    pub bar: u64,
+compat_derive_borsh! {
+    #[derive(Migrate)]
+    #[migrate(from = "old::Old")]
+    #[near_bindgen]
+    struct MyContract {
+        pub bar: u64,
+    }
 }
 
 impl MigrateHook for MyContract {
-    fn on_migrate(old: Old) -> Self {
+    fn on_migrate(old: old::Old) -> Self {
         Self { bar: old.foo }
     }
 }
 
 #[test]
 fn default_from() {
-    let old = Old::new(99);
+    let old = old::Old::new(99);
 
     // This is done automatically in real #[near_bindgen] WASM contracts
     env::state_write(&old);
 
     assert_eq!(old.foo, 99);
 
-    let migrated = <MyContract as MigrateExternal>::migrate();
+    let migrated = MyContract::migrate();
 
     assert_eq!(migrated.bar, 99);
 }

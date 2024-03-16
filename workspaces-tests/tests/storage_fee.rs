@@ -1,6 +1,7 @@
-#![cfg(not(windows))]
+workspaces_tests::near_sdk!();
 
-use near_sdk::{json_types::U128, serde_json::json, ONE_NEAR};
+use near_sdk::{json_types::U128, serde_json::json};
+use near_sdk_contract_tools::{compat_near_to_u128, COMPAT_ONE_NEAR};
 use near_workspaces::{sandbox, Account, Contract, DevNetwork, Worker};
 
 const WASM: &[u8] = include_bytes!("../../target/wasm32-unknown-unknown/release/storage_fee.wasm");
@@ -48,7 +49,9 @@ async fn storage_fee() {
         .unwrap()
         .0;
 
-    let num_bytes: usize = (ONE_NEAR / byte_cost).try_into().unwrap();
+    let num_bytes: usize = compat_near_to_u128!(COMPAT_ONE_NEAR.saturating_div(byte_cost))
+        .try_into()
+        .unwrap();
     let payload = "0".repeat(num_bytes);
     // This is the absolute minimum this payload should require to store (uncompressed)
     let minimum_storage_fee = num_bytes as u128 * byte_cost;
@@ -62,7 +65,7 @@ async fn storage_fee() {
             .args_json(json!({
                 "item": payload,
             }))
-            .deposit(ONE_NEAR * 10) // Should receive back about 9 NEAR as refund
+            .deposit(compat_near_to_u128!(COMPAT_ONE_NEAR.saturating_mul(10))) // Should receive back about 9 NEAR as refund
             .transact()
             .await
             .unwrap()

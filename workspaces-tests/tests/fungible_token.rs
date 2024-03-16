@@ -1,11 +1,11 @@
-#![cfg(not(windows))]
+workspaces_tests::near_sdk!();
 
 use near_sdk::{
     json_types::{Base64VecU8, U128},
     serde_json::json,
-    ONE_NEAR,
 };
 use near_sdk_contract_tools::{
+    compat_near, compat_near_to_u128,
     nft::StorageBalance,
     standard::{
         nep141::{FtTransferData, Nep141Event},
@@ -62,7 +62,7 @@ async fn setup_balances(num_accounts: usize, amount: impl Fn(usize) -> U128) -> 
             .call(
                 Function::new("storage_deposit")
                     .args_json(json!({}))
-                    .deposit(ONE_NEAR / 100),
+                    .deposit(compat_near_to_u128!(compat_near!(1u128).saturating_div(100))),
             )
             .call(Function::new("mint").args_json(json!({ "amount": amount(i) })))
             .transact();

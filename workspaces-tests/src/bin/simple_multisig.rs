@@ -1,35 +1,34 @@
 #![allow(missing_docs)]
 
-// Ignore
-pub fn main() {}
+workspaces_tests::predicate!();
 
 use std::fmt::Display;
 
-use near_sdk::{
-    borsh::{self, BorshDeserialize, BorshSerialize},
-    env, near_bindgen, AccountId, BorshStorageKey, PanicOnDefault,
-};
+use near_sdk::{env, near_bindgen, AccountId, BorshStorageKey, PanicOnDefault};
 use near_sdk_contract_tools::{
     approval::{
         self,
         simple_multisig::{AccountAuthorizer, ApprovalState, Configuration},
         ApprovalManager, ApprovalManagerInternal,
     },
+    compat_derive_borsh, compat_derive_storage_key,
     rbac::Rbac,
     slot::Slot,
     Rbac,
 };
 use thiserror::Error;
 
-#[derive(BorshSerialize, BorshStorageKey)]
-enum StorageKey {
-    SimpleMultisig,
+compat_derive_storage_key! {
+    enum StorageKey {
+        SimpleMultisig,
+    }
 }
 
-#[derive(BorshSerialize, BorshDeserialize)]
-enum MyAction {
-    SayHello,
-    SayGoodbye,
+compat_derive_borsh! {
+    enum MyAction {
+        SayHello,
+        SayGoodbye,
+    }
 }
 
 impl approval::Action<Contract> for MyAction {
@@ -43,15 +42,19 @@ impl approval::Action<Contract> for MyAction {
     }
 }
 
-#[derive(Debug, Clone, BorshSerialize, BorshStorageKey)]
-pub enum Role {
-    Multisig,
+compat_derive_storage_key! {
+    #[derive(Debug, Clone)]
+    pub enum Role {
+        Multisig,
+    }
 }
 
-#[derive(PanicOnDefault, BorshSerialize, BorshDeserialize, Rbac)]
-#[rbac(roles = "Role")]
-#[near_bindgen]
-pub struct Contract {}
+compat_derive_borsh! {
+    #[derive(PanicOnDefault, Rbac)]
+    #[rbac(roles = "Role")]
+    #[near_bindgen]
+    pub struct Contract {}
+}
 
 // This single function implementation completely implements simple multisig on
 // the contract

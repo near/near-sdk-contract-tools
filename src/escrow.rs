@@ -12,22 +12,17 @@
 //! You can change the key this is stored under by providing [storage_key] to the macro.
 use crate::{event, standard::nep297::Event};
 use crate::{slot::Slot, DefaultStorageKey};
-use near_sdk::{
-    borsh::BorshSerialize,
-    borsh::{self, BorshDeserialize},
-    env::panic_str,
-    require,
-    serde::Serialize,
-    BorshStorageKey,
-};
+compat_use_borsh!();
+use near_sdk::{env::panic_str, require, serde::Serialize, BorshStorageKey};
 
 const ESCROW_ALREADY_LOCKED_MESSAGE: &str = "Already locked";
 const ESCROW_NOT_LOCKED_MESSAGE: &str = "Lock required";
 const ESCROW_UNLOCK_HANDLER_FAILED_MESSAGE: &str = "Unlock handler failed";
 
-#[derive(BorshSerialize, BorshStorageKey)]
-enum StorageKey<'a, T> {
-    Locked(&'a T),
+compat_derive_storage_key! {
+    enum StorageKey<'a, T> {
+        Locked(&'a T),
+    }
 }
 
 /// Emit the state of an escrow lock and whether it was locked or unlocked
@@ -165,14 +160,12 @@ where
 mod tests {
     use super::Escrow;
     use crate::escrow::EscrowInternal;
-    use near_sdk::{
-        near_bindgen, test_utils::VMContextBuilder, testing_env, AccountId, Balance, VMContext,
-        ONE_YOCTO,
-    };
+    use near_sdk::{near_bindgen, test_utils::VMContextBuilder, testing_env, AccountId, VMContext};
     use near_sdk_contract_tools_macros::Escrow;
 
     const ID: u64 = 1;
     const IS_NOT_READY: bool = false;
+    const ONE_YOCTO: u128 = 1;
 
     #[derive(Escrow)]
     #[escrow(id = "u64", state = "bool", crate = "crate")]
@@ -191,11 +184,11 @@ mod tests {
         "alice".parse().unwrap()
     }
 
-    fn get_context(attached_deposit: Balance, signer: Option<AccountId>) -> VMContext {
+    fn get_context(attached_deposit: u128, signer: Option<AccountId>) -> VMContext {
         VMContextBuilder::new()
             .signer_account_id(signer.clone().unwrap_or_else(alice))
             .predecessor_account_id(signer.unwrap_or_else(alice))
-            .attached_deposit(attached_deposit)
+            .attached_deposit(compat_yoctonear!(attached_deposit))
             .is_view(false)
             .build()
     }

@@ -1,9 +1,8 @@
-#![cfg(not(windows))]
+workspaces_tests::near_sdk!();
+compat_use_borsh!(BorshSerialize);
 
-use near_sdk::{
-    borsh::{self, BorshSerialize},
-    serde::Serialize,
-};
+use near_sdk::serde::Serialize;
+use near_sdk_contract_tools::{compat_borsh_serialize, compat_derive_borsh, compat_use_borsh};
 use near_workspaces::{Account, Contract};
 use pretty_assertions::assert_eq;
 
@@ -25,9 +24,10 @@ const BAD_WASM: &[u8] =
 const RANDOM_WASM: &[u8] =
     include_bytes!("../../target/wasm32-unknown-unknown/release/counter_multisig.wasm");
 
-#[derive(BorshSerialize)]
-struct ArgsBorsh {
-    pub code: Vec<u8>,
+compat_derive_borsh! {[BorshSerialize],
+    struct ArgsBorsh {
+        pub code: Vec<u8>,
+    }
 }
 
 #[derive(Serialize)]
@@ -105,10 +105,9 @@ async fn perform_upgrade_test(wasm: &[u8], args: Vec<u8>) {
 async fn upgrade_borsh() {
     perform_upgrade_test(
         WASM_BORSH,
-        ArgsBorsh {
+        compat_borsh_serialize!(&ArgsBorsh {
             code: NEW_WASM.to_vec(),
-        }
-        .try_to_vec()
+        })
         .unwrap(),
     )
     .await;
@@ -194,10 +193,9 @@ async fn fail_owner(wasm: &[u8], args: Vec<u8>) {
 async fn upgrade_failure_not_owner_borsh() {
     fail_owner(
         WASM_BORSH,
-        ArgsBorsh {
+        compat_borsh_serialize!(&ArgsBorsh {
             code: NEW_WASM.to_vec(),
-        }
-        .try_to_vec()
+        })
         .unwrap(),
     )
     .await;

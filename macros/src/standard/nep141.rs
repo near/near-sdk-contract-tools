@@ -129,14 +129,13 @@ pub fn expand(meta: Nep141Meta) -> Result<TokenStream, darling::Error> {
                 Nep141Controller::transfer(self, &transfer)
                     .unwrap_or_else(|e| #near_sdk::env::panic_str(&e.to_string()));
 
-                let receiver_gas = prepaid_gas
-                    .0
-                    .checked_sub(GAS_FOR_FT_TRANSFER_CALL.0)
+                let receiver_gas = #me::compat_gas_to_u64!(prepaid_gas)
+                    .checked_sub(#me::compat_gas_to_u64!(GAS_FOR_FT_TRANSFER_CALL))
                     .unwrap_or_else(|| #near_sdk::env::panic_str("Prepaid gas underflow."));
 
                 // Initiating receiver's call and the callback
                 ext_nep141_receiver::ext(transfer.receiver_id.clone())
-                    .with_static_gas(receiver_gas.into())
+                    .with_static_gas(#me::compat_gas!(receiver_gas))
                     .ft_on_transfer(transfer.sender_id.clone(), transfer.amount.into(), msg.clone())
                     .then(
                         ext_nep141_resolver::ext(#near_sdk::env::current_account_id())
@@ -175,7 +174,6 @@ pub fn expand(meta: Nep141Meta) -> Result<TokenStream, darling::Error> {
                 let ft_on_transfer_promise_result = env::promise_result(0);
 
                 let unused_amount = match ft_on_transfer_promise_result {
-                    PromiseResult::NotReady => env::abort(),
                     PromiseResult::Successful(value) => {
                         if let Ok(U128(unused_amount)) = serde_json::from_slice::<U128>(&value) {
                             std::cmp::min(amount, unused_amount)
@@ -184,6 +182,7 @@ pub fn expand(meta: Nep141Meta) -> Result<TokenStream, darling::Error> {
                         }
                     }
                     PromiseResult::Failed => amount,
+                    _ => env::abort(),
                 };
 
                 let refunded_amount = if unused_amount > 0 {

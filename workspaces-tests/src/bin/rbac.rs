@@ -1,24 +1,22 @@
 #![allow(missing_docs)]
 
+workspaces_tests::predicate!();
+
 use std::str::FromStr;
 
-use near_sdk_contract_tools::{rbac::Rbac, Rbac};
-
-use near_sdk::{
-    borsh::{self, BorshDeserialize, BorshSerialize},
-    env, near_bindgen,
-    serde::Serialize,
-    AccountId, BorshStorageKey, PanicOnDefault,
+use near_sdk_contract_tools::{
+    compat_derive_serde_borsh, compat_derive_storage_key, rbac::Rbac, Rbac,
 };
 
-pub fn main() {}
+use near_sdk::{env, near_bindgen, serde::Serialize, AccountId, BorshStorageKey, PanicOnDefault};
 
-#[derive(BorshSerialize, BorshStorageKey)]
-pub enum Role {
-    Alpha,
-    Beta,
-    Gamma,
-    Delta,
+compat_derive_storage_key! {
+    pub enum Role {
+        Alpha,
+        Beta,
+        Gamma,
+        Delta,
+    }
 }
 
 impl FromStr for Role {
@@ -35,15 +33,16 @@ impl FromStr for Role {
     }
 }
 
-#[derive(BorshSerialize, BorshDeserialize, Serialize, PanicOnDefault, Rbac)]
-#[rbac(roles = "Role")]
-#[serde(crate = "near_sdk::serde")]
-#[near_bindgen]
-pub struct Contract {
-    pub alpha: u32,
-    pub beta: u32,
-    pub gamma: u32,
-    pub delta: u32,
+compat_derive_serde_borsh! {[BorshSerialize, BorshDeserialize, Serialize],
+    #[derive(PanicOnDefault, Rbac)]
+    #[rbac(roles = "Role")]
+    #[near_bindgen]
+    pub struct Contract {
+        pub alpha: u32,
+        pub beta: u32,
+        pub gamma: u32,
+        pub delta: u32,
+    }
 }
 
 #[near_bindgen]
@@ -94,7 +93,7 @@ impl Contract {
         self.delta += 1;
     }
 
-    pub fn get(&self) -> &Self {
-        self
+    pub fn get(&self) -> near_sdk::serde_json::Value {
+        near_sdk::serde_json::to_value(self).unwrap()
     }
 }

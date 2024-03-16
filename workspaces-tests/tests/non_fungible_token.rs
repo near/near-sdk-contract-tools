@@ -1,19 +1,24 @@
-#![cfg(not(windows))]
+workspaces_tests::near_sdk!();
 
 use std::collections::HashMap;
 
-use near_sdk::{json_types::U128, serde_json::json, ONE_NEAR};
-use near_sdk_contract_tools::standard::{
-    nep171::{
-        self,
-        event::{Nep171Event, NftTransferLog},
-        Token,
+use near_sdk::{json_types::U128, serde_json::json};
+use near_sdk_contract_tools::{
+    compat_near_to_u128,
+    standard::{
+        nep171::{
+            self,
+            event::{Nep171Event, NftTransferLog},
+            Token,
+        },
+        nep177::{self, TokenMetadata},
+        nep178::error::{
+            AccountAlreadyApprovedError, Nep178ApproveError, TooManyApprovalsError,
+            UnauthorizedError,
+        },
+        nep297::Event,
     },
-    nep177::{self, TokenMetadata},
-    nep178::error::{
-        AccountAlreadyApprovedError, Nep178ApproveError, TooManyApprovalsError, UnauthorizedError,
-    },
-    nep297::Event,
+    COMPAT_ONE_NEAR,
 };
 use near_workspaces::{operations::Function, types::Gas};
 use pretty_assertions::assert_eq;
@@ -62,7 +67,7 @@ async fn setup_balances(
             account.batch(s.contract.id()).call(
                 Function::new("storage_deposit")
                     .args_json(json!({}))
-                    .deposit(ONE_NEAR / 100),
+                    .deposit(compat_near_to_u128!(COMPAT_ONE_NEAR.saturating_div(100))),
             )
         } else {
             account.batch(s.contract.id())

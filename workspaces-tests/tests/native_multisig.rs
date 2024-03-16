@@ -1,10 +1,13 @@
-#![cfg(not(windows))]
+workspaces_tests::near_sdk!();
 
 use std::{future::IntoFuture, time::Duration};
 
 use near_crypto::{KeyType, SecretKey};
-use near_sdk::{serde_json::json, Gas, ONE_NEAR};
-use near_sdk_contract_tools::approval::native_transaction_action::PromiseAction;
+use near_sdk::serde_json::json;
+use near_sdk_contract_tools::{
+    approval::native_transaction_action::PromiseAction, compat_gas_to_u64, compat_near_to_u128,
+    COMPAT_ONE_NEAR, COMPAT_ONE_TERAGAS,
+};
 use near_workspaces::{
     result::{ExecutionResult, Value},
     sandbox,
@@ -236,7 +239,7 @@ async fn create_account_transfer_deploy_contract_function_call() {
             "receiver_id": new_account_id_str.clone(),
             "actions": [
                 PromiseAction::CreateAccount,
-                PromiseAction::Transfer { amount: (ONE_NEAR * 30).into() },
+                PromiseAction::Transfer { amount: compat_near_to_u128!(COMPAT_ONE_NEAR.saturating_mul(30)).into() },
                 PromiseAction::DeployContract { code: BASIC_ADDER_WASM.to_vec().into() },
                 PromiseAction::FunctionCall { function_name: "new".into(), arguments: vec![].into(), amount: 0.into(), gas: 1_000_000_000_000.into() }
             ],
@@ -251,7 +254,7 @@ async fn create_account_transfer_deploy_contract_function_call() {
     double_approve_and_execute(&contract, alice, bob, alice, request_id).await;
 
     let state = worker.view_account(&new_account_id).await.unwrap();
-    assert!(state.balance >= ONE_NEAR * 30);
+    assert!(state.balance >= compat_near_to_u128!(COMPAT_ONE_NEAR.saturating_mul(30)));
 
     let result = worker
         .view(&new_account_id, "add_five")
@@ -479,7 +482,7 @@ async fn transfer() {
             "receiver_id": charlie.id(),
             "actions": [
                 PromiseAction::Transfer {
-                    amount: (near_sdk::ONE_NEAR * 10).into(),
+                    amount: compat_near_to_u128!(COMPAT_ONE_NEAR.saturating_mul(10)).into(),
                 },
             ],
         }))
@@ -543,7 +546,10 @@ async fn transfer() {
     let balance_after = charlie.view_account().await.unwrap().balance;
 
     // charlie's balance should have increased by exactly 10 NEAR
-    assert_eq!(balance_after - balance_before, near_sdk::ONE_NEAR * 10);
+    assert_eq!(
+        balance_after - balance_before,
+        compat_near_to_u128!(COMPAT_ONE_NEAR.saturating_mul(10)),
+    );
 }
 
 #[tokio::test]
@@ -564,7 +570,9 @@ async fn reflexive_xcc() {
             .to_vec()
             .into(),
         amount: 0.into(),
-        gas: (Gas::ONE_TERA.0 * 50).into(),
+        gas: compat_gas_to_u64!(*COMPAT_ONE_TERAGAS)
+            .saturating_mul(50)
+            .into(),
     }];
 
     let request_id = alice
@@ -636,7 +644,9 @@ async fn external_xcc() {
             .to_vec()
             .into(),
         amount: 0.into(),
-        gas: (Gas::ONE_TERA.0 * 50).into(),
+        gas: compat_gas_to_u64!(*COMPAT_ONE_TERAGAS)
+            .saturating_mul(50)
+            .into(),
     }];
 
     let request_id = alice

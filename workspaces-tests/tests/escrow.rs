@@ -1,4 +1,4 @@
-#![cfg(not(windows))]
+workspaces_tests::near_sdk!();
 
 use near_sdk::{
     serde::{Deserialize, Serialize},

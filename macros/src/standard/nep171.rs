@@ -194,7 +194,10 @@ pub fn expand(meta: Nep171Meta) -> Result<TokenStream, darling::Error> {
                 let [token_id] = token_ids;
 
                 ext_nep171_receiver::ext(receiver_id.clone())
-                    .with_static_gas(#near_sdk::env::prepaid_gas() - GAS_FOR_NFT_TRANSFER_CALL)
+                    .with_static_gas(#me::compat_gas!(
+                        #me::compat_gas_to_u64!(#near_sdk::env::prepaid_gas())
+                            .saturating_sub(#me::compat_gas_to_u64!(GAS_FOR_NFT_TRANSFER_CALL))
+                    ))
                     .nft_on_transfer(
                         sender_id.clone(),
                         sender_id.clone(),

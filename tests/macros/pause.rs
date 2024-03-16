@@ -1,20 +1,24 @@
-use near_sdk::{
-    borsh::{self, BorshSerialize},
-    near_bindgen, BorshStorageKey,
-};
+compat_use_borsh!(BorshSerialize);
+use near_sdk::{near_bindgen, BorshStorageKey};
 use near_sdk_contract_tools::{
+    compat_derive_storage_key, compat_use_borsh,
     pause::{Pause, PauseExternal},
     Pause,
 };
 
-#[derive(BorshSerialize, BorshStorageKey)]
-enum StorageKey {
-    Pause,
+compat_derive_storage_key! {
+    enum StorageKey {
+        Pause,
+    }
 }
 
-#[derive(Pause)]
-#[near_bindgen]
-struct ContractImplicitKey {}
+mod implicit_key {
+    use super::*;
+
+    #[derive(Pause)]
+    #[near_bindgen]
+    struct ContractImplicitKey {}
+}
 
 #[derive(Pause)]
 #[pause(storage_key = "StorageKey::Pause")]

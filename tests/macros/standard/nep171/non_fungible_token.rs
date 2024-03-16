@@ -1,19 +1,20 @@
-use near_sdk::{
-    borsh::{self, BorshDeserialize, BorshSerialize},
-    env, near_bindgen, PanicOnDefault,
-};
+compat_use_borsh!();
+use near_sdk::{env, near_bindgen, PanicOnDefault};
 use near_sdk_contract_tools::{
+    compat_derive_borsh, compat_use_borsh,
     nft::*,
     owner::Owner,
     pause::{hooks::PausableHook, Pause},
     Owner, Pause,
 };
 
-#[derive(BorshSerialize, BorshDeserialize, PanicOnDefault, NonFungibleToken, Pause, Owner)]
-#[non_fungible_token(transfer_hook = "PausableHook")]
-#[near_bindgen]
-pub struct Contract {
-    next_token_id: u32,
+compat_derive_borsh! {
+    #[derive(PanicOnDefault, NonFungibleToken, Pause, Owner)]
+    #[non_fungible_token(transfer_hook = "PausableHook")]
+    #[near_bindgen]
+    pub struct Contract {
+        next_token_id: u32,
+    }
 }
 
 #[near_bindgen]

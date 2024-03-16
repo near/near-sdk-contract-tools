@@ -24,9 +24,11 @@ version = "2.1.0"
 
 [workspace.dependencies]
 # normal dependencies
-near-sdk = { version = "4.1.1", default-features = false }
+near-sdk-4 = { package = "near-sdk", version = "4.1.1", default-features = false }
+near-sdk-5 = { package = "near-sdk", version = "5.0.0-alpha.2", default-features = false }
 near-sdk-contract-tools-macros = { version = "=2.1.0", path = "./macros" }
 thiserror = "1"
+once_cell = "1"
 
 # macro dependencies
 darling = "0.20"
@@ -44,21 +46,30 @@ pretty_assertions = "1"
 tokio = "1"
 
 [dependencies]
-near-sdk.workspace = true
+near-sdk-4 = { workspace = true, default-features = false, optional = true }
+near-sdk-5 = { workspace = true, default-features = false, optional = true }
 near-sdk-contract-tools-macros.workspace = true
+once_cell.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
-near-sdk = { workspace = true, default-features = false, features = [
+near-sdk-4 = { workspace = true, default-features = false, features = [
+  "unit-testing",
+  "legacy",
+] }
+near-sdk-5 = { workspace = true, default-features = false, features = [
   "unit-testing",
   "legacy",
 ] }
 
 [features]
-unstable = ["near-sdk/unstable"]
+default = ["near-sdk-5"]
+near-sdk-4 = ["dep:near-sdk-4"]
+near-sdk-5 = ["dep:near-sdk-5"]
+unstable = ["near-sdk-4?/unstable", "near-sdk-5?/unstable"]
 
 [package.metadata.docs.rs]
-all-features = true
+features = ["unstable"]
 rustdoc-args = ["--cfg", "docsrs"]
 
 [profile.release]

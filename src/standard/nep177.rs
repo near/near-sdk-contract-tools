@@ -3,8 +3,10 @@
 //! Reference: <https://github.com/near/NEPs/blob/master/neps/nep-0177.md>
 use std::error::Error;
 
+#[cfg(feature = "near-sdk-4")]
+use near_sdk::borsh;
 use near_sdk::{
-    borsh::{self, BorshDeserialize, BorshSerialize},
+    borsh::{BorshDeserialize, BorshSerialize},
     env,
     json_types::U64,
     serde::*,
@@ -30,35 +32,32 @@ pub use ext::*;
 
 const CONTRACT_METADATA_NOT_INITIALIZED_ERROR: &str = "Contract metadata not initialized";
 
-/// Non-fungible token contract metadata.
-#[derive(
-    Serialize,
-    Deserialize,
-    BorshSerialize,
-    BorshDeserialize,
-    Clone,
-    Debug,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-)]
-#[serde(crate = "near_sdk::serde")]
-pub struct ContractMetadata {
-    /// The metadata specification version. Essentially a version like "nft-2.0.0", replacing "2.0.0" with the implemented version of NEP-177.
-    pub spec: String,
-    /// The name of the NFT contract, e.g. "Mochi Rising — Digital Edition" or "Metaverse 3".
-    pub name: String,
-    /// The symbol of the NFT contract, e.g. "MOCHI" or "M3".
-    pub symbol: String,
-    /// Data URI for the contract icon.
-    pub icon: Option<String>,
-    /// Gateway known to have reliable access to decentralized storage assets referenced by `reference` or `media` URLs.
-    pub base_uri: Option<String>,
-    /// URL to a JSON file with more info about the NFT contract.
-    pub reference: Option<String>,
-    /// Base-64-encoded SHA-256 hash of the referenced JSON file. Required if `reference` is present.
-    pub reference_hash: Option<String>,
+compat_derive_serde_borsh! {
+    /// Non-fungible token contract metadata.
+    #[derive(
+        Clone,
+        Debug,
+        PartialEq,
+        Eq,
+        PartialOrd,
+        Ord,
+    )]
+    pub struct ContractMetadata {
+        /// The metadata specification version. Essentially a version like "nft-2.0.0", replacing "2.0.0" with the implemented version of NEP-177.
+        pub spec: String,
+        /// The name of the NFT contract, e.g. "Mochi Rising — Digital Edition" or "Metaverse 3".
+        pub name: String,
+        /// The symbol of the NFT contract, e.g. "MOCHI" or "M3".
+        pub symbol: String,
+        /// Data URI for the contract icon.
+        pub icon: Option<String>,
+        /// Gateway known to have reliable access to decentralized storage assets referenced by `reference` or `media` URLs.
+        pub base_uri: Option<String>,
+        /// URL to a JSON file with more info about the NFT contract.
+        pub reference: Option<String>,
+        /// Base-64-encoded SHA-256 hash of the referenced JSON file. Required if `reference` is present.
+        pub reference_hash: Option<String>,
+    }
 }
 
 impl ContractMetadata {
@@ -80,46 +79,43 @@ impl ContractMetadata {
     }
 }
 
-/// Non-fungible token metadata.
-#[derive(
-    Serialize,
-    Deserialize,
-    BorshSerialize,
-    BorshDeserialize,
-    Clone,
-    Debug,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Default,
-)]
-#[serde(crate = "near_sdk::serde")]
-pub struct TokenMetadata {
-    /// This token's title, e.g. "Arch Nemesis: Mail Carrier" or "Parcel #5055".
-    pub title: Option<String>,
-    /// Free-text description of this specific token.
-    pub description: Option<String>,
-    /// The token's image or other associated media.
-    pub media: Option<String>,
-    /// Base-64-encoded SHA-256 hash of the media. Required if `media` is present.
-    pub media_hash: Option<String>,
-    /// Number of copies of this set of metadata in existence when token was minted.
-    pub copies: Option<U64>,
-    /// When the token was issued, in milliseconds since the UNIX epoch.
-    pub issued_at: Option<U64>,
-    /// When the token expires, in milliseconds since the UNIX epoch.
-    pub expires_at: Option<U64>,
-    /// When the token starts being valid, in milliseconds since the UNIX epoch.
-    pub starts_at: Option<U64>,
-    /// When the token was last updated, in milliseconds since the UNIX epoch.
-    pub updated_at: Option<U64>,
-    /// Anything extra the NFT wants to store on-chain. Can be stringified JSON.
-    pub extra: Option<String>,
-    /// URL to an off-chain JSON file with more info about the token.
-    pub reference: Option<String>,
-    /// Base-64-encoded SHA-256 hash of the referenced JSON file. Required if `reference` is present.
-    pub reference_hash: Option<String>,
+compat_derive_serde_borsh! {
+    /// Non-fungible token metadata.
+    #[derive(
+        Clone,
+        Debug,
+        PartialEq,
+        Eq,
+        PartialOrd,
+        Ord,
+        Default,
+    )]
+    pub struct TokenMetadata {
+        /// This token's title, e.g. "Arch Nemesis: Mail Carrier" or "Parcel #5055".
+        pub title: Option<String>,
+        /// Free-text description of this specific token.
+        pub description: Option<String>,
+        /// The token's image or other associated media.
+        pub media: Option<String>,
+        /// Base-64-encoded SHA-256 hash of the media. Required if `media` is present.
+        pub media_hash: Option<String>,
+        /// Number of copies of this set of metadata in existence when token was minted.
+        pub copies: Option<U64>,
+        /// When the token was issued, in milliseconds since the UNIX epoch.
+        pub issued_at: Option<U64>,
+        /// When the token expires, in milliseconds since the UNIX epoch.
+        pub expires_at: Option<U64>,
+        /// When the token starts being valid, in milliseconds since the UNIX epoch.
+        pub starts_at: Option<U64>,
+        /// When the token was last updated, in milliseconds since the UNIX epoch.
+        pub updated_at: Option<U64>,
+        /// Anything extra the NFT wants to store on-chain. Can be stringified JSON.
+        pub extra: Option<String>,
+        /// URL to an off-chain JSON file with more info about the token.
+        pub reference: Option<String>,
+        /// Base-64-encoded SHA-256 hash of the referenced JSON file. Required if `reference` is present.
+        pub reference_hash: Option<String>,
+    }
 }
 
 // Builder pattern for TokenMetadata.
@@ -225,10 +221,11 @@ impl<C: Nep177Controller> LoadTokenMetadata<C> for TokenMetadata {
     }
 }
 
-#[derive(BorshSerialize, BorshStorageKey)]
-enum StorageKey<'a> {
-    ContractMetadata,
-    TokenMetadata(&'a TokenId),
+compat_derive_storage_key! {
+    enum StorageKey<'a> {
+        ContractMetadata,
+        TokenMetadata(&'a TokenId),
+    }
 }
 
 /// Internal functions for [`Nep177Controller`].

@@ -3,15 +3,16 @@
 // Ignore
 pub fn main() {}
 
-use near_sdk::{
-    borsh::{self, BorshDeserialize, BorshSerialize},
-    env, log, near_bindgen, PanicOnDefault,
-};
-use near_sdk_contract_tools::{hook::Hook, nft::*};
+workspaces_tests::near_sdk!();
+compat_use_borsh!();
+use near_sdk::{env, log, near_bindgen, PanicOnDefault};
+use near_sdk_contract_tools::{compat_derive_borsh, compat_use_borsh, hook::Hook, nft::*};
 
-#[derive(PanicOnDefault, BorshSerialize, BorshDeserialize, NonFungibleToken)]
-#[near_bindgen]
-pub struct Contract {}
+compat_derive_borsh! {
+    #[derive(PanicOnDefault, NonFungibleToken)]
+    #[near_bindgen]
+    pub struct Contract {}
+}
 
 impl Hook<Contract, Nep178Approve<'_>> for Contract {
     fn hook<R>(

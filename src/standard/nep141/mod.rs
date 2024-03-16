@@ -1,11 +1,8 @@
 //! NEP-141 fungible token core implementation
 //! <https://github.com/near/NEPs/blob/master/neps/nep-0141.md>
 
-use near_sdk::{
-    borsh::{self, BorshSerialize},
-    serde::Serialize,
-    AccountId, BorshStorageKey, Gas,
-};
+compat_use_borsh!(BorshSerialize);
+use near_sdk::{serde::Serialize, AccountId, BorshStorageKey, Gas};
 
 use crate::{hook::Hook, slot::Slot, standard::nep297::*, DefaultStorageKey};
 
@@ -20,36 +17,50 @@ pub mod hooks;
 /// Gas value required for [`Nep141Resolver::ft_resolve_transfer`] call,
 /// independent of the amount of gas required for the preceding
 /// [`Nep141::ft_transfer`] call.
+#[cfg(feature = "near-sdk-4")]
 pub const GAS_FOR_RESOLVE_TRANSFER: Gas = Gas(5_000_000_000_000);
+/// Gas value required for [`Nep141Resolver::ft_resolve_transfer`] call,
+/// independent of the amount of gas required for the preceding
+/// [`Nep141::ft_transfer`] call.
+#[cfg(feature = "near-sdk-5")]
+pub const GAS_FOR_RESOLVE_TRANSFER: Gas = Gas::from_gas(5_000_000_000_000);
 /// Gas value required for [`Nep141::ft_transfer_call`] calls (includes gas for
 /// the subsequent [`Nep141Resolver::ft_resolve_transfer`] call).
+#[cfg(feature = "near-sdk-4")]
 pub const GAS_FOR_FT_TRANSFER_CALL: Gas = Gas(25_000_000_000_000 + GAS_FOR_RESOLVE_TRANSFER.0);
+/// Gas value required for [`Nep141::ft_transfer_call`] calls (includes gas for
+/// the subsequent [`Nep141Resolver::ft_resolve_transfer`] call).
+#[cfg(feature = "near-sdk-5")]
+pub const GAS_FOR_FT_TRANSFER_CALL: Gas =
+    Gas::from_gas(25_000_000_000_000 + GAS_FOR_RESOLVE_TRANSFER.as_gas());
 /// Error message for insufficient gas.
 pub const MORE_GAS_FAIL_MESSAGE: &str = "Insufficient gas attached.";
 
-#[derive(BorshSerialize, BorshStorageKey)]
-enum StorageKey {
-    TotalSupply,
-    Account(AccountId),
+compat_derive_storage_key! {
+    enum StorageKey {
+        TotalSupply,
+        Account(AccountId),
+    }
 }
 
-/// Transfer metadata generic over both types of transfer (`ft_transfer` and
-/// `ft_transfer_call`).
-#[derive(Serialize, BorshSerialize, PartialEq, Eq, Clone, Debug)]
-#[serde(crate = "near_sdk::serde")]
-pub struct Nep141Transfer<'a> {
-    /// Sender's account ID.
-    pub sender_id: &'a AccountId,
-    /// Receiver's account ID.
-    pub receiver_id: &'a AccountId,
-    /// Transferred amount.
-    pub amount: u128,
-    /// Optional memo string.
-    pub memo: Option<&'a str>,
-    /// Message passed to contract located at `receiver_id`.
-    pub msg: Option<&'a str>,
-    /// Is this transfer a revert as a result of a [`Nep141::ft_transfer_call`] -> [`Nep141Receiver::ft_on_transfer`] call?
-    pub revert: bool,
+compat_derive_serde_borsh! {[Serialize, BorshSerialize],
+    /// Transfer metadata generic over both types of transfer (`ft_transfer` and
+    /// `ft_transfer_call`).
+    #[derive(PartialEq, Eq, Clone, Debug)]
+    pub struct Nep141Transfer<'a> {
+        /// Sender's account ID.
+        pub sender_id: &'a AccountId,
+        /// Receiver's account ID.
+        pub receiver_id: &'a AccountId,
+        /// Transferred amount.
+        pub amount: u128,
+        /// Optional memo string.
+        pub memo: Option<&'a str>,
+        /// Message passed to contract located at `receiver_id`.
+        pub msg: Option<&'a str>,
+        /// Is this transfer a revert as a result of a [`Nep141::ft_transfer_call`] -> [`Nep141Receiver::ft_on_transfer`] call?
+        pub revert: bool,
+    }
 }
 
 impl<'a> Nep141Transfer<'a> {
@@ -60,28 +71,30 @@ impl<'a> Nep141Transfer<'a> {
     }
 }
 
-/// Describes a mint operation.
-#[derive(Clone, Debug, Serialize, BorshSerialize, PartialEq, Eq)]
-#[serde(crate = "near_sdk::serde")]
-pub struct Nep141Mint<'a> {
-    /// Amount to mint.
-    pub amount: u128,
-    /// Account ID to mint to.
-    pub receiver_id: &'a AccountId,
-    /// Optional memo string.
-    pub memo: Option<&'a str>,
+compat_derive_serde_borsh! {[Serialize, BorshSerialize],
+    /// Describes a mint operation.
+    #[derive(Clone, Debug, PartialEq, Eq)]
+    pub struct Nep141Mint<'a> {
+        /// Amount to mint.
+        pub amount: u128,
+        /// Account ID to mint to.
+        pub receiver_id: &'a AccountId,
+        /// Optional memo string.
+        pub memo: Option<&'a str>,
+    }
 }
 
-/// Describes a burn operation.
-#[derive(Clone, Debug, Serialize, BorshSerialize, PartialEq, Eq)]
-#[serde(crate = "near_sdk::serde")]
-pub struct Nep141Burn<'a> {
-    /// Amount to burn.
-    pub amount: u128,
-    /// Account ID to burn from.
-    pub owner_id: &'a AccountId,
-    /// Optional memo string.
-    pub memo: Option<&'a str>,
+compat_derive_serde_borsh! {[Serialize, BorshSerialize],
+    /// Describes a burn operation.
+    #[derive(Clone, Debug, PartialEq, Eq)]
+    pub struct Nep141Burn<'a> {
+        /// Amount to burn.
+        pub amount: u128,
+        /// Account ID to burn from.
+        pub owner_id: &'a AccountId,
+        /// Optional memo string.
+        pub memo: Option<&'a str>,
+    }
 }
 
 /// Internal functions for [`Nep141Controller`]. Using these methods may result in unexpected behavior.

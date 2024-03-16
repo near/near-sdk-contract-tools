@@ -1,18 +1,19 @@
+compat_use_borsh!();
 use near_sdk::{
-    borsh::{self, BorshDeserialize, BorshSerialize},
-    env,
-    json_types::U128,
-    log, near_bindgen,
-    store::LookupMap,
-    AccountId, PanicOnDefault,
+    env, json_types::U128, log, near_bindgen, store::LookupMap, AccountId, PanicOnDefault,
 };
-use near_sdk_contract_tools::{hook::Hook, standard::nep145::*, Nep145};
+use near_sdk_contract_tools::{
+    compat_derive_borsh, compat_near_to_u128, compat_use_borsh, hook::Hook, standard::nep145::*,
+    Nep145,
+};
 
-#[derive(BorshSerialize, BorshDeserialize, PanicOnDefault, Nep145)]
-#[nep145(force_unregister_hook = "ForceUnregisterHook")]
-#[near_bindgen]
-pub struct Contract {
-    pub storage: LookupMap<AccountId, Vec<u64>>,
+compat_derive_borsh! {
+    #[derive(PanicOnDefault, Nep145)]
+    #[nep145(force_unregister_hook = "ForceUnregisterHook")]
+    #[near_bindgen]
+    pub struct Contract {
+        pub storage: LookupMap<AccountId, Vec<u64>>,
+    }
 }
 
 pub struct ForceUnregisterHook;
@@ -59,16 +60,21 @@ impl Contract {
         self.storage.flush();
 
         let storage_usage = env::storage_usage() - storage_usage_start;
-        let storage_fee = env::storage_byte_cost() * storage_usage as u128;
+        let storage_fee = env::storage_byte_cost().saturating_mul(u128::from(storage_usage));
 
-        Nep145Controller::lock_storage(self, &predecessor, storage_fee.into())
-            .unwrap_or_else(|e| env::panic_str(&format!("Storage lock error: {}", e)));
+        Nep145Controller::lock_storage(
+            self,
+            &predecessor,
+            compat_near_to_u128!(storage_fee).into(),
+        )
+        .unwrap_or_else(|e| env::panic_str(&format!("Storage lock error: {}", e)));
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use near_sdk::{test_utils::VMContextBuilder, testing_env, ONE_NEAR};
+    use near_sdk::{test_utils::VMContextBuilder, testing_env};
+    use near_sdk_contract_tools::compat_near;
 
     use super::*;
 
@@ -78,13 +84,16 @@ mod tests {
 
     #[test]
     fn storage_sanity_check() {
-        let byte_cost = env::storage_byte_cost();
+        let one_near = compat_near!(1u128);
+        let one_near_u128 = compat_near_to_u128!(one_near);
+
+        let byte_cost = compat_near_to_u128!(env::storage_byte_cost());
 
         let mut contract = Contract::new();
 
         testing_env!(VMContextBuilder::new()
             .predecessor_account_id(alice())
-            .attached_deposit(ONE_NEAR)
+            .attached_deposit(one_near)
             .build());
 
         Nep145::storage_deposit(&mut contract, None, None);
@@ -92,8 +101,8 @@ mod tests {
         assert_eq!(
             Nep145::storage_balance_of(&contract, alice()),
             Some(StorageBalance {
-                total: U128(ONE_NEAR),
-                available: U128(ONE_NEAR),
+                total: U128(one_near_u128),
+                available: U128(one_near_u128),
             }),
         );
 
@@ -105,14 +114,14 @@ mod tests {
 
         let first = Nep145::storage_balance_of(&contract, alice()).unwrap();
 
-        assert_eq!(first.total.0, ONE_NEAR);
-        assert!(ONE_NEAR - (first.available.0 + 8 * 1000 * byte_cost) < 100 * byte_cost); // about 100 bytes for storing keys, etc.
+        assert_eq!(first.total.0, one_near_u128);
+        assert!(one_near_u128 - (first.available.0 + 8 * 1000 * byte_cost) < 100 * byte_cost); // about 100 bytes for storing keys, etc.
 
         contract.use_storage(2000);
 
         let second = Nep145::storage_balance_of(&contract, alice()).unwrap();
 
-        assert_eq!(second.total.0, ONE_NEAR);
+        assert_eq!(second.total.0, one_near_u128);
         assert_eq!(second.available.0, first.available.0 - 8 * 1000 * byte_cost);
     }
 }

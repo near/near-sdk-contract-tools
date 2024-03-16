@@ -1,7 +1,7 @@
 //! Queue and approve actions
 
+compat_use_borsh!();
 use near_sdk::{
-    borsh::{self, BorshDeserialize, BorshSerialize},
     env, require,
     serde::{Deserialize, Serialize},
     AccountId, BorshStorageKey,
@@ -62,23 +62,25 @@ pub trait ApprovalConfiguration<A, S> {
     ) -> Result<(), Self::ApprovalError>;
 }
 
-/// An action request is composed of an action that will be executed when the
-/// associated approval state is satisfied
-#[derive(Serialize, Deserialize, BorshSerialize, BorshDeserialize, Debug)]
-#[serde(crate = "near_sdk::serde")]
-pub struct ActionRequest<A, S> {
-    /// The action that will be executed when the approval state is
-    /// fulfilled
-    pub action: A,
-    /// The associated approval state
-    pub approval_state: S,
+compat_derive_serde_borsh! {
+    /// An action request is composed of an action that will be executed when the
+    /// associated approval state is satisfied
+    #[derive(Debug)]
+    pub struct ActionRequest<A, S> {
+        /// The action that will be executed when the approval state is
+        /// fulfilled
+        pub action: A,
+        /// The associated approval state
+        pub approval_state: S,
+    }
 }
 
-#[derive(BorshSerialize, BorshStorageKey)]
-enum ApprovalStorageKey {
-    NextRequestId,
-    Config,
-    Request(u32),
+compat_derive_storage_key! {
+    enum ApprovalStorageKey {
+        NextRequestId,
+        Config,
+        Request(u32),
+    }
 }
 
 /// The account is ineligile to perform an action for some reason
@@ -335,10 +337,10 @@ where
 
 #[cfg(test)]
 mod tests {
+    compat_use_borsh!();
     use near_sdk::{
-        borsh::{self, BorshDeserialize, BorshSerialize},
         near_bindgen,
-        serde::Serialize,
+        serde::{Deserialize, Serialize},
         test_utils::VMContextBuilder,
         testing_env, AccountId, BorshStorageKey,
     };
@@ -350,15 +352,18 @@ mod tests {
         Action, ActionRequest, ApprovalConfiguration, ApprovalManager, ApprovalManagerInternal,
     };
 
-    #[derive(BorshSerialize, BorshStorageKey)]
-    enum Role {
-        Multisig,
+    compat_derive_storage_key! {
+        enum Role {
+            Multisig,
+        }
     }
 
-    #[derive(BorshSerialize, BorshDeserialize, Debug, PartialEq, Eq, Clone)]
-    enum MyAction {
-        SayHello,
-        SayGoodbye,
+    compat_derive_borsh! {
+        #[derive(Debug, PartialEq, Eq, Clone)]
+        enum MyAction {
+            SayHello,
+            SayGoodbye,
+        }
     }
 
     impl Action<Contract> for MyAction {
@@ -401,15 +406,18 @@ mod tests {
         }
     }
 
-    #[derive(BorshSerialize, BorshDeserialize, Debug)]
-    struct MultisigConfig {
-        pub threshold: u8,
+    compat_derive_borsh! {
+        #[derive(Debug)]
+        struct MultisigConfig {
+            pub threshold: u8,
+        }
     }
 
-    #[derive(BorshSerialize, BorshDeserialize, Serialize, Default, Debug)]
-    #[serde(crate = "near_sdk::serde")]
-    struct MultisigApprovalState {
-        pub approved_by: Vec<AccountId>,
+    compat_derive_serde_borsh! {
+        #[derive(Default, Debug)]
+        struct MultisigApprovalState {
+            pub approved_by: Vec<AccountId>,
+        }
     }
 
     impl ApprovalConfiguration<MyAction, MultisigApprovalState> for MultisigConfig {

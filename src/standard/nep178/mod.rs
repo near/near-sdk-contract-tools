@@ -3,11 +3,8 @@
 //! Reference: <https://github.com/near/NEPs/blob/master/neps/nep-0178.md>
 use std::{collections::HashMap, error::Error};
 
-use near_sdk::{
-    borsh::{self, BorshDeserialize, BorshSerialize},
-    store::UnorderedMap,
-    AccountId, BorshStorageKey,
-};
+compat_use_borsh!();
+use near_sdk::{store::UnorderedMap, AccountId, BorshStorageKey};
 
 use crate::{
     hook::Hook,
@@ -34,14 +31,16 @@ pub type ApprovalId = u32;
 /// Maximum number of approvals per token.
 pub const MAX_APPROVALS: ApprovalId = 32;
 
-/// NFT token approvals. Hooks are implemented on this struct.
-#[derive(BorshSerialize, BorshDeserialize, Debug)]
-pub struct TokenApprovals {
-    /// The next approval ID to use. Only incremented.
-    pub next_approval_id: ApprovalId,
+compat_derive_borsh! {
+    /// NFT token approvals. Hooks are implemented on this struct.
+    #[derive(Debug)]
+    pub struct TokenApprovals {
+        /// The next approval ID to use. Only incremented.
+        pub next_approval_id: ApprovalId,
 
-    /// The list of approved accounts.
-    pub accounts: UnorderedMap<AccountId, ApprovalId>,
+        /// The list of approved accounts.
+        pub accounts: UnorderedMap<AccountId, ApprovalId>,
+    }
 }
 
 impl<C: Nep178Controller> LoadTokenMetadata<C> for TokenApprovals {
@@ -106,10 +105,11 @@ impl<C: Nep171Controller + Nep178Controller> CheckExternalTransfer<C> for TokenA
     }
 }
 
-#[derive(BorshSerialize, BorshStorageKey)]
-enum StorageKey<'a> {
-    TokenApprovals(&'a TokenId),
-    TokenApprovalsUnorderedMap(&'a TokenId),
+compat_derive_storage_key! {
+    enum StorageKey<'a> {
+        TokenApprovals(&'a TokenId),
+        TokenApprovalsUnorderedMap(&'a TokenId),
+    }
 }
 
 /// Internal functions for [`Nep178Controller`].

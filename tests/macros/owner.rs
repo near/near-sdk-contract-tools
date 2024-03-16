@@ -1,48 +1,53 @@
+compat_use_borsh!(BorshSerialize);
 use near_sdk::{
-    borsh::{self, BorshSerialize},
     env, near_bindgen,
     test_utils::VMContextBuilder,
     testing_env, AccountId, BorshStorageKey,
 };
 use near_sdk_contract_tools::{
-    owner::{Owner, OwnerExternal},
-    Owner,
+    compat_derive_storage_key, compat_use_borsh, owner::{Owner, OwnerExternal}, Owner
 };
 
-#[derive(Owner)]
-#[near_bindgen]
-pub struct OwnedStructImplicitKey {
-    pub permissioned_item: u32,
+mod implicit_key {
+    use super::*;
+
+    #[derive(Owner)]
+    #[near_bindgen]
+    pub struct OwnedStructImplicitKey {
+        pub permissioned_item: u32,
+    }
+
+    #[near_bindgen]
+    impl OwnedStructImplicitKey {
+        #[init]
+        pub fn new() -> Self {
+            let mut contract = Self {
+                permissioned_item: 0,
+            };
+
+            // This method can only be called once throughout the entire duration of the contract
+            Owner::init(&mut contract, &env::predecessor_account_id());
+
+            contract
+        }
+
+        pub fn set_permissioned_item(&mut self, value: u32) {
+            Self::require_owner();
+
+            self.permissioned_item = value;
+        }
+
+        pub fn get_permissioned_item(&self) -> u32 {
+            self.permissioned_item
+        }
+    }
 }
+use implicit_key::OwnedStructImplicitKey;
 
-#[near_bindgen]
-impl OwnedStructImplicitKey {
-    #[init]
-    pub fn new() -> Self {
-        let mut contract = Self {
-            permissioned_item: 0,
-        };
-
-        // This method can only be called once throughout the entire duration of the contract
-        Owner::init(&mut contract, &env::predecessor_account_id());
-
-        contract
+compat_derive_storage_key! {
+    enum StorageKey {
+        MyStorageKey,
     }
-
-    pub fn set_permissioned_item(&mut self, value: u32) {
-        Self::require_owner();
-
-        self.permissioned_item = value;
-    }
-
-    pub fn get_permissioned_item(&self) -> u32 {
-        self.permissioned_item
-    }
-}
-
-#[derive(BorshStorageKey, BorshSerialize)]
-enum StorageKey {
-    MyStorageKey,
 }
 
 #[derive(Owner)]

@@ -39,8 +39,10 @@
 
 use std::error::Error;
 
+#[cfg(feature = "near-sdk-4")]
+use near_sdk::borsh;
 use near_sdk::{
-    borsh::{self, BorshSerialize},
+    borsh::BorshSerialize,
     serde::{Deserialize, Serialize},
     AccountId, BorshStorageKey, Gas,
 };
@@ -60,18 +62,28 @@ pub use ext::*;
 pub mod hooks;
 
 /// Minimum required gas for [`Nep171Resolver::nft_resolve_transfer`] call in promise chain during [`Nep171::nft_transfer_call`].
+#[cfg(feature = "near-sdk-4")]
 pub const GAS_FOR_RESOLVE_TRANSFER: Gas = Gas(5_000_000_000_000);
+/// Minimum required gas for [`Nep171Resolver::nft_resolve_transfer`] call in promise chain during [`Nep171::nft_transfer_call`].
+#[cfg(feature = "near-sdk-5")]
+pub const GAS_FOR_RESOLVE_TRANSFER: Gas = Gas::from_gas(5_000_000_000_000);
 /// Minimum gas required to execute the main body of [`Nep171::nft_transfer_call`] + gas for [`Nep171Resolver::nft_resolve_transfer`].
+#[cfg(feature = "near-sdk-4")]
 pub const GAS_FOR_NFT_TRANSFER_CALL: Gas = Gas(25_000_000_000_000 + GAS_FOR_RESOLVE_TRANSFER.0);
+/// Minimum gas required to execute the main body of [`Nep171::nft_transfer_call`] + gas for [`Nep171Resolver::nft_resolve_transfer`].
+#[cfg(feature = "near-sdk-5")]
+pub const GAS_FOR_NFT_TRANSFER_CALL: Gas =
+    Gas::from_gas(25_000_000_000_000 + GAS_FOR_RESOLVE_TRANSFER.as_gas());
 /// Error message when insufficient gas is attached to function calls with a minimum attached gas requirement (i.e. those that produce a promise chain, perform cross-contract calls).
 pub const INSUFFICIENT_GAS_MESSAGE: &str = "More gas is required";
 
 /// NFT token IDs.
 pub type TokenId = String;
 
-#[derive(BorshSerialize, BorshStorageKey)]
-enum StorageKey<'a> {
-    TokenOwner(&'a str),
+compat_derive_storage_key! {
+    enum StorageKey<'a> {
+        TokenOwner(&'a str),
+    }
 }
 
 /// Internal (storage location) methods for implementors of [`Nep171Controller`].
@@ -180,14 +192,15 @@ pub trait Nep171Controller {
     fn load_token(&self, token_id: &TokenId) -> Option<Token>;
 }
 
-/// Authorization for a transfer.
-#[derive(Serialize, BorshSerialize, PartialEq, Eq, Clone, Debug, Hash)]
-#[serde(crate = "near_sdk::serde")]
-pub enum Nep171TransferAuthorization {
-    /// The sender is the owner of the token.
-    Owner,
-    /// The sender holds a valid approval ID for the token.
-    ApprovalId(u32),
+compat_derive_serde_borsh! {[Serialize, BorshSerialize],
+    /// Authorization for a transfer.
+    #[derive(PartialEq, Eq, Clone, Debug, Hash)]
+    pub enum Nep171TransferAuthorization {
+        /// The sender is the owner of the token.
+        Owner,
+        /// The sender holds a valid approval ID for the token.
+        ApprovalId(u32),
+    }
 }
 
 /// Different ways of checking if a transfer is valid.

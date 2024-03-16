@@ -38,7 +38,12 @@ pub const DEFAULT_POST_UPGRADE_METHOD_NAME: &str = "migrate";
 pub const DEFAULT_POST_UPGRADE_METHOD_ARGS: Vec<u8> = vec![];
 /// Guarantee the post-upgrade function receives at least this much gas by
 /// default.
+#[cfg(feature = "near-sdk-4")]
 pub const DEFAULT_POST_UPGRADE_MINIMUM_GAS: Gas = Gas(15_000_000_000_000);
+/// Guarantee the post-upgrade function receives at least this much gas by
+/// default.
+#[cfg(feature = "near-sdk-5")]
+pub const DEFAULT_POST_UPGRADE_MINIMUM_GAS: Gas = Gas::from_gas(15_000_000_000_000);
 
 #[cfg(feature = "unstable")]
 pub mod raw;
