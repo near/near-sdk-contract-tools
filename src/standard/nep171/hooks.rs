@@ -20,9 +20,8 @@ where
         action: &Nep145ForceUnregister<'_>,
         f: impl FnOnce(&mut C) -> R,
     ) -> R {
-        let token_ids = contract.with_tokens_for_owner(action.account_id, |t| {
-            t.iter().collect::<Vec<_>>()
-        });
+        let token_ids =
+            contract.with_tokens_for_owner(action.account_id, |t| t.iter().collect::<Vec<_>>());
 
         contract
             .burn(&Nep171Burn {

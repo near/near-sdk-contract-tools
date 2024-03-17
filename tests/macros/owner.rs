@@ -1,11 +1,11 @@
 compat_use_borsh!(BorshSerialize);
 use near_sdk::{
-    env, near_bindgen,
-    test_utils::VMContextBuilder,
-    testing_env, AccountId, BorshStorageKey,
+    env, near_bindgen, test_utils::VMContextBuilder, testing_env, AccountId, BorshStorageKey,
 };
 use near_sdk_contract_tools::{
-    compat_derive_storage_key, compat_use_borsh, owner::{Owner, OwnerExternal}, Owner
+    compat_derive_storage_key, compat_use_borsh,
+    owner::{Owner, OwnerExternal},
+    Owner,
 };
 
 mod implicit_key {

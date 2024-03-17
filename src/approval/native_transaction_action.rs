@@ -140,14 +140,12 @@ impl<C> super::Action<C> for NativeTransactionAction {
                     arguments,
                     amount,
                     gas,
-                } => {
-                    promise.function_call(
-                        function_name,
-                        arguments.0,
-                        compat_yoctonear!(amount),
-                        compat_gas!(gas.0),
-                    )
-                }
+                } => promise.function_call(
+                    function_name,
+                    arguments.0,
+                    compat_yoctonear!(amount),
+                    compat_gas!(gas.0),
+                ),
                 PromiseAction::Transfer { amount } => promise.transfer(compat_yoctonear!(amount)),
                 PromiseAction::Stake { amount, public_key } => {
                     promise.stake(compat_yoctonear!(amount), public_key.parse().unwrap())
