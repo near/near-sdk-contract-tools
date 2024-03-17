@@ -7,8 +7,13 @@ extern crate near_sdk_4 as near_sdk;
 extern crate near_sdk_5 as near_sdk;
 
 use near_sdk::{json_types::U128, serde::de::DeserializeOwned, serde_json::json};
-use near_workspaces::{result::ExecutionFinalResult, Account, AccountId, Contract};
+use near_workspaces::{
+    result::ExecutionFinalResult, types::NearToken, Account, AccountId, Contract,
+};
 use pretty_assertions::assert_eq;
+
+pub const ONE_YOCTO: NearToken = NearToken::from_yoctonear(1);
+pub const ONE_NEAR: NearToken = NearToken::from_near(1);
 
 pub async fn nft_token<T: DeserializeOwned>(contract: &Contract, token_id: &str) -> Option<T> {
     contract

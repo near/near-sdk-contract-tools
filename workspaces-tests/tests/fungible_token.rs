@@ -5,7 +5,6 @@ use near_sdk::{
     serde_json::json,
 };
 use near_sdk_contract_tools::{
-    compat_near, compat_near_to_u128,
     nft::StorageBalance,
     standard::{
         nep141::{FtTransferData, Nep141Event},
@@ -16,7 +15,7 @@ use near_sdk_contract_tools::{
 use near_workspaces::{network::Sandbox, operations::Function, Account, Contract, Worker};
 use pretty_assertions::assert_eq;
 use tokio::task::JoinSet;
-use workspaces_tests_utils::{expect_execution_error, ft_balance_of};
+use workspaces_tests_utils::{expect_execution_error, ft_balance_of, ONE_NEAR, ONE_YOCTO};
 
 const WASM: &[u8] =
     include_bytes!("../../target/wasm32-unknown-unknown/release/fungible_token.wasm");
@@ -62,7 +61,7 @@ async fn setup_balances(num_accounts: usize, amount: impl Fn(usize) -> U128) -> 
             .call(
                 Function::new("storage_deposit")
                     .args_json(json!({}))
-                    .deposit(compat_near_to_u128!(compat_near!(1u128).saturating_div(100))),
+                    .deposit(ONE_NEAR.saturating_div(100)),
             )
             .call(Function::new("mint").args_json(json!({ "amount": amount(i) })))
             .transact();
@@ -114,7 +113,7 @@ async fn transfer_normal() {
 
     alice
         .call(contract.id(), "ft_transfer")
-        .deposit(1)
+        .deposit(ONE_YOCTO)
         .args_json(json!({
             "receiver_id": bob.id(),
             "amount": "10",
@@ -139,7 +138,7 @@ async fn transfer_zero() {
 
     alice
         .call(contract.id(), "ft_transfer")
-        .deposit(1)
+        .deposit(ONE_YOCTO)
         .args_json(json!({
             "receiver_id": bob.id(),
             "amount": "0",
@@ -164,7 +163,7 @@ async fn transfer_negative() {
 
     alice
         .call(contract.id(), "ft_transfer")
-        .deposit(1)
+        .deposit(ONE_YOCTO)
         .args_json(json!({
             "receiver_id": bob.id(),
             "amount": "-10",
@@ -211,7 +210,7 @@ async fn transfer_more_than_balance() {
             "receiver_id": bob.id(),
             "amount": "1000000",
         }))
-        .deposit(1)
+        .deposit(ONE_YOCTO)
         .transact()
         .await
         .unwrap()
@@ -249,7 +248,7 @@ async fn transfer_fail_not_registered() {
 
     let result = alice
         .call(contract.id(), "ft_transfer")
-        .deposit(1)
+        .deposit(ONE_YOCTO)
         .args_json(json!({
             "receiver_id": charlie.id(),
             "amount": "10",
@@ -297,7 +296,7 @@ async fn fail_run_out_of_space() {
         format!(
             "Smart contract panicked: Storage lock error: {}",
             InsufficientBalanceError {
-                account_id: alice.id().parse().unwrap(),
+                account_id: alice.id().as_str().parse().unwrap(),
                 available: balance.available,
                 attempted_to_lock: 100490000000000000000000u128.into()
             }
@@ -324,7 +323,7 @@ async fn transfer_call_normal() {
 
     let result = alice
         .call(contract.id(), "ft_transfer_call")
-        .deposit(1)
+        .deposit(ONE_YOCTO)
         .max_gas()
         .args_json(json!({
             "receiver_id": bob.id(),
@@ -340,8 +339,8 @@ async fn transfer_call_normal() {
         result.logs().to_vec(),
         vec![
             Nep141Event::FtTransfer(vec![FtTransferData {
-                old_owner_id: alice.id().parse().unwrap(),
-                new_owner_id: bob.id().parse().unwrap(),
+                old_owner_id: alice.id().as_str().parse().unwrap(),
+                new_owner_id: bob.id().as_str().parse().unwrap(),
                 amount: U128(10),
                 memo: None,
             }])
@@ -374,7 +373,7 @@ async fn transfer_call_return() {
 
     let result = alice
         .call(contract.id(), "ft_transfer_call")
-        .deposit(1)
+        .deposit(ONE_YOCTO)
         .max_gas()
         .args_json(json!({
             "receiver_id": bob.id(),
@@ -390,16 +389,16 @@ async fn transfer_call_return() {
         result.logs().to_vec(),
         vec![
             Nep141Event::FtTransfer(vec![FtTransferData {
-                old_owner_id: alice.id().parse().unwrap(),
-                new_owner_id: bob.id().parse().unwrap(),
+                old_owner_id: alice.id().as_str().parse().unwrap(),
+                new_owner_id: bob.id().as_str().parse().unwrap(),
                 amount: U128(10),
                 memo: None,
             }])
             .to_event_string(),
             format!("Received 10 from {}", alice.id()),
             Nep141Event::FtTransfer(vec![FtTransferData {
-                old_owner_id: bob.id().parse().unwrap(),
-                new_owner_id: alice.id().parse().unwrap(),
+                old_owner_id: bob.id().as_str().parse().unwrap(),
+                new_owner_id: alice.id().as_str().parse().unwrap(),
                 amount: U128(10),
                 memo: None,
             }])
@@ -431,7 +430,7 @@ async fn transfer_call_inner_transfer() {
 
     let result = alice
         .call(contract.id(), "ft_transfer_call")
-        .deposit(1)
+        .deposit(ONE_YOCTO)
         .max_gas()
         .args_json(json!({
             "receiver_id": bob.id(),
@@ -447,8 +446,8 @@ async fn transfer_call_inner_transfer() {
         result.logs().to_vec(),
         vec![
             Nep141Event::FtTransfer(vec![FtTransferData {
-                old_owner_id: alice.id().parse().unwrap(),
-                new_owner_id: bob.id().parse().unwrap(),
+                old_owner_id: alice.id().as_str().parse().unwrap(),
+                new_owner_id: bob.id().as_str().parse().unwrap(),
                 amount: U128(10),
                 memo: None,
             }])
@@ -456,15 +455,15 @@ async fn transfer_call_inner_transfer() {
             format!("Received 10 from {}", alice.id()),
             format!("Transferring 10 to {}", charlie.id()),
             Nep141Event::FtTransfer(vec![FtTransferData {
-                old_owner_id: bob.id().parse().unwrap(),
-                new_owner_id: charlie.id().parse().unwrap(),
+                old_owner_id: bob.id().as_str().parse().unwrap(),
+                new_owner_id: charlie.id().as_str().parse().unwrap(),
                 amount: U128(10),
                 memo: None,
             }])
             .to_event_string(),
             Nep141Event::FtTransfer(vec![FtTransferData {
-                old_owner_id: bob.id().parse().unwrap(),
-                new_owner_id: alice.id().parse().unwrap(),
+                old_owner_id: bob.id().as_str().parse().unwrap(),
+                new_owner_id: alice.id().as_str().parse().unwrap(),
                 amount: U128(10),
                 memo: None,
             }])
@@ -496,7 +495,7 @@ async fn transfer_call_inner_panic() {
 
     let result = alice
         .call(contract.id(), "ft_transfer_call")
-        .deposit(1)
+        .deposit(ONE_YOCTO)
         .max_gas()
         .args_json(json!({
             "receiver_id": bob.id(),
@@ -516,16 +515,16 @@ async fn transfer_call_inner_panic() {
         result.logs().to_vec(),
         vec![
             Nep141Event::FtTransfer(vec![FtTransferData {
-                old_owner_id: alice.id().parse().unwrap(),
-                new_owner_id: bob.id().parse().unwrap(),
+                old_owner_id: alice.id().as_str().parse().unwrap(),
+                new_owner_id: bob.id().as_str().parse().unwrap(),
                 amount: U128(10),
                 memo: None,
             }])
             .to_event_string(),
             format!("Received 10 from {}", alice.id()),
             Nep141Event::FtTransfer(vec![FtTransferData {
-                old_owner_id: bob.id().parse().unwrap(),
-                new_owner_id: alice.id().parse().unwrap(),
+                old_owner_id: bob.id().as_str().parse().unwrap(),
+                new_owner_id: alice.id().as_str().parse().unwrap(),
                 amount: U128(10),
                 memo: None,
             }])

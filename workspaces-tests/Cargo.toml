@@ -76,7 +76,7 @@ thiserror.workspace = true
 near-crypto.workspace = true
 tokio.workspace = true
 pretty_assertions.workspace = true
-near-workspaces.workspace = true
+near-workspaces = { workspace = true, features = ["unstable"] }
 workspaces-tests-utils = { path = "../workspaces-tests-utils", default-features = false, features = [
     "unstable",
 ] }
