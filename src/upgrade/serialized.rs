@@ -20,7 +20,7 @@ pub fn upgrade(code: Vec<u8>, post_upgrade: PostUpgrade) -> Promise {
         .function_call_weight(
             post_upgrade.method,
             post_upgrade.args,
-            0,
+            compat_yoctonear!(0u128),
             post_upgrade.minimum_gas,
             GasWeight(u64::MAX),
         )

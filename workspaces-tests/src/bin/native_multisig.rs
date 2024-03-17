@@ -3,30 +3,34 @@
 // Ignore
 pub fn main() {}
 
-use near_sdk::{
-    borsh::{self, BorshDeserialize, BorshSerialize},
-    env, near_bindgen, AccountId, BorshStorageKey, PanicOnDefault, Promise,
-};
+workspaces_tests::near_sdk!();
+compat_use_borsh!();
+use near_sdk::{env, near_bindgen, AccountId, BorshStorageKey, PanicOnDefault, Promise};
 use near_sdk_contract_tools::{
     approval::{
         native_transaction_action::{self, NativeTransactionAction},
         simple_multisig::{ApprovalState, Configuration},
         ApprovalManager,
     },
+    compat_derive_borsh, compat_derive_storage_key, compat_use_borsh,
     rbac::Rbac,
     Rbac, SimpleMultisig,
 };
 
-#[derive(Clone, Debug, BorshSerialize, BorshStorageKey)]
-pub enum Role {
-    Multisig,
+compat_derive_storage_key! {
+    #[derive(Clone, Debug)]
+    pub enum Role {
+        Multisig,
+    }
 }
 
-#[derive(PanicOnDefault, BorshSerialize, BorshDeserialize, Rbac, SimpleMultisig)]
-#[simple_multisig(action = "NativeTransactionAction", role = "Role::Multisig")]
-#[rbac(roles = "Role")]
-#[near_bindgen]
-pub struct Contract {}
+compat_derive_borsh! {
+    #[derive(PanicOnDefault, Rbac, SimpleMultisig)]
+    #[simple_multisig(action = "NativeTransactionAction", role = "Role::Multisig")]
+    #[rbac(roles = "Role")]
+    #[near_bindgen]
+    pub struct Contract {}
+}
 
 #[near_bindgen]
 impl Contract {
@@ -44,7 +48,7 @@ impl Contract {
     }
 
     pub fn obtain_multisig_permission(&mut self) {
-        self.add_role(env::predecessor_account_id(), &Role::Multisig);
+        self.add_role(&env::predecessor_account_id(), &Role::Multisig);
     }
 
     pub fn request(

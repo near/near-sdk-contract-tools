@@ -3,12 +3,9 @@
 //! Reference: <https://github.com/near/NEPs/blob/master/neps/nep-0181.md>
 use std::borrow::Cow;
 
-use near_sdk::{
-    borsh::{self, BorshSerialize},
-    env,
-    store::UnorderedSet,
-    AccountId, BorshStorageKey,
-};
+#[cfg(feature = "near-sdk-4")]
+use near_sdk::borsh;
+use near_sdk::{borsh::BorshSerialize, collections::UnorderedSet, env, AccountId, BorshStorageKey};
 
 use crate::{hook::Hook, slot::Slot, standard::nep171::*, DefaultStorageKey};
 
@@ -58,10 +55,11 @@ impl<C: Nep171Controller + Nep181Controller> Hook<C, action::Nep171Burn<'_>> for
     }
 }
 
-#[derive(BorshSerialize, BorshStorageKey)]
-enum StorageKey<'a> {
-    Tokens,
-    OwnerTokens(&'a AccountId),
+compat_derive_storage_key! {
+    enum StorageKey<'a> {
+        Tokens,
+        OwnerTokens(&'a AccountId),
+    }
 }
 
 /// Internal functions for [`Nep181Controller`].

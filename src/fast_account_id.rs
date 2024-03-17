@@ -59,6 +59,7 @@ impl From<near_sdk::AccountId> for FastAccountId {
     }
 }
 
+#[cfg(feature = "near-sdk-4")]
 impl From<FastAccountId> for near_sdk::AccountId {
     fn from(account_id: FastAccountId) -> Self {
         Self::new_unchecked(account_id.0.to_string())
@@ -92,11 +93,23 @@ impl BorshSerialize for FastAccountId {
 }
 
 impl BorshDeserialize for FastAccountId {
+    #[cfg(feature = "near-sdk-4")]
     fn deserialize(buf: &mut &[u8]) -> std::io::Result<Self> {
         let len = buf[0] as usize;
         let compressed = &buf[1..];
         let account_id = decompress_account_id(compressed, len);
         *buf = &buf[1 + compressed_size(len)..];
+        Ok(Self(Rc::from(account_id)))
+    }
+
+    #[cfg(feature = "near-sdk-5")]
+    fn deserialize_reader<R: std::io::Read>(buf: &mut R) -> std::io::Result<Self> {
+        let mut l = [0u8];
+        buf.read_exact(&mut l)?;
+        let len = l[0] as usize;
+        let mut compressed = [0u8; near_sdk::AccountId::MAX_LEN];
+        buf.read_exact(&mut compressed[..compressed_size(len)])?;
+        let account_id = decompress_account_id(&compressed, len);
         Ok(Self(Rc::from(account_id)))
     }
 }
@@ -153,6 +166,11 @@ fn decompress_account_id(compressed: &[u8], len: usize) -> String {
 }
 
 const fn compressed_size(len: usize) -> usize {
+    #[cfg(feature = "near-sdk-5")]
+    debug_assert!(
+        len <= near_sdk::AccountId::MAX_LEN,
+        "Account ID is too long"
+    );
     len * 3 / 4 + (len * 3 % 4 > 0) as usize
 }
 
@@ -215,15 +233,15 @@ mod tests {
     #[test]
     fn test_account_id_borsh() {
         let account_id = "0".repeat(64);
-        let sdk_account_id = near_sdk::AccountId::new_unchecked(account_id.clone());
+        let sdk_account_id = near_sdk::AccountId::from_str(&account_id).unwrap();
         let expected_serialized_length = 64 * 3 / 4 + 1; // no +1 for remainder (64 * 3 % 4 == 0), but +1 for length
         let account_id = FastAccountId::new_unchecked(&account_id);
-        let serialized = account_id.try_to_vec().unwrap();
+        let serialized = compat_borsh_serialize!(&account_id).unwrap();
         assert_eq!(serialized.len(), expected_serialized_length);
         let deserializalized = FastAccountId::try_from_slice(&serialized).unwrap();
         assert_eq!(account_id, deserializalized);
 
-        let sdk_serialized = sdk_account_id.try_to_vec().unwrap();
+        let sdk_serialized = compat_borsh_serialize!(&sdk_account_id).unwrap();
         assert!(sdk_serialized.len() > serialized.len()); // gottem
     }
 
@@ -244,7 +262,7 @@ mod tests {
 
         for test in tests {
             let account_id = FastAccountId::new_unchecked(test);
-            let serialized = account_id.try_to_vec().unwrap();
+            let serialized = compat_borsh_serialize!(&account_id).unwrap();
             let deserializalized = FastAccountId::try_from_slice(&serialized).unwrap();
             assert_eq!(account_id, deserializalized);
         }

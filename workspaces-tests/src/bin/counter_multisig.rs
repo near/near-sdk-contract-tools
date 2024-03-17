@@ -1,30 +1,30 @@
 #![allow(missing_docs)]
 
-use near_sdk::{
-    borsh::{self, BorshDeserialize, BorshSerialize},
-    env, near_bindgen,
-    serde::Serialize,
-    BorshStorageKey, PanicOnDefault,
-};
+workspaces_tests::near_sdk!();
+compat_use_borsh!();
+use near_sdk::{env, near_bindgen, serde::Serialize, BorshStorageKey, PanicOnDefault};
 use near_sdk_contract_tools::{
     approval::{simple_multisig::Configuration, *},
+    compat_derive_borsh, compat_derive_serde_borsh, compat_derive_storage_key, compat_use_borsh,
     rbac::Rbac,
     Rbac, SimpleMultisig,
 };
 use std::string::ToString;
 use strum_macros::Display;
 
-#[derive(BorshSerialize, BorshStorageKey, Clone, Debug, Display)]
-pub enum Role {
-    Member,
+compat_derive_storage_key! {
+    #[derive(Clone, Debug, Display)]
+    pub enum Role {
+        Member,
+    }
 }
 
-#[derive(BorshSerialize, BorshDeserialize, Serialize)]
-#[serde(crate = "near_sdk::serde")]
-pub enum CounterAction {
-    Increment,
-    Decrement,
-    Reset,
+compat_derive_serde_borsh! {[Serialize, BorshSerialize, BorshDeserialize],
+    pub enum CounterAction {
+        Increment,
+        Decrement,
+        Reset,
+    }
 }
 
 impl Action<Contract> for CounterAction {
@@ -47,12 +47,14 @@ impl Action<Contract> for CounterAction {
     }
 }
 
-#[derive(BorshSerialize, BorshDeserialize, PanicOnDefault, Rbac, SimpleMultisig)]
-#[simple_multisig(action = "CounterAction", role = "Role::Member")]
-#[rbac(roles = "Role")]
-#[near_bindgen]
-pub struct Contract {
-    pub counter: u32,
+compat_derive_borsh! {
+    #[derive(PanicOnDefault, Rbac, SimpleMultisig)]
+    #[simple_multisig(action = "CounterAction", role = "Role::Member")]
+    #[rbac(roles = "Role")]
+    #[near_bindgen]
+    pub struct Contract {
+        pub counter: u32,
+    }
 }
 
 #[near_bindgen]
@@ -71,7 +73,7 @@ impl Contract {
     }
 
     pub fn obtain_multisig_permission(&mut self) {
-        self.add_role(env::predecessor_account_id(), &Role::Member);
+        self.add_role(&env::predecessor_account_id(), &Role::Member);
     }
 
     pub fn request_increment(&mut self) -> u32 {

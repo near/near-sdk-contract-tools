@@ -1,17 +1,11 @@
+compat_use_borsh!();
 use near_sdk::{
-    borsh::{self, BorshDeserialize, BorshSerialize},
-    env, near_bindgen,
-    test_utils::VMContextBuilder,
-    testing_env, AccountId, BorshStorageKey,
+    env, near_bindgen, test_utils::VMContextBuilder, testing_env, AccountId, BorshStorageKey,
 };
 use near_sdk_contract_tools::{
-    escrow::Escrow,
-    migrate::{MigrateExternal, MigrateHook},
-    owner::Owner,
-    pause::Pause,
-    rbac::Rbac,
-    standard::nep297::Event,
-    Escrow, Migrate, Owner, Pause, Rbac,
+    compat_derive_borsh, compat_derive_storage_key, compat_use_borsh, escrow::Escrow,
+    migrate::MigrateHook, owner::Owner, pause::Pause, rbac::Rbac, standard::nep297::Event, Escrow,
+    Migrate, Owner, Pause, Rbac,
 };
 
 mod escrow;
@@ -41,101 +35,112 @@ mod my_event {
     }
 }
 
-#[derive(BorshSerialize, BorshStorageKey)]
-enum StorageKey {
-    Owner,
-    Pause,
-    Rbac,
-}
-
-#[derive(BorshSerialize, BorshStorageKey)]
-enum Role {
-    CanPause,
-    CanSetValue,
-}
-
-#[derive(Owner, Pause, Rbac, Escrow, BorshDeserialize, BorshSerialize)]
-#[owner(storage_key = "StorageKey::Owner")]
-#[pause(storage_key = "StorageKey::Pause")]
-#[rbac(storage_key = "StorageKey::Rbac", roles = "Role")]
-#[escrow(storage_key = "StorageKey::Owner", id = "u64", state = "String")]
-#[near_bindgen]
-struct Integration {
-    pub value: u32,
-}
-
-#[near_bindgen]
-impl Integration {
-    #[init]
-    pub fn new(owner_id: AccountId) -> Self {
-        let mut contract = Self { value: 0 };
-
-        Owner::init(&mut contract, &owner_id);
-        contract.add_role(owner_id.clone(), &Role::CanSetValue);
-        contract.add_role(owner_id.clone(), &Role::CanPause);
-
-        contract
+compat_derive_storage_key! {
+    enum StorageKey {
+        Owner,
+        Pause,
+        Rbac,
     }
+}
 
-    pub fn add_value_setter(&mut self, account_id: AccountId) {
-        Self::require_owner();
-
-        self.add_role(account_id.clone(), &Role::CanSetValue);
-
-        my_event::PermissionGranted { to: account_id }.emit();
+compat_derive_storage_key! {
+    pub enum Role {
+        CanPause,
+        CanSetValue,
     }
+}
 
-    pub fn set_value(&mut self, value: u32) {
-        Self::require_unpaused();
-        Self::require_role(&Role::CanSetValue);
+mod integration {
+    use super::*;
 
-        let old = self.value;
-
-        self.value = value;
-
-        my_event::ValueChanged {
-            from: old,
-            to: value,
+    compat_derive_borsh! {
+        #[derive(Owner, Pause, Rbac, Escrow)]
+        #[owner(storage_key = "StorageKey::Owner")]
+        #[pause(storage_key = "StorageKey::Pause")]
+        #[rbac(storage_key = "StorageKey::Rbac", roles = "Role")]
+        #[escrow(storage_key = "StorageKey::Owner", id = "u64", state = "String")]
+        #[near_bindgen]
+        pub struct Integration {
+            pub value: u32,
         }
-        .emit();
     }
 
-    pub fn pause(&mut self) {
-        Self::require_role(&Role::CanPause);
-        Pause::pause(self);
-    }
+    #[near_bindgen]
+    impl Integration {
+        #[init]
+        pub fn new(owner_id: AccountId) -> Self {
+            let mut contract = Self { value: 0 };
 
-    pub fn unpause(&mut self) {
-        Self::require_role(&Role::CanPause);
-        Pause::unpause(self);
-    }
+            Owner::init(&mut contract, &owner_id);
+            contract.add_role(&owner_id, &Role::CanSetValue);
+            contract.add_role(&owner_id, &Role::CanPause);
 
-    pub fn get_value(&self) -> u32 {
-        self.value
-    }
+            contract
+        }
 
-    pub fn lock_data(&mut self, id: u64, data: String) {
-        self.lock(&id, &data);
-    }
+        pub fn add_value_setter(&mut self, account_id: AccountId) {
+            Self::require_owner();
 
-    pub fn unlock_data(&mut self, id: u64) {
-        self.unlock(&id, |data| !data.is_empty());
-    }
+            self.add_role(&account_id, &Role::CanSetValue);
 
-    pub fn check_is_locked(&self, id: u64) -> bool {
-        self.is_locked(&id)
+            my_event::PermissionGranted { to: account_id }.emit();
+        }
+
+        pub fn set_value(&mut self, value: u32) {
+            Self::require_unpaused();
+            Self::require_role(&Role::CanSetValue);
+
+            let old = self.value;
+
+            self.value = value;
+
+            my_event::ValueChanged {
+                from: old,
+                to: value,
+            }
+            .emit();
+        }
+
+        pub fn pause(&mut self) {
+            Self::require_role(&Role::CanPause);
+            Pause::pause(self);
+        }
+
+        pub fn unpause(&mut self) {
+            Self::require_role(&Role::CanPause);
+            Pause::unpause(self);
+        }
+
+        pub fn get_value(&self) -> u32 {
+            self.value
+        }
+
+        pub fn lock_data(&mut self, id: u64, data: String) {
+            self.lock(&id, &data);
+        }
+
+        pub fn unlock_data(&mut self, id: u64) {
+            self.unlock(&id, |data| !data.is_empty());
+        }
+
+        pub fn check_is_locked(&self, id: u64) -> bool {
+            self.is_locked(&id)
+        }
     }
 }
+use integration::Integration;
 
-#[derive(Migrate, Owner, Pause, Rbac, BorshSerialize, BorshDeserialize)]
-#[migrate(from = "Integration")]
-#[owner(storage_key = "StorageKey::Owner")]
-#[pause(storage_key = "StorageKey::Pause")]
-#[rbac(storage_key = "StorageKey::Rbac", roles = "Role")]
-#[near_bindgen]
-struct MigrateIntegration {
-    pub new_value: String,
-    pub moved_value: u32,
+compat_derive_borsh! {
+    #[derive(Migrate, Owner, Pause, Rbac)]
+    #[migrate(from = "Integration")]
+    #[owner(storage_key = "StorageKey::Owner")]
+    #[pause(storage_key = "StorageKey::Pause")]
+    #[rbac(storage_key = "StorageKey::Rbac", roles = "Role")]
+    #[near_bindgen]
+    struct MigrateIntegration {
+        pub new_value: String,
+        pub moved_value: u32,
+    }
 }
 
 impl MigrateHook for MigrateIntegration {
@@ -155,7 +160,7 @@ impl MigrateIntegration {
     pub fn add_value_setter(&mut self, account_id: AccountId) {
         Self::require_owner();
 
-        self.add_role(account_id.clone(), &Role::CanSetValue);
+        self.add_role(&account_id, &Role::CanSetValue);
 
         my_event::PermissionGranted { to: account_id }.emit();
     }
@@ -233,7 +238,7 @@ fn integration() {
     // Perform migration
     env::state_write(&c);
 
-    let mut migrated = <MigrateIntegration as MigrateExternal>::migrate();
+    let mut migrated = MigrateIntegration::migrate();
 
     assert_eq!(migrated.moved_value, 25);
     assert_eq!(migrated.get_value(), 25);
@@ -350,7 +355,7 @@ fn integration_fail_migrate_allow() {
 
     testing_env!(context);
 
-    <MigrateIntegration as MigrateExternal>::migrate();
+    MigrateIntegration::migrate();
 }
 
 #[test]
@@ -368,7 +373,7 @@ fn integration_fail_migrate_paused() {
 
     env::state_write(&c);
 
-    <MigrateIntegration as MigrateExternal>::migrate();
+    MigrateIntegration::migrate();
 }
 #[test]
 #[should_panic(expected = "Already locked")]
@@ -389,24 +394,23 @@ fn integration_fail_cannot_lock_twice() {
 
 #[cfg(test)]
 mod pausable_fungible_token {
-    use near_sdk::{
-        borsh::{self, BorshDeserialize, BorshSerialize},
-        env, near_bindgen,
-        test_utils::VMContextBuilder,
-        testing_env, AccountId, ONE_NEAR,
-    };
+    compat_use_borsh!();
+    use near_sdk::{env, near_bindgen, test_utils::VMContextBuilder, testing_env, AccountId};
     use near_sdk_contract_tools::{
+        compat_derive_borsh, compat_use_borsh,
         ft::*,
         hook::Hook,
         pause::{hooks::PausableHook, Pause},
-        Pause,
+        Pause, COMPAT_ONE_NEAR, COMPAT_ONE_YOCTONEAR,
     };
 
-    #[derive(FungibleToken, Pause, BorshDeserialize, BorshSerialize)]
-    #[fungible_token(all_hooks = "PausableHook", transfer_hook = "TransferHook")]
-    #[near_bindgen]
-    struct Contract {
-        pub storage_usage: u64,
+    compat_derive_borsh! {
+        #[derive(FungibleToken, Pause)]
+        #[fungible_token(all_hooks = "PausableHook", transfer_hook = "TransferHook")]
+        #[near_bindgen]
+        struct Contract {
+            pub storage_usage: u64,
+        }
     }
 
     #[near_bindgen]
@@ -452,13 +456,13 @@ mod pausable_fungible_token {
         let mut c = Contract::new();
 
         let context = VMContextBuilder::new()
-            .attached_deposit(ONE_NEAR / 100)
+            .attached_deposit(COMPAT_ONE_NEAR.saturating_div(100))
             .predecessor_account_id(alice.clone())
             .build();
         testing_env!(context);
         c.storage_deposit(None, None);
         let context = VMContextBuilder::new()
-            .attached_deposit(ONE_NEAR / 100)
+            .attached_deposit(COMPAT_ONE_NEAR.saturating_div(100))
             .predecessor_account_id(bob.clone())
             .build();
         testing_env!(context);
@@ -467,7 +471,7 @@ mod pausable_fungible_token {
         c.deposit_unchecked(&alice, 100).unwrap();
 
         let context = VMContextBuilder::new()
-            .attached_deposit(1)
+            .attached_deposit(*COMPAT_ONE_YOCTONEAR)
             .predecessor_account_id(alice.clone())
             .build();
         testing_env!(context);
@@ -488,7 +492,7 @@ mod pausable_fungible_token {
         c.deposit_unchecked(&alice, 100).unwrap();
 
         let context = VMContextBuilder::new()
-            .attached_deposit(1)
+            .attached_deposit(*COMPAT_ONE_YOCTONEAR)
             .predecessor_account_id(alice.clone())
             .build();
 
@@ -502,24 +506,24 @@ mod pausable_fungible_token {
 
 #[cfg(test)]
 mod owned_fungible_token {
+    compat_use_borsh!();
     use near_sdk::{
-        borsh::{self, BorshDeserialize, BorshSerialize},
-        env,
-        json_types::U128,
-        near_bindgen,
-        test_utils::VMContextBuilder,
-        testing_env, AccountId, PanicOnDefault, ONE_NEAR,
+        env, json_types::U128, near_bindgen, test_utils::VMContextBuilder, testing_env, AccountId,
+        PanicOnDefault,
     };
     use near_sdk_contract_tools::{
+        compat_derive_borsh, compat_near_to_u128, compat_use_borsh,
         ft::*,
         owner::{hooks::OnlyOwner, *},
-        Owner,
+        Owner, COMPAT_ONE_NEAR, COMPAT_ONE_YOCTONEAR,
     };
 
-    #[derive(BorshSerialize, BorshDeserialize, PanicOnDefault, Owner, FungibleToken)]
-    #[fungible_token(all_hooks = "OnlyOwner")] // only the owner can transfer, etc. the tokens
-    #[near_bindgen]
-    pub struct Contract {}
+    compat_derive_borsh! {
+        #[derive(PanicOnDefault, Owner, FungibleToken)]
+        #[fungible_token(all_hooks = "OnlyOwner")] // only the owner can transfer, etc. the tokens
+        #[near_bindgen]
+        pub struct Contract {}
+    }
 
     #[near_bindgen]
     impl Contract {
@@ -557,10 +561,10 @@ mod owned_fungible_token {
 
         // internal method calls
         contract
-            .deposit_to_storage_account(&alice, ONE_NEAR.into())
+            .deposit_to_storage_account(&alice, compat_near_to_u128!(*COMPAT_ONE_NEAR).into())
             .unwrap();
         contract
-            .deposit_to_storage_account(&bob, ONE_NEAR.into())
+            .deposit_to_storage_account(&bob, compat_near_to_u128!(*COMPAT_ONE_NEAR).into())
             .unwrap();
 
         // external; alice is still predecessor
@@ -571,7 +575,7 @@ mod owned_fungible_token {
 
         testing_env!(VMContextBuilder::new()
             .predecessor_account_id(alice.clone())
-            .attached_deposit(1)
+            .attached_deposit(*COMPAT_ONE_YOCTONEAR)
             .build());
         contract.ft_transfer(bob.clone(), U128(10), None);
 
@@ -592,10 +596,10 @@ mod owned_fungible_token {
 
         // internal method calls
         contract
-            .deposit_to_storage_account(&alice, ONE_NEAR.into())
+            .deposit_to_storage_account(&alice, compat_near_to_u128!(*COMPAT_ONE_NEAR).into())
             .unwrap();
         contract
-            .deposit_to_storage_account(&bob, ONE_NEAR.into())
+            .deposit_to_storage_account(&bob, compat_near_to_u128!(*COMPAT_ONE_NEAR).into())
             .unwrap();
 
         testing_env!(VMContextBuilder::new().predecessor_account_id(bob).build());
@@ -616,17 +620,17 @@ mod owned_fungible_token {
 
         // internal method calls
         contract
-            .deposit_to_storage_account(&alice, ONE_NEAR.into())
+            .deposit_to_storage_account(&alice, compat_near_to_u128!(*COMPAT_ONE_NEAR).into())
             .unwrap();
         contract
-            .deposit_to_storage_account(&bob, ONE_NEAR.into())
+            .deposit_to_storage_account(&bob, compat_near_to_u128!(*COMPAT_ONE_NEAR).into())
             .unwrap();
 
         Nep141Controller::deposit_unchecked(&mut contract, &bob, 100).unwrap();
 
         testing_env!(VMContextBuilder::new()
             .predecessor_account_id(bob)
-            .attached_deposit(1)
+            .attached_deposit(*COMPAT_ONE_YOCTONEAR)
             .build());
         contract.ft_transfer(alice, U128(10), None);
     }

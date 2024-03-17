@@ -69,13 +69,7 @@ pub fn expand(meta: Nep145Meta) -> Result<TokenStream, darling::Error> {
                 let bounds = Nep145Controller::get_storage_balance_bounds(self);
 
                 let attached = env::attached_deposit();
-                let amount = if registration_only.unwrap_or(false) {
-                    bounds.min.0
-                } else if let Some(U128(max)) = bounds.max {
-                    u128::min(max, attached)
-                } else {
-                    attached
-                };
+                let amount = bounds.compat_bound(attached, registration_only.unwrap_or(false));
                 let refund = attached.checked_sub(amount).unwrap_or_else(|| {
                     env::panic_str(&format!(
                         "Attached deposit {} is less than required {}",
@@ -87,12 +81,12 @@ pub fn expand(meta: Nep145Meta) -> Result<TokenStream, darling::Error> {
                 let storage_balance = Nep145Controller::deposit_to_storage_account(
                     self,
                     &account_id.unwrap_or_else(|| predecessor.clone()),
-                    U128(amount),
+                    U128(#me::compat_near_to_u128!(amount)),
                 )
                 .unwrap_or_else(|e| env::panic_str(&format!("Storage deposit error: {}", e)));
 
-                if refund > 0 {
-                    Promise::new(predecessor).transfer(amount);
+                if #me::compat_near_to_u128!(refund) > 0 {
+                    Promise::new(predecessor).transfer(refund);
                 }
 
                 storage_balance
@@ -119,7 +113,7 @@ pub fn expand(meta: Nep145Meta) -> Result<TokenStream, darling::Error> {
                 let new_balance = Nep145Controller::withdraw_from_storage_account(self, &predecessor, amount)
                     .unwrap_or_else(|e| env::panic_str(&format!("Storage withdraw error: {}", e)));
 
-                Promise::new(predecessor).transfer(amount.0);
+                Promise::new(predecessor).transfer(#me::compat_yoctonear!(amount.0));
 
                 new_balance
             }
@@ -149,7 +143,7 @@ pub fn expand(meta: Nep145Meta) -> Result<TokenStream, darling::Error> {
                     }
                 };
 
-                Promise::new(predecessor).transfer(refund.0);
+                Promise::new(predecessor).transfer(#me::compat_yoctonear!(refund.0));
                 true
             }
 

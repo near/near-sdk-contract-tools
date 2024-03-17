@@ -1,20 +1,22 @@
 #![allow(dead_code)]
 
-use near_sdk::{
-    borsh::{self, BorshDeserialize, BorshSerialize},
-    env, near_bindgen, store, AccountId, ONE_NEAR,
+compat_use_borsh!();
+use near_sdk::{env, near_bindgen, store, AccountId};
+use near_sdk_contract_tools::{
+    compat_derive_borsh, compat_near, compat_near_to_u128, compat_use_borsh, hook::Hook, nft::*,
 };
-use near_sdk_contract_tools::{hook::Hook, nft::*};
 
 mod hooks;
 mod manual_integration;
 mod no_hooks;
 mod non_fungible_token;
 
-#[derive(BorshDeserialize, BorshSerialize, Debug, Clone, PartialEq, PartialOrd)]
-struct TokenRecord {
-    owner_id: AccountId,
-    token_id: TokenId,
+compat_derive_borsh! {
+    #[derive(Debug, Clone, PartialEq, PartialOrd)]
+    struct TokenRecord {
+        owner_id: AccountId,
+        token_id: TokenId,
+    }
 }
 
 impl From<Token> for TokenRecord {
@@ -26,38 +28,51 @@ impl From<Token> for TokenRecord {
     }
 }
 
-#[derive(NonFungibleToken, BorshDeserialize, BorshSerialize)]
-#[near_bindgen]
-struct NonFungibleTokenNoHooks {
-    pub before_nft_transfer_balance_record: store::Vector<Option<TokenRecord>>,
-    pub after_nft_transfer_balance_record: store::Vector<Option<TokenRecord>>,
-}
+mod full_no_hooks {
+    use super::*;
 
-#[test]
-fn t() {
-    let mut n = NonFungibleTokenNoHooks {
-        before_nft_transfer_balance_record: store::Vector::new(b"a"),
-        after_nft_transfer_balance_record: store::Vector::new(b"b"),
-    };
+    compat_derive_borsh! {
+        #[derive(NonFungibleToken)]
+        #[near_bindgen]
+        struct NonFungibleTokenNoHooks {
+            pub before_nft_transfer_balance_record: store::Vector<Option<TokenRecord>>,
+            pub after_nft_transfer_balance_record: store::Vector<Option<TokenRecord>>,
+        }
+    }
 
-    let token_id = "token1".to_string();
-    let alice: AccountId = "alice".parse().unwrap();
+    #[test]
+    fn nft_no_hooks() {
+        let mut n = NonFungibleTokenNoHooks {
+            before_nft_transfer_balance_record: store::Vector::new(b"a"),
+            after_nft_transfer_balance_record: store::Vector::new(b"b"),
+        };
 
-    Nep145Controller::deposit_to_storage_account(&mut n, &alice, ONE_NEAR.into()).unwrap();
+        let token_id = "token1".to_string();
+        let alice: AccountId = "alice".parse().unwrap();
 
-    n.mint_with_metadata(token_id.clone(), alice, TokenMetadata::new().title("Title"))
+        Nep145Controller::deposit_to_storage_account(
+            &mut n,
+            &alice,
+            compat_near_to_u128!(compat_near!(1u128)).into(),
+        )
         .unwrap();
 
-    let nft_tok = n.nft_token(token_id);
-    dbg!(nft_tok);
+        n.mint_with_metadata(token_id.clone(), alice, TokenMetadata::new().title("Title"))
+            .unwrap();
+
+        let nft_tok = n.nft_token(token_id);
+        dbg!(nft_tok);
+    }
 }
 
-#[derive(Nep171, BorshDeserialize, BorshSerialize)]
-#[nep171(transfer_hook = "Self")]
-#[near_bindgen]
-struct NonFungibleToken {
-    pub before_nft_transfer_balance_record: store::Vector<Option<TokenRecord>>,
-    pub after_nft_transfer_balance_record: store::Vector<Option<TokenRecord>>,
+compat_derive_borsh! {
+    #[derive(Nep171)]
+    #[nep171(transfer_hook = "Self")]
+    #[near_bindgen]
+    struct NonFungibleToken {
+        pub before_nft_transfer_balance_record: store::Vector<Option<TokenRecord>>,
+        pub after_nft_transfer_balance_record: store::Vector<Option<TokenRecord>>,
+    }
 }
 
 impl Hook<NonFungibleToken, Nep171Transfer<'_>> for NonFungibleToken {
@@ -106,12 +121,15 @@ mod tests {
         test_utils::{get_logs, VMContextBuilder},
         testing_env, AccountId,
     };
-    use near_sdk_contract_tools::standard::{
-        nep171::{
-            event::{Nep171Event, NftTransferLog},
-            Nep171,
+    use near_sdk_contract_tools::{
+        compat_yoctonear,
+        standard::{
+            nep171::{
+                event::{Nep171Event, NftTransferLog},
+                Nep171,
+            },
+            nep297::Event,
         },
-        nep297::Event,
     };
 
     use super::*;
@@ -138,7 +156,7 @@ mod tests {
 
         testing_env!(VMContextBuilder::new()
             .predecessor_account_id(account_alice.clone())
-            .attached_deposit(1)
+            .attached_deposit(compat_yoctonear!(1u128))
             .build());
 
         contract.nft_transfer(account_bob.clone(), token_id.to_string(), None, None);

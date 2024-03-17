@@ -1,17 +1,16 @@
 #![allow(missing_docs)]
 
-use near_sdk_contract_tools::{owner::*, upgrade::PostUpgrade, Owner};
+workspaces_tests::predicate!();
 
-use near_sdk::{
-    borsh::{self, BorshDeserialize, BorshSerialize},
-    env, near_bindgen, PanicOnDefault,
-};
-pub fn main() {}
+use near_sdk::{env, near_bindgen, PanicOnDefault};
+use near_sdk_contract_tools::{compat_derive_borsh, owner::*, upgrade::PostUpgrade, Owner};
 
-#[derive(BorshSerialize, BorshDeserialize, PanicOnDefault, Owner)]
-#[near_bindgen]
-pub struct ContractOld {
-    pub foo: u32,
+compat_derive_borsh! {
+    #[derive(PanicOnDefault, Owner)]
+    #[near_bindgen]
+    pub struct ContractOld {
+        pub foo: u32,
+    }
 }
 
 #[near_bindgen]

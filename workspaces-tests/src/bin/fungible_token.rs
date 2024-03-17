@@ -3,20 +3,23 @@
 // Ignore
 pub fn main() {}
 
+workspaces_tests::near_sdk!();
+compat_use_borsh!();
 use near_sdk::{
-    borsh::{self, BorshDeserialize, BorshSerialize},
     env,
     json_types::{Base64VecU8, U128},
     near_bindgen,
     store::Vector,
     PanicOnDefault,
 };
-use near_sdk_contract_tools::ft::*;
+use near_sdk_contract_tools::{compat_derive_borsh, compat_near_to_u128, compat_use_borsh, ft::*};
 
-#[derive(PanicOnDefault, BorshSerialize, BorshDeserialize, FungibleToken)]
-#[near_bindgen]
-pub struct Contract {
-    blobs: Vector<Vec<u8>>,
+compat_derive_borsh! {
+    #[derive(PanicOnDefault, FungibleToken)]
+    #[near_bindgen]
+    pub struct Contract {
+        blobs: Vector<Vec<u8>>,
+    }
 }
 
 #[near_bindgen]
@@ -56,7 +59,9 @@ impl Contract {
         let storage_end = env::storage_usage();
         self.lock_storage(
             &env::predecessor_account_id(),
-            ((storage_end - storage_start) as u128 * env::storage_byte_cost()).into(),
+            ((storage_end - storage_start) as u128
+                * compat_near_to_u128!(env::storage_byte_cost()))
+            .into(),
         )
         .unwrap_or_else(|e| env::panic_str(&format!("Storage lock error: {}", e)));
     }

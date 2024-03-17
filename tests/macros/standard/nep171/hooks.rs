@@ -1,14 +1,14 @@
-use near_sdk::{
-    borsh::{self, BorshDeserialize, BorshSerialize},
-    log, near_bindgen, PanicOnDefault,
-};
-use near_sdk_contract_tools::{hook::Hook, nft::*};
+use near_sdk_contract_tools::{compat_derive_borsh, compat_use_borsh, hook::Hook, nft::*};
+compat_use_borsh!();
+use near_sdk::{log, near_bindgen, PanicOnDefault};
 
-#[derive(BorshSerialize, BorshDeserialize, PanicOnDefault, Nep171)]
-#[nep171(transfer_hook = "Self")]
-#[near_bindgen]
-pub struct Contract {
-    transfer_count: u32,
+compat_derive_borsh! {
+    #[derive(PanicOnDefault, Nep171)]
+    #[nep171(transfer_hook = "Self")]
+    #[near_bindgen]
+    pub struct Contract {
+        transfer_count: u32,
+    }
 }
 
 impl Hook<Contract, Nep171Transfer<'_>> for Contract {

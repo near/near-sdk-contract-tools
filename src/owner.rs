@@ -31,10 +31,9 @@
 //! * (ERR) The external functions exposed in [`OwnerExternal`] call their
 //!   respective [`Owner`] methods and expect the same invariants.
 
-use near_sdk::{
-    borsh::{self, BorshSerialize},
-    env, require, AccountId, BorshStorageKey,
-};
+#[cfg(feature = "near-sdk-4")]
+use near_sdk::borsh;
+use near_sdk::{borsh::BorshSerialize, env, require, AccountId, BorshStorageKey};
 use near_sdk_contract_tools_macros::event;
 
 use crate::{slot::Slot, standard::nep297::Event, DefaultStorageKey};
@@ -70,11 +69,13 @@ pub enum OwnerEvent {
     },
 }
 
-#[derive(BorshSerialize, BorshStorageKey, Debug, Clone)]
-enum StorageKey {
-    IsInitialized,
-    Owner,
-    ProposedOwner,
+compat_derive_storage_key! {
+    #[derive(Debug, Clone)]
+    enum StorageKey {
+        IsInitialized,
+        Owner,
+        ProposedOwner,
+    }
 }
 
 /// Internal functions for [`Owner`]. Using these methods may result in unexpected behavior.
@@ -417,7 +418,7 @@ mod tests {
         assert_eq!(contract.own_get_owner(), Some(owner_id.clone()));
         testing_env!(VMContextBuilder::new()
             .predecessor_account_id(owner_id)
-            .attached_deposit(1)
+            .attached_deposit(compat_yoctonear!(1u128))
             .build());
         contract.own_renounce_owner();
         assert_eq!(contract.own_get_owner(), None);
@@ -432,7 +433,7 @@ mod tests {
 
         testing_env!(VMContextBuilder::new()
             .predecessor_account_id(owner_id)
-            .attached_deposit(1)
+            .attached_deposit(compat_yoctonear!(1u128))
             .build());
 
         assert_eq!(contract.own_get_proposed_owner(), None);
@@ -452,7 +453,7 @@ mod tests {
 
         testing_env!(VMContextBuilder::new()
             .predecessor_account_id(proposed_owner.clone())
-            .attached_deposit(1)
+            .attached_deposit(compat_yoctonear!(1u128))
             .build());
 
         contract.own_propose_owner(Some(proposed_owner));
@@ -483,14 +484,14 @@ mod tests {
 
         testing_env!(VMContextBuilder::new()
             .predecessor_account_id(owner_id)
-            .attached_deposit(1)
+            .attached_deposit(compat_yoctonear!(1u128))
             .build());
 
         contract.own_propose_owner(Some(proposed_owner.clone()));
 
         testing_env!(VMContextBuilder::new()
             .predecessor_account_id(proposed_owner.clone())
-            .attached_deposit(1)
+            .attached_deposit(compat_yoctonear!(1u128))
             .build());
 
         contract.own_accept_owner();
@@ -510,7 +511,7 @@ mod tests {
 
         testing_env!(VMContextBuilder::new()
             .predecessor_account_id(owner_id)
-            .attached_deposit(1)
+            .attached_deposit(compat_yoctonear!(1u128))
             .build());
 
         contract.own_propose_owner(Some(proposed_owner));
@@ -519,7 +520,7 @@ mod tests {
 
         testing_env!(VMContextBuilder::new()
             .predecessor_account_id(third_party)
-            .attached_deposit(1)
+            .attached_deposit(compat_yoctonear!(1u128))
             .build());
 
         contract.own_accept_owner();
@@ -536,7 +537,7 @@ mod tests {
 
         testing_env!(VMContextBuilder::new()
             .predecessor_account_id(owner_id)
-            .attached_deposit(1)
+            .attached_deposit(compat_yoctonear!(1u128))
             .build());
 
         contract.own_propose_owner(Some(proposed_owner.clone()));

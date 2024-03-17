@@ -1,16 +1,16 @@
 #![allow(missing_docs)]
 
-use near_sdk::{
-    borsh::{self, BorshDeserialize, BorshSerialize},
-    near_bindgen, PanicOnDefault,
-};
+workspaces_tests::predicate!();
 
-pub fn main() {} // Ignore
+use near_sdk::{near_bindgen, PanicOnDefault};
+use near_sdk_contract_tools::compat_derive_borsh;
 
-#[derive(BorshSerialize, BorshDeserialize, PanicOnDefault)]
-#[near_bindgen]
-pub struct ContractBad {
-    pub foo: u32,
+compat_derive_borsh! {
+    #[derive(PanicOnDefault)]
+    #[near_bindgen]
+    pub struct ContractBad {
+        pub foo: u32,
+    }
 }
 
 #[near_bindgen]

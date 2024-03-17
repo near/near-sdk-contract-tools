@@ -1,8 +1,254 @@
 #![doc = include_str!("../README.md")]
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 
+#[cfg(all(feature = "near-sdk-4", feature = "near-sdk-5"))]
+compile_error!("Features `near-sdk-4` and `near-sdk-5` cannot be enabled at the same time.");
+
+#[cfg(feature = "near-sdk-4")]
+pub extern crate near_sdk_4 as near_sdk;
+#[cfg(feature = "near-sdk-5")]
+pub extern crate near_sdk_5 as near_sdk;
+
+/// **COMPATIBLE (UNSTABLE)**
+///
+/// Data structure representing an amount of NEAR tokens. Only for
+/// compatibility between `near_sdk` versions.
+#[cfg(feature = "near-sdk-4")]
+pub type CompatNearToken = near_sdk::Balance;
+/// **COMPATIBLE (UNSTABLE)**
+///
+/// Data structure representing an amount of NEAR tokens. Only for
+/// compatibility between `near_sdk` versions.
+#[cfg(feature = "near-sdk-5")]
+pub type CompatNearToken = near_sdk::NearToken;
+
+/// **COMPATIBLE (UNSTABLE)**
+///
+/// 1 NEAR token.
+pub static COMPAT_ONE_NEAR: Lazy<CompatNearToken> = Lazy::new(|| compat_near!(1u128));
+
+/// **COMPATIBLE (UNSTABLE)**
+///
+/// 1 yoctoNEAR token.
+pub static COMPAT_ONE_YOCTONEAR: Lazy<CompatNearToken> = Lazy::new(|| compat_yoctonear!(1u128));
+
+/// **COMPATIBLE (UNSTABLE)**
+///
+/// 1 Gas unit.
+pub static COMPAT_ONE_GAS: Lazy<near_sdk::Gas> = Lazy::new(|| compat_gas!(1u64));
+
+/// **COMPATIBLE (UNSTABLE)**
+///
+/// 1 gigaGas unit.
+pub static COMPAT_ONE_GIGAGAS: Lazy<near_sdk::Gas> = Lazy::new(|| compat_gas!(10u64.pow(9)));
+
+/// **COMPATIBLE (UNSTABLE)**
+///
+/// 1 teraGas unit.
+pub static COMPAT_ONE_TERAGAS: Lazy<near_sdk::Gas> = Lazy::new(|| compat_gas!(10u64.pow(12)));
+
+/// **COMPATIBLE (UNSTABLE)**
+///
+/// Converts a number into the NEAR balance amount for the current `near_sdk`
+/// version, depending on feature flags. Value is given in units of yoctoNEAR.
+#[macro_export]
+macro_rules! compat_yoctonear {
+    ($amount: expr) => {{
+        #[cfg(feature = "near-sdk-4")]
+        {
+            near_sdk::Balance::from($amount)
+        }
+        #[cfg(feature = "near-sdk-5")]
+        {
+            near_sdk::NearToken::from_yoctonear(u128::from($amount))
+        }
+    }};
+}
+
+/// **COMPATIBLE (UNSTABLE)**
+///
+/// Converts a number into the NEAR balance amount for the current `near_sdk`
+/// version, depending on feature flags. Value is given in units of NEAR.
+#[macro_export]
+macro_rules! compat_near {
+    ($amount: expr) => {{
+        #[cfg(feature = "near-sdk-4")]
+        {
+            near_sdk::Balance::from(10u128.pow(24) * $amount)
+        }
+        #[cfg(feature = "near-sdk-5")]
+        {
+            near_sdk::NearToken::from_near(u128::from($amount))
+        }
+    }};
+}
+
+/// **COMPATIBLE (UNSTABLE)**
+///
+/// Converts a NEAR balance amount to a `u128` for the current `near_sdk`
+/// version, depending on feature flags.
+#[macro_export]
+macro_rules! compat_near_to_u128 {
+    ($amount: expr) => {{
+        #[cfg(feature = "near-sdk-4")]
+        {
+            u128::from($amount)
+        }
+        #[cfg(feature = "near-sdk-5")]
+        {
+            near_sdk::NearToken::as_yoctonear(&$amount)
+        }
+    }};
+}
+
+/// **COMPATIBLE (UNSTABLE)**
+///
+/// Converts a u64 to a gas value for the current `near_sdk` version,
+/// depending on feature flags.
+#[macro_export]
+macro_rules! compat_gas {
+    ($amount: expr) => {{
+        #[cfg(feature = "near-sdk-4")]
+        {
+            near_sdk::Gas::from($amount)
+        }
+        #[cfg(feature = "near-sdk-5")]
+        {
+            near_sdk::Gas::from_gas($amount)
+        }
+    }};
+}
+
+/// **COMPATIBLE (UNSTABLE)**
+///
+/// Converts a u64 to a gas value for the current `near_sdk` version,
+/// depending on feature flags.
+#[macro_export]
+macro_rules! compat_gas_to_u64 {
+    ($amount: expr) => {{
+        #[cfg(feature = "near-sdk-4")]
+        {
+            <near_sdk::Gas as Into<u64>>::into($amount)
+        }
+        #[cfg(feature = "near-sdk-5")]
+        {
+            near_sdk::Gas::as_gas($amount)
+        }
+    }};
+}
+
+/// **COMPATIBLE (UNSTABLE)**
+///
+/// Serializes an expression using Borsh, using the correct version from
+/// `near_sdk`, depending on feature flags.
+#[macro_export]
+macro_rules! compat_borsh_serialize {
+    ($e: expr) => {{
+        #[cfg(feature = "near-sdk-4")]
+        {
+            near_sdk::borsh::BorshSerialize::try_to_vec($e)
+        }
+        #[cfg(feature = "near-sdk-5")]
+        {
+            near_sdk::borsh::to_vec($e)
+        }
+    }};
+}
+
+/// **COMPATIBLE (UNSTABLE)**
+///
+/// Imports Borsh from `near_sdk`. Imports the correct items from `near_sdk`
+/// versions 4 and 5 depending on feature flags.
+#[macro_export]
+macro_rules! compat_use_borsh {
+    () => {
+        $crate::compat_use_borsh!{BorshSerialize, BorshDeserialize}
+    };
+    ($($i: ident),*) => {
+        #[cfg(feature = "near-sdk-4")]
+        use near_sdk::borsh;
+        use near_sdk::borsh::{$($i),*};
+    };
+}
+
+/// **COMPATIBLE (UNSTABLE)**
+///
+/// Implements serde & Borsh serialization and deserialization from `near_sdk`
+/// on the given items. Supports `near_sdk` versions 4 and 5 depending on
+/// feature flags.
+#[macro_export]
+macro_rules! compat_derive_serde_borsh {
+    (feature = $v: expr, [$($i: ident),*], $($b: tt)+) => {
+        #[derive($($i),*)]
+        #[cfg_attr(feature = $v, borsh(crate = "near_sdk::borsh"))]
+        #[serde(crate = "near_sdk::serde")]
+        $($b)+
+    };
+    ([$($i: ident),*], $($b: tt)+) => {
+        $crate::compat_derive_serde_borsh!{feature = "near-sdk-5", [$($i),*], $($b)+}
+    };
+    ($($b: tt)+) => {
+        $crate::compat_derive_serde_borsh!{[Serialize, Deserialize, BorshSerialize, BorshDeserialize], $($b)+}
+    };
+}
+
+/// **COMPATIBLE (UNSTABLE)**
+///
+/// Implements serde serialization and deserialization from `near_sdk` on the
+/// given items. Supports `near_sdk` versions 4 and 5 depending on feature
+/// flags.
+#[macro_export]
+macro_rules! compat_derive_serde {
+    ([$($i: ident),*], $($b: tt)+) => {
+        #[derive($($i),*)]
+        #[serde(crate = "near_sdk::serde")]
+        $($b)+
+    };
+    ($($b: tt)+) => {
+        $crate::compat_derive_serde!{[Serialize, Deserialize], $($b)+}
+    };
+}
+
+/// **COMPATIBLE (UNSTABLE)**
+///
+/// Implements Borsh serialization and deserialization from `near_sdk` on the
+/// given items. Supports `near_sdk` versions 4 and 5 depending on feature
+/// flags.
+#[macro_export]
+macro_rules! compat_derive_borsh {
+    (feature = $v: expr, [$($i: ident),*], $($b: tt)+) => {
+        #[derive($($i),*)]
+        #[cfg_attr(feature = $v, borsh(crate = "near_sdk::borsh"))]
+        $($b)+
+    };
+    ([$($i: ident),*], $($b: tt)+) => {
+        $crate::compat_derive_borsh!{feature = "near-sdk-5", [$($i),*], $($b)+}
+    };
+    ($($b: tt)+) => {
+        $crate::compat_derive_borsh!{[BorshSerialize, BorshDeserialize], $($b)+}
+    };
+}
+
+/// **COMPATIBLE (UNSTABLE)**
+///
+/// Implements Borsh serialization and [`near_sdk::BorshStorageKey`] on the
+/// given items. Supports `near_sdk` versions 4 and 5 depending on feature
+/// flags.
+#[macro_export]
+macro_rules! compat_derive_storage_key {
+    (feature = $v: expr, $($b: tt)+) => {
+        #[derive(BorshSerialize, BorshStorageKey)]
+        #[cfg_attr(feature = $v, borsh(crate = "near_sdk::borsh"))]
+        $($b)+
+    };
+    ($($b: tt)+) => {
+        $crate::compat_derive_storage_key!{feature = "near-sdk-5", $($b)+}
+    };
+}
+
 use near_sdk::IntoStorageKey;
 pub use near_sdk_contract_tools_macros::*;
+use once_cell::sync::Lazy;
 
 /// Default storage keys used by various traits' `root()` functions.
 #[derive(Clone, Debug)]

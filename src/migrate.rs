@@ -57,5 +57,5 @@ pub trait MigrateHook: MigrateController {
 #[ext_contract(ext_migrate)]
 pub trait MigrateExternal {
     /// Perform the migration with optional arguments
-    fn migrate() -> Self;
+    fn migrate();
 }

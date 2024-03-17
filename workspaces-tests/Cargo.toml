@@ -63,8 +63,11 @@ name = "upgrade_old_multisig"
 name = "upgrade_old_raw"
 
 [dependencies]
-near-sdk.workspace = true
-near-sdk-contract-tools = { path = "../", features = ["unstable"] }
+near-sdk-4 = { workspace = true, default-features = false, optional = true }
+near-sdk-5 = { workspace = true, default-features = false, optional = true }
+near-sdk-contract-tools = { path = "../", default-features = false, features = [
+    "unstable",
+] }
 strum.workspace = true
 strum_macros.workspace = true
 thiserror.workspace = true
@@ -73,7 +76,21 @@ thiserror.workspace = true
 near-crypto.workspace = true
 tokio.workspace = true
 pretty_assertions.workspace = true
+near-workspaces = { workspace = true, features = ["unstable"] }
+workspaces-tests-utils = { path = "../workspaces-tests-utils", default-features = false, features = [
+    "unstable",
+] }
 
-[target.'cfg(not(windows))'.dev-dependencies]
-near-workspaces.workspace = true
-workspaces-tests-utils = { path = "../workspaces-tests-utils" }
+[features]
+default = ["near-sdk-5"]
+near-sdk-4 = [
+    "dep:near-sdk-4",
+    "near-sdk-contract-tools/near-sdk-4",
+    "workspaces-tests-utils/near-sdk-4",
+]
+near-sdk-5 = [
+    "dep:near-sdk-5",
+    "near-sdk-contract-tools/near-sdk-5",
+    "workspaces-tests-utils/near-sdk-5",
+]
+unstable = ["near-sdk-4?/unstable", "near-sdk-5?/unstable"]

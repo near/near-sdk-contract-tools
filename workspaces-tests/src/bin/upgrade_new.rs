@@ -1,23 +1,22 @@
 #![allow(missing_docs)]
 
-use near_sdk::{
-    borsh::{self, BorshDeserialize, BorshSerialize},
-    near_bindgen, PanicOnDefault,
-};
-use near_sdk_contract_tools::{migrate::*, Migrate};
+workspaces_tests::predicate!();
+use near_sdk::{near_bindgen, PanicOnDefault};
+use near_sdk_contract_tools::{compat_derive_borsh, migrate::*, Migrate};
 
-pub fn main() {} // Ignore
-
-#[derive(BorshDeserialize)]
-pub struct ContractOld {
-    pub foo: u32,
+compat_derive_borsh! {[BorshDeserialize],
+    pub struct ContractOld {
+        pub foo: u32,
+    }
 }
 
-#[derive(BorshSerialize, BorshDeserialize, PanicOnDefault, Migrate)]
-#[migrate(from = "ContractOld")]
-#[near_bindgen]
-pub struct ContractNew {
-    pub bar: u64,
+compat_derive_borsh! {
+    #[derive(PanicOnDefault, Migrate)]
+    #[migrate(from = "ContractOld")]
+    #[near_bindgen]
+    pub struct ContractNew {
+        pub bar: u64,
+    }
 }
 
 impl MigrateHook for ContractNew {

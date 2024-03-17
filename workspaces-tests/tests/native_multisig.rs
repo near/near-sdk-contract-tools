@@ -1,18 +1,22 @@
-#![cfg(not(windows))]
+workspaces_tests::near_sdk!();
 
 use std::{future::IntoFuture, time::Duration};
 
 use near_crypto::{KeyType, SecretKey};
-use near_sdk::{serde_json::json, Gas, ONE_NEAR};
-use near_sdk_contract_tools::approval::native_transaction_action::PromiseAction;
+use near_sdk::serde_json::json;
+use near_sdk_contract_tools::{
+    approval::native_transaction_action::PromiseAction, compat_gas_to_u64, compat_near_to_u128,
+    COMPAT_ONE_NEAR, COMPAT_ONE_TERAGAS,
+};
 use near_workspaces::{
     result::{ExecutionResult, Value},
     sandbox,
-    types::{AccessKeyPermission, Finality},
+    types::{AccessKeyPermission, Finality, NearToken},
     Account, AccountDetailsPatch, Contract, DevNetwork, Worker,
 };
 use pretty_assertions::assert_eq;
 use tokio::{join, time::sleep};
+use workspaces_tests_utils::ONE_NEAR;
 
 const WASM: &[u8] =
     include_bytes!("../../target/wasm32-unknown-unknown/release/native_multisig.wasm");
@@ -105,11 +109,11 @@ async fn stake() {
         worker,
     } = setup_roles(sandbox().await.unwrap(), 2).await;
 
-    const MINIMUM_STAKE: u128 = 800_000_000_000_000_000_000_000_000;
+    const MINIMUM_STAKE: NearToken = NearToken::from_yoctonear(800_000_000_000_000_000_000_000_000);
 
     worker
         .patch(contract.id())
-        .account(AccountDetailsPatch::default().balance(MINIMUM_STAKE * 4))
+        .account(AccountDetailsPatch::default().balance(MINIMUM_STAKE.saturating_mul(4)))
         .transact()
         .await
         .unwrap();
@@ -122,11 +126,12 @@ async fn stake() {
 
     let contract_before = contract.view_account().await.unwrap();
     assert_eq!(
-        contract_before.locked, 0,
+        contract_before.locked.as_yoctonear(),
+        0,
         "Account should start with no staked tokens"
     );
 
-    let stake_amount = MINIMUM_STAKE * 2;
+    let stake_amount = MINIMUM_STAKE.saturating_mul(2);
 
     let request_id = alice
         .call(contract.id(), "request")
@@ -134,7 +139,7 @@ async fn stake() {
             "receiver_id": contract.id(),
             "actions": [
                 PromiseAction::Stake {
-                    amount: stake_amount.into(),
+                    amount: stake_amount.as_yoctonear().into(),
                     public_key: public_key.to_string(),
                 },
             ],
@@ -181,7 +186,7 @@ async fn delete_account() {
             "receiver_id": contract.id(),
             "actions": [
                 PromiseAction::DeleteAccount {
-                    beneficiary_id: alice.id().parse().unwrap()
+                    beneficiary_id: alice.id().as_str().parse().unwrap()
                 },
             ],
         }))
@@ -207,8 +212,11 @@ async fn delete_account() {
     const MAX_GAS: u128 = 300_000_000_000_000;
 
     assert!(
-        alice_balance_after.abs_diff(alice_balance_before + contract_balance_before)
-            <= MAX_GAS * gas_price,
+        alice_balance_after.as_yoctonear().abs_diff(
+            alice_balance_before
+                .saturating_add(contract_balance_before)
+                .as_yoctonear()
+        ) <= gas_price.saturating_mul(MAX_GAS).as_yoctonear(),
         "All contract account funds (sans gas) transfer to the beneficiary account",
     );
 }
@@ -236,7 +244,7 @@ async fn create_account_transfer_deploy_contract_function_call() {
             "receiver_id": new_account_id_str.clone(),
             "actions": [
                 PromiseAction::CreateAccount,
-                PromiseAction::Transfer { amount: (ONE_NEAR * 30).into() },
+                PromiseAction::Transfer { amount: compat_near_to_u128!(COMPAT_ONE_NEAR.saturating_mul(30)).into() },
                 PromiseAction::DeployContract { code: BASIC_ADDER_WASM.to_vec().into() },
                 PromiseAction::FunctionCall { function_name: "new".into(), arguments: vec![].into(), amount: 0.into(), gas: 1_000_000_000_000.into() }
             ],
@@ -251,7 +259,7 @@ async fn create_account_transfer_deploy_contract_function_call() {
     double_approve_and_execute(&contract, alice, bob, alice, request_id).await;
 
     let state = worker.view_account(&new_account_id).await.unwrap();
-    assert!(state.balance >= ONE_NEAR * 30);
+    assert!(state.balance >= ONE_NEAR.saturating_mul(30));
 
     let result = worker
         .view(&new_account_id, "add_five")
@@ -385,7 +393,7 @@ async fn add_both_access_key_kinds_and_delete() {
         execute_actions(vec![PromiseAction::AddAccessKey {
             public_key: new_public_key_string.clone(),
             allowance: (1234567890).into(),
-            receiver_id: alice.id().parse().unwrap(),
+            receiver_id: alice.id().as_str().parse().unwrap(),
             function_names: vec!["one".into(), "two".into(), "three".into()],
             nonce: None,
         }])
@@ -415,7 +423,7 @@ async fn add_both_access_key_kinds_and_delete() {
             _ => panic!("Expected function call permission"),
         };
 
-        assert_eq!(perm.allowance, Some(1234567890));
+        assert_eq!(perm.allowance, Some(NearToken::from_yoctonear(1234567890)));
         assert_eq!(perm.method_names, &["one", "two", "three"]);
         assert_eq!(perm.receiver_id, alice.id().to_string());
 
@@ -479,7 +487,7 @@ async fn transfer() {
             "receiver_id": charlie.id(),
             "actions": [
                 PromiseAction::Transfer {
-                    amount: (near_sdk::ONE_NEAR * 10).into(),
+                    amount: compat_near_to_u128!(COMPAT_ONE_NEAR.saturating_mul(10)).into(),
                 },
             ],
         }))
@@ -543,7 +551,10 @@ async fn transfer() {
     let balance_after = charlie.view_account().await.unwrap().balance;
 
     // charlie's balance should have increased by exactly 10 NEAR
-    assert_eq!(balance_after - balance_before, near_sdk::ONE_NEAR * 10);
+    assert_eq!(
+        balance_after.saturating_sub(balance_before).as_yoctonear(),
+        compat_near_to_u128!(COMPAT_ONE_NEAR.saturating_mul(10)),
+    );
 }
 
 #[tokio::test]
@@ -564,7 +575,9 @@ async fn reflexive_xcc() {
             .to_vec()
             .into(),
         amount: 0.into(),
-        gas: (Gas::ONE_TERA.0 * 50).into(),
+        gas: compat_gas_to_u64!(*COMPAT_ONE_TERAGAS)
+            .saturating_mul(50)
+            .into(),
     }];
 
     let request_id = alice
@@ -636,7 +649,9 @@ async fn external_xcc() {
             .to_vec()
             .into(),
         amount: 0.into(),
-        gas: (Gas::ONE_TERA.0 * 50).into(),
+        gas: compat_gas_to_u64!(*COMPAT_ONE_TERAGAS)
+            .saturating_mul(50)
+            .into(),
     }];
 
     let request_id = alice

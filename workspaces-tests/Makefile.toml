@@ -28,10 +28,13 @@ script = """
 set -e
 
 if [[ -n $2 ]]; then
-    cargo nextest run --package workspaces-tests --test "$1" -E "test($2)"
+    cargo nextest run --package workspaces-tests --no-default-features --features near-sdk-5 --test "$1" -E "test($2)"
+    cargo nextest run --package workspaces-tests --no-default-features --features near-sdk-4 --test "$1" -E "test($2)"
 elif [[ -n $1 ]]; then
-    cargo nextest run --package workspaces-tests --test "$1"
+    cargo nextest run --package workspaces-tests --no-default-features --features near-sdk-5 --test "$1"
+    cargo nextest run --package workspaces-tests --no-default-features --features near-sdk-4 --test "$1"
 else
-    cargo nextest run --package workspaces-tests
+    cargo nextest run --package workspaces-tests --no-default-features --features near-sdk-5
+    cargo nextest run --package workspaces-tests --no-default-features --features near-sdk-4
 fi
 """

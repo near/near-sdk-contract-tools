@@ -1,18 +1,20 @@
 #![allow(missing_docs)]
 
-use near_sdk::{
-    borsh::{self, BorshDeserialize, BorshSerialize},
-    env, near_bindgen, require, AccountId, PanicOnDefault,
-};
+workspaces_tests::near_sdk!();
+compat_use_borsh!();
+use near_sdk::{env, near_bindgen, require, AccountId, PanicOnDefault};
+use near_sdk_contract_tools::{compat_derive_borsh, compat_use_borsh};
 
 pub fn main() {} // Ignore
 
-#[derive(PanicOnDefault, BorshSerialize, BorshDeserialize)]
-#[near_bindgen]
-pub struct Contract {
-    owner_id: AccountId,
-    value: String,
-    calls: u32,
+compat_derive_borsh! {
+    #[derive(PanicOnDefault)]
+    #[near_bindgen]
+    pub struct Contract {
+        owner_id: AccountId,
+        value: String,
+        calls: u32,
+    }
 }
 
 #[near_bindgen]

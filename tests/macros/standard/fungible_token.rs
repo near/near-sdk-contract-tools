@@ -25,7 +25,8 @@ impl MyFungibleTokenContract {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use near_sdk::{test_utils::VMContextBuilder, testing_env, AccountId, ONE_NEAR};
+    use near_sdk::{test_utils::VMContextBuilder, testing_env, AccountId};
+    use near_sdk_contract_tools::{compat_near, compat_yoctonear};
 
     #[test]
     fn fungible_token_transfer() {
@@ -36,14 +37,14 @@ mod tests {
 
         let context = VMContextBuilder::new()
             .predecessor_account_id(alice.clone())
-            .attached_deposit(ONE_NEAR / 100)
+            .attached_deposit(compat_near!(1u128).saturating_div(100))
             .build();
         testing_env!(context);
         ft.storage_deposit(None, None);
 
         let context = VMContextBuilder::new()
             .predecessor_account_id(bob.clone())
-            .attached_deposit(ONE_NEAR / 100)
+            .attached_deposit(compat_near!(1u128).saturating_div(100))
             .build();
         testing_env!(context);
         ft.storage_deposit(None, None);
@@ -61,7 +62,7 @@ mod tests {
 
         let context = VMContextBuilder::new()
             .predecessor_account_id(alice.clone())
-            .attached_deposit(1)
+            .attached_deposit(compat_yoctonear!(1u128))
             .build();
 
         testing_env!(context);

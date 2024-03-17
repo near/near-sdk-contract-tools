@@ -1,4 +1,4 @@
-#![cfg(not(windows))]
+workspaces_tests::near_sdk!();
 
 use std::collections::HashSet;
 
