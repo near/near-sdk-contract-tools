@@ -167,9 +167,9 @@ pub fn derive_fungible_token(input: TokenStream) -> TokenStream {
 ///
 /// Fields:
 /// - `no_hooks`: Flag. Removes the requirement for the contract to implement
-/// transfer hooks.
+///     transfer hooks.
 /// - `token_data`: specify the token metadata loading extensions invoked by
-/// `nft_token`.
+///     `nft_token`.
 #[proc_macro_derive(Nep171, attributes(nep171))]
 pub fn derive_nep171(input: TokenStream) -> TokenStream {
     make_derive(input, standard::nep171::expand)
