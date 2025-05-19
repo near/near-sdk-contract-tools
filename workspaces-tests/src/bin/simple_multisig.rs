@@ -112,7 +112,7 @@ impl Contract {
 
         let request_id = self.create_request(action, ApprovalState::new()).unwrap();
 
-        near_sdk::log!(format!("Request ID: {request_id}"));
+        near_sdk::log!("Request ID: {request_id}");
 
         request_id
     }
