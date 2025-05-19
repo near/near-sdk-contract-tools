@@ -51,7 +51,7 @@ mod receiver {
             let used_amount: u128 = amount.0 / 2;
 
             let out = format!("ft_on_transfer[from={sender_id}, used={used_amount}]");
-            log!(&out);
+            log!("{}", &out);
             println!("{out}");
 
             self.log.push(&(msg, amount.0));
