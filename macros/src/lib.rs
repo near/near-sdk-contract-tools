@@ -208,6 +208,15 @@ pub fn derive_non_fungible_token(input: TokenStream) -> TokenStream {
     make_derive(input, standard::non_fungible_token::expand)
 }
 
+/// Adds NEP-245 multi token core functionality to a contract.
+///
+/// The storage key prefix for the fields can be optionally specified (default:
+/// `"~$245"`) using `#[nep245(storage_key = "<expression>")]`.
+#[proc_macro_derive(Nep245, attributes(nep245))]
+pub fn derive_nep245(input: TokenStream) -> TokenStream {
+    make_derive(input, standard::nep245::expand)
+}
+
 /// Migrate a contract's default struct from one schema to another.
 ///
 /// Fields may be specified in the `#[migrate(...)]` attribute.

@@ -30,6 +30,17 @@ pub async fn ft_balance_of(contract: &Contract, account: &AccountId) -> u128 {
         .unwrap()
 }
 
+pub async fn mt_balance_of(contract: &Contract, account: &AccountId, token_id: &str) -> u128 {
+    contract
+        .view("mt_balance_of")
+        .args_json(json!({ "token_id": token_id, "account_id": account }))
+        .await
+        .unwrap()
+        .json::<U128>()
+        .map(u128::from)
+        .unwrap()
+}
+
 pub struct Setup {
     pub contract: Contract,
     pub accounts: Vec<Account>,

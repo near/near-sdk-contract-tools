@@ -17,21 +17,27 @@ impl<C: Nep245Controller + Nep245ControllerInternal> Hook<C, Nep145ForceUnregist
     ) -> R {
         let r = f(contract);
 
-        // for token_id in contract.slot
+        let tokens = contract.tokens();
+        #[allow(clippy::cast_possible_truncation)]
+        let mut burn = Nep245Burn::empty(tokens.len() as usize, args.account_id.clone())
+            .memo("storage forced unregistration");
 
-        let balance = contract.balance_of(&args.account_id);
-        contract
-            .burn(
-                &Nep245Burn::new(balance, args.account_id.clone())
-                    .memo("storage forced unregistration"),
-            )
-            .unwrap_or_else(|e| {
-                near_sdk::env::panic_str(&format!(
-                    "Failed to burn tokens during forced unregistration: {e}",
-                ))
-            });
+        for token_id in tokens.iter() {
+            burn = burn.and_burn(
+                token_id.clone(),
+                contract.balance_of(&token_id, &args.account_id),
+            );
+        }
 
-        <C as Nep245ControllerInternal>::slot_account(&args.account_id).remove();
+        contract.burn(&burn).unwrap_or_else(|e| {
+            near_sdk::env::panic_str(&format!(
+                "Failed to burn tokens during forced unregistration: {e}",
+            ))
+        });
+
+        for token_id in tokens.iter() {
+            <C as Nep245ControllerInternal>::slot_balance(&token_id, &args.account_id).remove();
+        }
 
         r
     }

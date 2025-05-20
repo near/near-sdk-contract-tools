@@ -38,14 +38,17 @@ pub trait Nep245Receiver {
 pub struct MtResolveTransferApproval(pub AccountId, pub ApprovalId, pub U128);
 
 impl MtResolveTransferApproval {
+    #[must_use]
     pub fn owner_id(&self) -> &AccountIdRef {
         &self.0
     }
 
+    #[must_use]
     pub fn approval_id(&self) -> ApprovalId {
         self.1
     }
 
+    #[must_use]
     pub fn amount(&self) -> u128 {
         u128::from(self.2)
     }
@@ -59,6 +62,7 @@ pub trait Nep245Resolver {
         sender_id: AccountId,
         receiver_id: AccountId,
         token_ids: Vec<TokenId>,
+        amounts: Vec<U128>,
         approvals: Option<Vec<Option<MtResolveTransferApproval>>>,
     ) -> Vec<U128>;
 }
@@ -68,12 +72,12 @@ pub trait Nep245Resolver {
 pub struct MtTransferApproval(pub AccountId, pub ApprovalId);
 
 impl MtTransferApproval {
-    #[inline]
+    #[must_use]
     pub fn owner_id(&self) -> &AccountIdRef {
         &self.0
     }
 
-    #[inline]
+    #[must_use]
     pub fn approval_id(&self) -> ApprovalId {
         self.1
     }
@@ -99,6 +103,15 @@ pub trait Nep245 {
     /// Simple transfer. Transfer a given `token_id` from current owner to
     /// `receiver_id`.
     ///
+    /// Requirements:
+    /// * Caller of the method must attach a deposit of 1 yoctoNEAR for security purposes.
+    /// * Caller must have greater than or equal to the `amount` being requested.
+    /// * Contract MUST panic if called by someone other than token owner or,
+    ///   if using approval management, one of the approved accounts.
+    /// * `approval_id` is for use with approval management extension.
+    /// * If using approval management, contract MUST nullify approved accounts on
+    ///   successful transfer.
+    ///
     /// Arguments:
     /// * `receiver_id`: the valid NEAR account receiving the token.
     /// * `token_id`: the token to transfer.
@@ -119,6 +132,21 @@ pub trait Nep245 {
 
     /// Simple batch transfer. Transfer a given `token_ids` from current owner
     /// to `receiver_id`.
+    ///
+    /// Requirements:
+    /// * Caller of the method must attach a deposit of 1 yoctoNEAR for
+    ///     security purposes.
+    /// * Caller must have greater than or equal to the `amounts` being
+    ///     requested for the given `token_ids`.
+    /// * Contract MUST panic if called by someone other than token owner or,
+    ///     if using approval management, one of the approved accounts
+    /// * `approval_id` is for use with approval management extension.
+    /// * If using approval management, contract MUST nullify approved accounts
+    ///     on successful transfer.
+    /// * Contract MUST panic if the length of `token_ids` is not equal to the
+    ///     length of `amounts`.
+    /// * Contract MUST panic if `approval_ids` is not `null` and its length
+    ///     does not equal the length of `token_ids`.
     ///
     /// Arguments:
     /// * `receiver_id`: the valid NEAR account receiving the token.
@@ -142,9 +170,43 @@ pub trait Nep245 {
         memo: Option<String>,
     );
 
-    /// Performs a token transfer, then initiates a promise chain that calls
-    /// `mt_on_transfer` on the receiving account, followed by
-    /// `mt_resolve_transfer` on the original token contract (this contract).
+    /// Transfer token and call a method on a receiver contract. A successful
+    /// workflow will end in a success execution outcome to the callback on the
+    /// multi token contract at the method `mt_resolve_transfer`.
+    ///
+    /// You can think of this as being similar to attaching native NEAR tokens
+    /// to a function call. It allows you to attach any multi token contract's
+    /// token in a call to a receiver contract.
+    ///
+    /// Requirements:
+    /// * Caller of the method must attach a deposit of 1 yoctoNEAR for security
+    ///     purposes.
+    /// * Caller must have greater than or equal to the `amount` being requested.
+    /// * Contract MUST panic if called by someone other than token owner or, if
+    ///     using approval management, one of the approved accounts.
+    /// * The receiving contract must implement `mt_on_transfer` according to
+    ///     the standard. If it does not, MT contract's `mt_resolve_transfer`
+    ///     MUST deal with the resulting failed cross-contract call and roll
+    ///     back the transfer.
+    /// * Contract MUST implement the behavior described in
+    ///     `mt_resolve_transfer`.
+    /// * `approval_id` is for use with approval management extension.
+    /// * If using approval management, contract MUST nullify approved accounts
+    ///     on successful transfer.
+    ///
+    /// Arguments:
+    /// * `receiver_id`: the valid NEAR account receiving the token.
+    /// * `token_id`: the token to send.
+    /// * `amount`: the number of tokens to transfer.
+    /// * `owner_id`: the valid NEAR account that owns the token.
+    /// * `approval` (optional): is a tuple of the form `(owner_id, approval_id)`:
+    ///     * `owner_id` is the valid NEAR account that owns the tokens.
+    ///     * `approval_id` is the expected approval ID.
+    /// * `memo` (optional): for use cases that may benefit from indexing or
+    ///     providing information for a transfer.
+    /// * `msg`: specifies information needed by the receiving contract in
+    ///    order to properly handle the transfer. Can indicate both a function to
+    ///    call and the parameters to pass to that function.
     fn mt_transfer_call(
         &mut self,
         receiver_id: AccountId,
@@ -162,6 +224,26 @@ pub trait Nep245 {
     /// You can think of this as being similar to attaching native NEAR tokens to a
     /// function call. It allows you to attach any Multi Token, token in a call to a
     /// receiver contract.
+    ///
+    /// Requirements:
+    /// * Caller of the method must attach a deposit of 1 yoctoNEAR for
+    ///     security purposes.
+    /// * Caller must have greater than or equal to the `amount` being requested.
+    /// * Contract MUST panic if called by someone other than token owner or,
+    ///     if using approval management, one of the approved accounts.
+    /// * The receiving contract must implement `mt_on_transfer` according to
+    ///     the standard. If it does not, the multi token contract's
+    ///     `mt_resolve_transfer` MUST handle the resulting failed
+    ///     cross-contract call and roll back the transfer.
+    /// * Contract MUST implement the behavior described in
+    ///     `mt_resolve_transfer`.
+    /// * `approval_id` is for use with approval management extension.
+    /// * If using approval management, contract MUST nullify approved accounts
+    ///     on successful transfer.
+    /// * Contract MUST panic if the length of `token_ids` is not equal to the
+    ///     length of `amounts`.
+    /// * Contract MUST panic if `approval_ids` is not `null` and its length
+    ///     does not equal the length of `token_ids`.
     ///
     /// Arguments:
     /// * `receiver_id`: the valid NEAR account receiving the token.

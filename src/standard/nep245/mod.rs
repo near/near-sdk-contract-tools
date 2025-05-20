@@ -1,10 +1,14 @@
 //! NEP-245 fungible token core implementation
 //! <https://github.com/near/NEPs/blob/master/neps/nep-0245.md>
 
-use std::borrow::Cow;
+use std::{
+    borrow::Cow,
+    iter::{IntoIterator, Iterator},
+};
 
 use near_sdk::{
-    borsh::BorshSerialize, collections::UnorderedSet, near, AccountIdRef, BorshStorageKey, Gas,
+    borsh::BorshSerialize, collections::Vector, env, json_types::U128, near, AccountId,
+    AccountIdRef, BorshStorageKey, Gas, Promise,
 };
 
 use crate::{hook::Hook, slot::Slot, standard::nep297::*, DefaultStorageKey};
@@ -17,27 +21,39 @@ mod ext;
 pub use ext::*;
 pub mod hooks;
 
+/// Type of an approval ID.
 pub type ApprovalId = u32;
+/// Type of a token ID.
 pub type TokenId = String;
+/// Reference type of a token ID.
 pub type TokenIdRef = str;
 
-/// Gas value required for [`Nep245Resolver::ft_resolve_transfer`] call,
+// TODO: Measure gas values.
+
+/// Gas value required for [`Nep245Resolver::mt_resolve_transfer`] call,
 /// independent of the amount of gas required for the preceding
-/// [`Nep245::ft_transfer`] call.
-pub const GAS_FOR_RESOLVE_TRANSFER: Gas = Gas::from_gas(5_000_000_000_000);
-/// Gas value required for [`Nep245::ft_transfer_call`] calls (includes gas for
-/// the subsequent [`Nep245Resolver::ft_resolve_transfer`] call).
-pub const GAS_FOR_FT_TRANSFER_CALL: Gas =
-    Gas::from_gas(25_000_000_000_000 + GAS_FOR_RESOLVE_TRANSFER.as_gas());
+/// [`Nep245::mt_transfer`] call.
+pub const GAS_FOR_MT_RESOLVE_TRANSFER: Gas = Gas::from_gas(5_000_000_000_000);
+/// Gas value required for [`Nep245::mt_transfer_call`] calls (includes gas for
+/// the subsequent [`Nep245Resolver::mt_resolve_transfer`] call).
+pub const GAS_FOR_MT_TRANSFER_CALL: Gas =
+    Gas::from_gas(25_000_000_000_000).saturating_add(GAS_FOR_MT_RESOLVE_TRANSFER);
 /// Error message for insufficient gas.
-pub const MORE_GAS_FAIL_MESSAGE: &str = "Insufficient gas attached.";
+pub const INSUFFICIENT_GAS_MESSAGE: &str = "Insufficient gas attached.";
 
 #[derive(BorshSerialize, BorshStorageKey)]
 #[borsh(crate = "near_sdk::borsh")]
 enum StorageKey<'a> {
     Tokens,
-    Supply(&'a TokenIdRef),
+    Token(&'a TokenIdRef),
     Balance(&'a TokenIdRef, &'a AccountIdRef),
+}
+
+#[derive(PartialEq, Eq, Debug, Clone)]
+#[near(serializers = [borsh])]
+pub struct TokenRecord {
+    pub owner_id: Option<AccountId>,
+    pub supply: u128,
 }
 
 #[derive(PartialEq, Eq, Debug, Clone)]
@@ -79,13 +95,52 @@ pub struct Nep245Transfer<'a> {
     pub payload: Vec<TokenAmount<'a>>,
     /// Optional memo string.
     pub memo: Option<Cow<'a, str>>,
-    /// Message passed to contract located at `receiver_id`.
-    pub msg: Option<Cow<'a, str>>,
     /// Is this transfer a revert as a result of a [`Nep245::mt_transfer_call`] -> [`Nep245Receiver::mt_on_transfer`] call?
     pub revert: bool,
 }
 
 impl<'a> Nep245Transfer<'a> {
+    #[must_use]
+    pub fn new(
+        sender_id: impl Into<Cow<'a, AccountIdRef>>,
+        receiver_id: impl Into<Cow<'a, AccountIdRef>>,
+        count: usize,
+        token_ids: impl IntoIterator<Item = impl Into<Cow<'a, TokenIdRef>>>,
+        amounts: impl IntoIterator<Item = impl Into<u128>>,
+        approvals: Option<impl IntoIterator<Item = Option<MtTransferApproval>>>,
+        memo: Option<impl Into<Cow<'a, str>>>,
+    ) -> Result<Self, LengthMismatchError> {
+        let mut payload = Vec::with_capacity(count);
+        let mut token_ids = token_ids.into_iter();
+        let mut amounts = amounts.into_iter();
+        let mut approvals: Option<_> = approvals.map(IntoIterator::into_iter);
+
+        loop {
+            match (
+                token_ids.next(),
+                amounts.next(),
+                approvals.as_mut().map(Iterator::next),
+            ) {
+                (Some(token_id), Some(amount), None | Some(Some(_))) => payload.push(TokenAmount {
+                    token_id: token_id.into(),
+                    amount: amount.into(),
+                }),
+                (None, None, None) => break,
+                _ => {
+                    return Err(LengthMismatchError);
+                }
+            }
+        }
+
+        Ok(Self {
+            sender_id: sender_id.into(),
+            receiver_id: receiver_id.into(),
+            payload,
+            memo: memo.map(Into::into),
+            revert: false,
+        })
+    }
+
     // Create a new transfer action of no tokens.
     #[must_use]
     pub fn empty(
@@ -98,17 +153,17 @@ impl<'a> Nep245Transfer<'a> {
             sender_id: sender_id.into(),
             payload: Vec::with_capacity(capacity),
             memo: None,
-            msg: None,
             revert: false,
         }
     }
 
     /// Create a new transfer action of a single token.
     pub fn single(
-        token_id: impl Into<Cow<'a, TokenIdRef>>,
-        amount: u128,
         sender_id: impl Into<Cow<'a, AccountIdRef>>,
         receiver_id: impl Into<Cow<'a, AccountIdRef>>,
+        token_id: impl Into<Cow<'a, TokenIdRef>>,
+        amount: u128,
+        memo: Option<impl Into<Cow<'a, str>>>,
     ) -> Self {
         Self {
             receiver_id: receiver_id.into(),
@@ -118,8 +173,7 @@ impl<'a> Nep245Transfer<'a> {
                 amount,
                 // approval: None,
             }],
-            memo: None,
-            msg: None,
+            memo: memo.map(Into::into),
             revert: false,
         }
     }
@@ -149,18 +203,96 @@ impl<'a> Nep245Transfer<'a> {
 
     /// Add a message string.
     #[must_use]
-    pub fn msg(self, msg: impl Into<Cow<'a, str>>) -> Self {
-        Self {
-            msg: Some(msg.into()),
-            ..self
+    pub fn msg(self, msg: impl Into<Cow<'a, str>>) -> Nep245TransferCall<'a> {
+        Nep245TransferCall {
+            transfer: self,
+            msg: msg.into(),
         }
     }
 
-    /// Returns `true` if this transfer comes from a `ft_transfer_call`
-    /// call, `false` otherwise.
+    /// Set revert status.
     #[must_use]
-    pub fn is_transfer_call(&self) -> bool {
-        self.msg.is_some()
+    pub fn revert(self, revert: bool) -> Self {
+        Self { revert, ..self }
+    }
+
+    /// Returns a vector of the previous owner IDs, as compatible with the
+    /// standard arguments of [`Nep245Receiver::mt_on_transfer`].
+    #[must_use]
+    pub fn previous_owner_ids(&self) -> Vec<AccountId> {
+        self.payload
+            .iter()
+            .map(|_| self.sender_id.clone().into())
+            .collect()
+    }
+
+    /// Returns a vector of the token IDs, as compatible with the standard
+    /// arguments of [`Nep245Receiver::mt_on_transfer`].
+    #[must_use]
+    pub fn token_ids(&self) -> Vec<TokenId> {
+        self.payload
+            .iter()
+            .map(|token| token.token_id.clone().into())
+            .collect()
+    }
+
+    /// Returns a vector of the token amounts, as compatible with the standard
+    /// arguments of [`Nep245Receiver::mt_on_transfer`].
+    #[must_use]
+    pub fn amounts(&self) -> Vec<U128> {
+        self.payload
+            .iter()
+            .map(|token| token.amount.into())
+            .collect()
+    }
+
+    pub fn approvals(&self) -> Option<Vec<Option<MtResolveTransferApproval>>> {
+        // TODO: implement real approvals
+        Some(vec![None; self.payload.len()])
+    }
+}
+
+#[derive(PartialEq, Eq, Clone, Debug)]
+#[near]
+pub struct Nep245TransferCall<'a> {
+    transfer: Nep245Transfer<'a>,
+    /// Message passed to contract located at `receiver_id`.
+    pub msg: Cow<'a, str>,
+}
+
+impl<'a> std::ops::Deref for Nep245TransferCall<'a> {
+    type Target = Nep245Transfer<'a>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.transfer
+    }
+}
+
+impl<'a> Nep245TransferCall<'a> {
+    #[must_use]
+    pub fn promise(&self, current_account_id: AccountId) -> Promise {
+        let sender_id: AccountId = self.sender_id.clone().into();
+        let receiver_id: AccountId = self.receiver_id.clone().into();
+        let previous_owner_ids = self.previous_owner_ids();
+        let token_ids = self.token_ids();
+        let amounts = self.amounts();
+        let approvals = self.approvals();
+        let msg = self.msg.to_string();
+        ext_nep245_receiver::ext(receiver_id.clone())
+            .with_unused_gas_weight(10)
+            .mt_on_transfer(
+                sender_id.clone(),
+                previous_owner_ids,
+                token_ids.clone(),
+                amounts.clone(),
+                msg,
+            )
+            .then(
+                ext_nep245_resolver::ext(current_account_id)
+                    .with_static_gas(GAS_FOR_MT_RESOLVE_TRANSFER)
+                    .with_unused_gas_weight(1)
+                    .mt_resolve_transfer(sender_id, receiver_id, token_ids, amounts, approvals),
+            )
     }
 }
 
@@ -278,29 +410,20 @@ pub trait Nep245ControllerInternal {
         Slot::new(DefaultStorageKey::Nep245)
     }
 
-    /// Root storage slot.
-    #[must_use]
-    fn slot_tokens() -> Slot<near_sdk::collections::UnorderedSet<TokenId>> {
+    fn slot_tokens() -> Slot<Vector<TokenId>> {
         Self::root().field(StorageKey::Tokens)
     }
 
+    /// Slot for token record.
     #[must_use]
-    fn read_tokens_set() -> UnorderedSet<TokenId> {
-        Self::slot_tokens()
-            .read()
-            .unwrap_or_else(|| UnorderedSet::new(Self::slot_tokens().key))
+    fn slot_token(token_id: &TokenIdRef) -> Slot<TokenRecord> {
+        Self::root().field(StorageKey::Token(token_id))
     }
 
     /// Slot for account data.
     #[must_use]
     fn slot_balance(token_id: &TokenIdRef, account_id: &AccountIdRef) -> Slot<u128> {
         Self::root().field(StorageKey::Balance(token_id, account_id))
-    }
-
-    /// Slot for storing total supply.
-    #[must_use]
-    fn slot_supply(token_id: &TokenIdRef) -> Slot<u128> {
-        Self::root().field(StorageKey::Supply(token_id))
     }
 }
 
@@ -319,15 +442,20 @@ pub trait Nep245Controller {
     where
         Self: Sized;
 
+    /// Adds a token to the multi token contract.
     fn create_token(&mut self, token_id: TokenId) -> Result<(), TokenIdCollisionError>;
 
-    fn iter_tokens(&self) -> impl Iterator<Item = &TokenIdRef>;
+    /// Get the list of all tokens in this contract.
+    fn tokens(&self) -> Vector<TokenId>;
+
+    /// Get the token record for the token ID, should it exist.
+    fn token(&self, token_id: &TokenIdRef) -> Option<Token>;
 
     /// Get the balance of an account. Returns 0 if the account does not exist.
     fn balance_of(&self, token_id: &TokenIdRef, account_id: &AccountIdRef) -> u128;
 
     /// Get the total circulating supply of the token.
-    fn supply(&self, token_id: &TokenIdRef) -> u128;
+    fn supply(&self, token_id: &TokenIdRef) -> Option<u128>;
 
     /// Removes tokens from an account and decreases total supply. No event
     /// emission or hook invocation.
@@ -399,6 +527,67 @@ pub trait Nep245Controller {
     /// - Account balance underflow.
     /// - Total supply underflow.
     fn burn(&mut self, burn: &Nep245Burn<'_>) -> Result<(), WithdrawError>;
+
+    fn resolve_transfer(
+        &mut self,
+        sender_id: AccountId,
+        receiver_id: AccountId,
+        token_ids: Vec<TokenId>,
+        amounts: Vec<U128>,
+        _approvals: Option<Vec<Option<MtResolveTransferApproval>>>,
+        mt_on_transfer_result: Option<Vec<U128>>,
+    ) -> Vec<U128> {
+        let reverts_bounded_by_transfer_value = if let Some(callback_returned) =
+            mt_on_transfer_result.filter(|v| v.len() == amounts.len())
+        {
+            amounts
+                .iter()
+                .zip(callback_returned)
+                .map(|(U128(original_amount), U128(attempted_return))| {
+                    u128::min(*original_amount, attempted_return)
+                })
+                .collect::<Vec<_>>()
+        } else {
+            amounts.iter().map(|a| a.0).collect()
+        };
+
+        // No need to pull in a HashMap for this.
+        let mut balance_map = vec![0; token_ids.len()];
+
+        let ix = |token_ids: &[TokenId], token_id: &TokenIdRef| {
+            token_ids.iter().position(|i| i == token_id).unwrap()
+        };
+
+        for token_id in &token_ids {
+            let i = ix(&token_ids, token_id);
+            if balance_map[i] == 0 {
+                balance_map[i] = self.balance_of(token_id, &receiver_id);
+            }
+        }
+
+        let mut transfer =
+            Nep245Transfer::empty(token_ids.len(), receiver_id, sender_id).revert(true);
+
+        let mut effective_used = Vec::with_capacity(token_ids.len());
+
+        for ((token_id, revert_value), original_amount) in token_ids
+            .iter()
+            .zip(reverts_bounded_by_transfer_value.iter())
+            .zip(amounts.iter())
+        {
+            let i = ix(&token_ids, token_id);
+            let receiver_has = balance_map[i];
+            let actual_revert_value = u128::min(*revert_value, receiver_has);
+            balance_map[i] = receiver_has - actual_revert_value;
+            transfer = transfer.and_transfer(token_id, actual_revert_value);
+            effective_used.push(U128(original_amount.0 - actual_revert_value));
+        }
+
+        self.transfer(&transfer)
+            .unwrap_or_else(|e| env::panic_str(&e.to_string()));
+
+        effective_used
+    }
 }
 
 impl<T: Nep245ControllerInternal> Nep245Controller for T {
@@ -407,25 +596,42 @@ impl<T: Nep245ControllerInternal> Nep245Controller for T {
     type BurnHook = T::BurnHook;
 
     fn create_token(&mut self, token_id: TokenId) -> Result<(), TokenIdCollisionError> {
-        let mut tokens = Self::read_tokens_set();
-        if tokens.insert(&token_id) {
+        let mut token_record = Self::slot_token(&token_id);
+        if token_record.exists() {
+            Err(TokenIdCollisionError { token_id })
+        } else {
+            token_record.write(&TokenRecord {
+                owner_id: None,
+                supply: 0,
+            });
+            let mut tokens = self.tokens();
+            tokens.push(&token_id);
             Self::slot_tokens().write(&tokens);
             Ok(())
-        } else {
-            Err(TokenIdCollisionError { token_id })
         }
     }
 
-    fn iter_tokens(&self) -> impl Iterator<Item = &TokenIdRef> {
-        Self::read_tokens_set().iter()
+    fn tokens(&self) -> Vector<TokenId> {
+        Self::slot_tokens()
+            .read()
+            .unwrap_or_else(|| Vector::new(Self::slot_tokens().key))
+    }
+
+    fn token(&self, token_id: &TokenIdRef) -> Option<Token> {
+        Self::slot_token(token_id).read().map(|token_record| Token {
+            token_id: token_id.to_owned(),
+            owner_id: token_record.owner_id,
+        })
     }
 
     fn balance_of(&self, token_id: &TokenIdRef, account_id: &AccountIdRef) -> u128 {
         Self::slot_balance(token_id, account_id).read().unwrap_or(0)
     }
 
-    fn supply(&self, token_id: &TokenIdRef) -> u128 {
-        Self::slot_supply(token_id).read().unwrap_or(0)
+    fn supply(&self, token_id: &TokenIdRef) -> Option<u128> {
+        Self::slot_token(token_id)
+            .read()
+            .map(|record| record.supply)
     }
 
     fn withdraw_unchecked(
@@ -434,7 +640,24 @@ impl<T: Nep245ControllerInternal> Nep245Controller for T {
         account_id: &AccountIdRef,
         amount: u128,
     ) -> Result<(), WithdrawError> {
+        let mut token_record =
+            Self::slot_token(token_id)
+                .read()
+                .ok_or_else(|| TokenIdDoesNotExistError {
+                    token_id: token_id.to_owned(),
+                })?;
+
         if amount != 0 {
+            token_record.supply =
+                token_record
+                    .supply
+                    .checked_sub(amount)
+                    .ok_or_else(|| SupplyUnderflowError {
+                        token_id: token_id.to_owned(),
+                        supply: token_record.supply,
+                        amount,
+                    })?;
+
             let balance = self.balance_of(token_id, account_id);
             let balance = balance
                 .checked_sub(amount)
@@ -445,17 +668,8 @@ impl<T: Nep245ControllerInternal> Nep245Controller for T {
                     amount,
                 })?;
 
-            let supply = self.supply(token_id);
-            let supply = supply
-                .checked_sub(amount)
-                .ok_or_else(|| SupplyUnderflowError {
-                    token_id: token_id.to_owned(),
-                    supply,
-                    amount,
-                })?;
-
             Self::slot_balance(token_id, account_id).write(&balance);
-            Self::slot_supply(token_id).write(&supply);
+            Self::slot_token(token_id).write(&token_record);
         }
 
         Ok(())
@@ -467,7 +681,26 @@ impl<T: Nep245ControllerInternal> Nep245Controller for T {
         account_id: &AccountIdRef,
         amount: u128,
     ) -> Result<(), DepositError> {
+        let mut token_record =
+            Self::slot_token(token_id)
+                .read()
+                .ok_or_else(|| TokenIdDoesNotExistError {
+                    token_id: token_id.to_owned(),
+                })?;
+
         if amount != 0 {
+            let original_supply = token_record.supply;
+
+            token_record.supply =
+                token_record
+                    .supply
+                    .checked_add(amount)
+                    .ok_or_else(|| SupplyOverflowError {
+                        token_id: token_id.to_owned(),
+                        supply: token_record.supply,
+                        amount,
+                    })?;
+
             let balance = self.balance_of(token_id, account_id);
             let balance = balance
                 .checked_add(amount)
@@ -478,16 +711,12 @@ impl<T: Nep245ControllerInternal> Nep245Controller for T {
                     amount,
                 })?;
 
-            let supply = self.supply(token_id);
-            let supply = supply
-                .checked_add(amount)
-                .ok_or_else(|| SupplyOverflowError {
-                    token_id: token_id.to_owned(),
-                    supply,
-                    amount,
-                })?;
+            if original_supply == 0 && token_record.supply == 1 && token_record.owner_id.is_none() {
+                token_record.owner_id = Some(account_id.to_owned());
+            }
+
             Self::slot_balance(token_id, account_id).write(&balance);
-            Self::slot_supply(token_id).write(&supply);
+            Self::slot_token(token_id).write(&token_record);
         }
 
         Ok(())
@@ -500,6 +729,17 @@ impl<T: Nep245ControllerInternal> Nep245Controller for T {
         receiver_account_id: &AccountIdRef,
         amount: u128,
     ) -> Result<(), TransferError> {
+        if !Self::slot_token(token_id).exists() {
+            return Err(TokenIdDoesNotExistError {
+                token_id: token_id.to_owned(),
+            }
+            .into());
+        }
+
+        if amount == 0 {
+            return Ok(());
+        }
+
         let sender_balance = self.balance_of(token_id, sender_account_id);
         let sender_balance =
             sender_balance
@@ -533,25 +773,29 @@ impl<T: Nep245ControllerInternal> Nep245Controller for T {
             let mut token_ids = Vec::with_capacity(transfer.payload.len());
             let mut amounts = Vec::with_capacity(transfer.payload.len());
             for token in &transfer.payload {
-                contract.transfer_unchecked(
-                    &token.token_id,
-                    &transfer.sender_id,
-                    &transfer.receiver_id,
-                    token.amount,
-                )?;
-                token_ids.push(token.token_id);
-                amounts.push(token.amount.into());
+                if token.amount != 0 {
+                    contract.transfer_unchecked(
+                        &token.token_id,
+                        &transfer.sender_id,
+                        &transfer.receiver_id,
+                        token.amount,
+                    )?;
+                    token_ids.push(token.token_id.clone());
+                    amounts.push(token.amount.into());
+                }
             }
 
-            Nep245Event::MtTransfer(vec![MtTransferData {
-                authorized_id: None,
-                old_owner_id: transfer.sender_id.clone(),
-                new_owner_id: transfer.receiver_id.clone(),
-                token_ids,
-                amounts,
-                memo: transfer.memo.clone(),
-            }])
-            .emit();
+            if !token_ids.is_empty() {
+                Nep245Event::MtTransfer(vec![MtTransferData {
+                    authorized_id: None,
+                    old_owner_id: transfer.sender_id.clone(),
+                    new_owner_id: transfer.receiver_id.clone(),
+                    token_ids,
+                    amounts,
+                    memo: transfer.memo.clone(),
+                }])
+                .emit();
+            }
 
             Ok(())
         })
@@ -564,7 +808,7 @@ impl<T: Nep245ControllerInternal> Nep245Controller for T {
 
             for token in &mint.payload {
                 contract.deposit_unchecked(&token.token_id, &mint.receiver_id, token.amount)?;
-                token_ids.push(token.token_id);
+                token_ids.push(token.token_id.clone());
                 amounts.push(token.amount.into());
             }
 
@@ -587,7 +831,7 @@ impl<T: Nep245ControllerInternal> Nep245Controller for T {
 
             for token in &burn.payload {
                 contract.withdraw_unchecked(&token.token_id, &burn.owner_id, token.amount)?;
-                token_ids.push(token.token_id);
+                token_ids.push(token.token_id.clone());
                 amounts.push(token.amount.into());
             }
 

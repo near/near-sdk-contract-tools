@@ -6,6 +6,16 @@ use thiserror::Error;
 use super::TokenId;
 
 #[derive(Debug, Error)]
+#[error("Input arrays have inconsistent lengths.")]
+pub struct LengthMismatchError;
+
+#[derive(Debug, Error)]
+#[error("Token ID {token_id} does not exist.")]
+pub struct TokenIdDoesNotExistError {
+    pub token_id: TokenId,
+}
+
+#[derive(Debug, Error)]
 #[error("Token ID {token_id} already exists.")]
 pub struct TokenIdCollisionError {
     pub token_id: TokenId,
@@ -14,6 +24,9 @@ pub struct TokenIdCollisionError {
 /// Errors that may occur when withdrawing (burning) tokens.
 #[derive(Debug, Error)]
 pub enum WithdrawError {
+    /// The referenced token ID does not exist.
+    #[error(transparent)]
+    TokenIdDoesNotExist(#[from] TokenIdDoesNotExistError),
     /// The account does not have enough balance to withdraw the given amount.
     #[error(transparent)]
     BalanceUnderflow(#[from] BalanceUnderflowError),
@@ -51,6 +64,9 @@ pub struct SupplyUnderflowError {
 /// Errors that may occur when depositing (minting) tokens.
 #[derive(Debug, Error)]
 pub enum DepositError {
+    /// The referenced token ID does not exist.
+    #[error(transparent)]
+    TokenIdDoesNotExist(#[from] TokenIdDoesNotExistError),
     /// The balance of the receiver would overflow u128.
     #[error(transparent)]
     BalanceOverflow(#[from] BalanceOverflowError),
@@ -88,6 +104,9 @@ pub struct SupplyOverflowError {
 /// Errors that may occur when transferring tokens.
 #[derive(Debug, Error)]
 pub enum TransferError {
+    /// The referenced token ID does not exist.
+    #[error(transparent)]
+    TokenIdDoesNotExist(#[from] TokenIdDoesNotExistError),
     /// The balance of the receiver would overflow u128.
     #[error("Balance of the receiver would overflow u128: {0}")]
     ReceiverBalanceOverflow(#[from] BalanceOverflowError),
