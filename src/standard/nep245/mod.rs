@@ -49,35 +49,42 @@ enum StorageKey<'a> {
     Balance(&'a TokenIdRef, &'a AccountIdRef),
 }
 
+/// Token-wide metadata storage.
 #[derive(PartialEq, Eq, Debug, Clone)]
 #[near(serializers = [borsh])]
 pub struct TokenRecord {
+    /// Only `Some` if the supply has only ever been 1.
+    /// (Will not be used even if tokens are burned from >1 to 1.)
     pub owner_id: Option<AccountId>,
+    /// The quantity of tokens in circulation.
     pub supply: u128,
 }
 
-#[derive(PartialEq, Eq, Debug, Clone)]
-#[near]
-pub struct TransferApproval<'a> {
-    pub owner_id: Cow<'a, AccountIdRef>,
-    pub approval_id: ApprovalId,
-    pub amount: u128,
-}
+// #[derive(PartialEq, Eq, Debug, Clone)]
+// #[near]
+// pub struct TransferApproval<'a> {
+//     pub owner_id: Cow<'a, AccountIdRef>,
+//     pub approval_id: ApprovalId,
+//     pub amount: u128,
+// }
 
-impl<'a> From<&'a MtResolveTransferApproval> for TransferApproval<'a> {
-    fn from(value: &'a MtResolveTransferApproval) -> Self {
-        Self {
-            owner_id: value.owner_id().into(),
-            approval_id: value.approval_id(),
-            amount: value.amount(),
-        }
-    }
-}
+// impl<'a> From<&'a MtResolveTransferApproval> for TransferApproval<'a> {
+//     fn from(value: &'a MtResolveTransferApproval) -> Self {
+//         Self {
+//             owner_id: value.owner_id().into(),
+//             approval_id: value.approval_id(),
+//             amount: value.amount(),
+//         }
+//     }
+// }
 
+/// A token amount involved in a mint, transfer, or burn action.
 #[derive(PartialEq, Eq, Debug, Clone)]
 #[near]
 pub struct TokenAmount<'a> {
+    /// The token ID involved.
     pub token_id: Cow<'a, TokenIdRef>,
+    /// The amount of tokens.
     pub amount: u128,
     // pub approval: Option<TransferApproval<'a>>,
 }
@@ -100,7 +107,15 @@ pub struct Nep245Transfer<'a> {
 }
 
 impl<'a> Nep245Transfer<'a> {
-    #[must_use]
+    /// Create a new multi token transfer.
+    ///
+    /// The types of the arguments of this function are intended to closely
+    /// replicate those in the NEP-245 standard functions so minimal
+    /// transformation is required prior to invocation.
+    ///
+    /// # Errors
+    ///
+    /// - If the input iterators are of differing lengths.
     pub fn new(
         sender_id: impl Into<Cow<'a, AccountIdRef>>,
         receiver_id: impl Into<Cow<'a, AccountIdRef>>,
@@ -141,7 +156,7 @@ impl<'a> Nep245Transfer<'a> {
         })
     }
 
-    // Create a new transfer action of no tokens.
+    /// Create a new transfer action of no tokens.
     #[must_use]
     pub fn empty(
         capacity: usize,
@@ -178,6 +193,8 @@ impl<'a> Nep245Transfer<'a> {
         }
     }
 
+    /// Adds another token transfer to this action.
+    #[must_use]
     pub fn and_transfer(
         mut self,
         token_id: impl Into<Cow<'a, TokenIdRef>>,
@@ -194,11 +211,9 @@ impl<'a> Nep245Transfer<'a> {
 
     /// Add a memo string.
     #[must_use]
-    pub fn memo(self, memo: impl Into<Cow<'a, str>>) -> Self {
-        Self {
-            memo: Some(memo.into()),
-            ..self
-        }
+    pub fn memo(mut self, memo: impl Into<Cow<'a, str>>) -> Self {
+        self.memo = Some(memo.into());
+        self
     }
 
     /// Add a message string.
@@ -246,12 +261,17 @@ impl<'a> Nep245Transfer<'a> {
             .collect()
     }
 
+    /// Returns a vector of the token approvals, as acompatible with the
+    /// standard arguments of [`Nep245Receiver::mt_on_transfer`].
+    #[must_use]
     pub fn approvals(&self) -> Option<Vec<Option<MtResolveTransferApproval>>> {
         // TODO: implement real approvals
         Some(vec![None; self.payload.len()])
     }
 }
 
+/// A wrapper type for transfers that includes contract invocation metadata.
+/// This corresponds to the `*_call` analogues of normal `mt_transfer` functions.
 #[derive(PartialEq, Eq, Clone, Debug)]
 #[near]
 pub struct Nep245TransferCall<'a> {
@@ -269,6 +289,8 @@ impl<'a> std::ops::Deref for Nep245TransferCall<'a> {
 }
 
 impl<'a> Nep245TransferCall<'a> {
+    /// Generates the appropriate [`Promise`] chain for resolving this
+    /// transfer-call.
     #[must_use]
     pub fn promise(&self, current_account_id: AccountId) -> Promise {
         let sender_id: AccountId = self.sender_id.clone().into();
@@ -355,6 +377,8 @@ impl<'a> Nep245Burn<'a> {
         }
     }
 
+    /// Adds more tokens to this burn action.
+    #[must_use]
     pub fn and_burn(mut self, token_id: impl Into<Cow<'a, TokenIdRef>>, amount: u128) -> Self {
         self.payload.push(TokenAmount {
             token_id: token_id.into(),
@@ -364,6 +388,7 @@ impl<'a> Nep245Burn<'a> {
     }
 
     /// Create a new burn action for burning an amount of a single token.
+    #[must_use]
     pub fn single(
         token_id: impl Into<Cow<'a, TokenIdRef>>,
         amount: u128,
@@ -410,6 +435,8 @@ pub trait Nep245ControllerInternal {
         Slot::new(DefaultStorageKey::Nep245)
     }
 
+    /// Slot for the list of token IDs.
+    #[must_use]
     fn slot_tokens() -> Slot<Vector<TokenId>> {
         Self::root().field(StorageKey::Tokens)
     }
@@ -443,6 +470,10 @@ pub trait Nep245Controller {
         Self: Sized;
 
     /// Adds a token to the multi token contract.
+    ///
+    /// # Errors
+    ///
+    /// - If the token ID is already in use.
     fn create_token(&mut self, token_id: TokenId) -> Result<(), TokenIdCollisionError>;
 
     /// Get the list of all tokens in this contract.
@@ -528,6 +559,8 @@ pub trait Nep245Controller {
     /// - Total supply underflow.
     fn burn(&mut self, burn: &Nep245Burn<'_>) -> Result<(), WithdrawError>;
 
+    /// Performs token transfer reversions (refunds) in the case that tokens
+    /// are returned from a transfer-call.
     fn resolve_transfer(
         &mut self,
         sender_id: AccountId,

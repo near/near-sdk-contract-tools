@@ -1,13 +1,9 @@
-use near_sdk::{
-    json_types::{Base64VecU8, U128},
-    serde_json::json,
-    NearToken,
-};
+use near_sdk::{json_types::U128, serde_json::json};
 use near_sdk_contract_tools::{mt::*, standard::nep297::Event};
-use near_workspaces::{network::Sandbox, operations::Function, Account, Contract, Worker};
+use near_workspaces::{operations::Function, Account, Contract};
 use pretty_assertions::assert_eq;
 use tokio::task::JoinSet;
-use workspaces_tests_utils::{expect_execution_error, mt_balance_of, ONE_NEAR, ONE_YOCTO};
+use workspaces_tests_utils::{mt_balance_of, ONE_YOCTO};
 
 const WASM: &[u8] = include_bytes!("../../target/wasm32-unknown-unknown/release/multi_token.wasm");
 
@@ -17,7 +13,7 @@ const RECEIVER_WASM: &[u8] =
 struct Setup {
     pub contract: Contract,
     pub accounts: Vec<Account>,
-    pub worker: Worker<Sandbox>,
+    // pub worker: Worker<Sandbox>,
 }
 
 /// Setup for individual tests
@@ -37,7 +33,7 @@ async fn setup(num_accounts: usize) -> Setup {
     Setup {
         contract,
         accounts,
-        worker,
+        // worker,
     }
 }
 

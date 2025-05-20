@@ -5,19 +5,24 @@ use thiserror::Error;
 
 use super::TokenId;
 
+/// When two arrays that should have the same length do not.
 #[derive(Debug, Error)]
 #[error("Input arrays have inconsistent lengths.")]
 pub struct LengthMismatchError;
 
+/// When a referenced token ID does not exist/has not (yet) been created.
 #[derive(Debug, Error)]
 #[error("Token ID {token_id} does not exist.")]
 pub struct TokenIdDoesNotExistError {
+    /// The nonexistent token ID that was referenced.
     pub token_id: TokenId,
 }
 
+/// When attempting to create a token using an ID that has already been created.
 #[derive(Debug, Error)]
 #[error("Token ID {token_id} already exists.")]
 pub struct TokenIdCollisionError {
+    /// The duplicated token ID that was referenced.
     pub token_id: TokenId,
 }
 
