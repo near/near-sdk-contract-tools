@@ -148,7 +148,7 @@ mod tests {
                 memo: Some("have fun!".into()),
             },])
             .to_event_string(),
-            r#"EVENT_JSON:{"standard":"nep245","version":"1.0.0","event":"mt_transfer","data":[{"old_owner_id":"user2.near","new_owner_id":"user3.near","token_ids":["meme"],"amounts":["1"],"authorized_id":"thirdparty.near","memo":"have fun!"}]}"#
+            r#"EVENT_JSON:{"standard":"nep245","version":"1.0.0","event":"mt_transfer","data":[{"authorized_id":"thirdparty.near","old_owner_id":"user2.near","new_owner_id":"user3.near","token_ids":["meme"],"amounts":["1"],"memo":"have fun!"}]}"#
         );
     }
 
@@ -174,7 +174,7 @@ mod tests {
                 memo: None,
             }])
             .to_event_string(),
-            r#"EVENT_JSON:{"standard":"nep245","version":"1.0.0","event":"mt_burn","data":[{"owner_id":"foundation.near","token_ids":["aurora_alpha","proximitylabs_ft"],"amounts":["1","100"],"authorized_id":"thirdparty.near"}]}"#
+            r#"EVENT_JSON:{"standard":"nep245","version":"1.0.0","event":"mt_burn","data":[{"authorized_id":"thirdparty.near","owner_id":"foundation.near","token_ids":["aurora","proximitylabs_ft"],"amounts":["1","100"]}]}"#
         );
     }
 }
