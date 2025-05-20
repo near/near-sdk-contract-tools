@@ -16,7 +16,8 @@ use pretty_assertions::assert_eq;
 use tokio::task::JoinSet;
 use workspaces_tests_utils::{expect_execution_error, ft_balance_of, ONE_NEAR, ONE_YOCTO};
 
-const WASM: &[u8] = include_bytes!("../../target/wasm32-unknown-unknown/release/multi_token.wasm");
+const WASM: &[u8] =
+    include_bytes!("../../target/wasm32-unknown-unknown/release/fungible_token.wasm");
 
 const RECEIVER_WASM: &[u8] =
     include_bytes!("../../target/wasm32-unknown-unknown/release/fungible_token_receiver.wasm");
