@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
 
-use near_sdk::{json_types::U128, serde::de::DeserializeOwned, serde_json::json};
+use near_sdk::{json_types::U128, serde::de::DeserializeOwned, serde_json::json, AccountIdRef};
 use near_workspaces::{
     result::ExecutionFinalResult, types::NearToken, Account, AccountId, Contract,
 };
@@ -38,6 +38,24 @@ pub async fn mt_balance_of(contract: &Contract, account: &AccountId, token_id: &
         .unwrap()
         .json::<U128>()
         .map(u128::from)
+        .unwrap()
+}
+
+pub async fn mt_batch_balance_of(
+    contract: &Contract,
+    account_id: &AccountIdRef,
+    token_ids: impl IntoIterator<Item = &str>,
+) -> Vec<u128> {
+    contract
+        .view("mt_batch_balance_of")
+        .args_json(json!({
+            "token_ids": token_ids.into_iter().collect::<Vec<_>>(),
+            "account_id": account_id,
+        }))
+        .await
+        .unwrap()
+        .json::<Vec<U128>>()
+        .map(|v| v.into_iter().map(u128::from).collect())
         .unwrap()
 }
 

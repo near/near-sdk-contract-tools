@@ -1,6 +1,8 @@
 workspaces_tests::predicate!();
 
-use near_sdk::{env, json_types::U128, log, near, AccountId, NearToken, PromiseOrValue};
+use near_sdk::{
+    env, json_types::U128, log, near, serde_json, AccountId, NearToken, PromiseOrValue,
+};
 use near_sdk_contract_tools::mt::*;
 
 #[derive(Default)]
@@ -55,6 +57,9 @@ impl Nep245Receiver for Contract {
 
         PromiseOrValue::Value(if msg == "return" {
             amounts
+        } else if let Some(return_amounts) = msg.strip_prefix("return:") {
+            let return_amounts: Vec<U128> = serde_json::from_str(return_amounts).unwrap();
+            return_amounts
         } else {
             vec![U128(0); amounts.len()]
         })
