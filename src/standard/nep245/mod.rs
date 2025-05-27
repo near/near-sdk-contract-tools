@@ -1,5 +1,7 @@
 //! NEP-245 fungible token core implementation
 //! <https://github.com/near/NEPs/blob/master/neps/nep-0245.md>
+//!
+//! NOTE: This library does not implement the Approval Management standard.
 
 use std::{
     borrow::Cow,
@@ -20,6 +22,8 @@ pub use event::*;
 mod ext;
 pub use ext::*;
 pub mod hooks;
+pub mod metadata;
+pub use metadata::*;
 
 /// Type of an approval ID.
 pub type ApprovalId = u32;
@@ -51,7 +55,7 @@ enum StorageKey<'a> {
 
 /// Token-wide metadata storage.
 #[derive(PartialEq, Eq, Debug, Clone)]
-#[near(serializers = [borsh])]
+#[near]
 pub struct TokenRecord {
     /// Only `Some` if the supply has only ever been 1.
     /// (Will not be used even if tokens are burned from >1 to 1.)
@@ -59,24 +63,6 @@ pub struct TokenRecord {
     /// The quantity of tokens in circulation.
     pub supply: u128,
 }
-
-// #[derive(PartialEq, Eq, Debug, Clone)]
-// #[near]
-// pub struct TransferApproval<'a> {
-//     pub owner_id: Cow<'a, AccountIdRef>,
-//     pub approval_id: ApprovalId,
-//     pub amount: u128,
-// }
-
-// impl<'a> From<&'a MtResolveTransferApproval> for TransferApproval<'a> {
-//     fn from(value: &'a MtResolveTransferApproval) -> Self {
-//         Self {
-//             owner_id: value.owner_id().into(),
-//             approval_id: value.approval_id(),
-//             amount: value.amount(),
-//         }
-//     }
-// }
 
 /// A token amount involved in a mint, transfer, or burn action.
 #[derive(PartialEq, Eq, Debug, Clone)]
@@ -86,7 +72,6 @@ pub struct TokenAmount<'a> {
     pub token_id: Cow<'a, TokenIdRef>,
     /// The amount of tokens.
     pub amount: u128,
-    // pub approval: Option<TransferApproval<'a>>,
 }
 
 /// Transfer metadata generic over both types of transfer (`ft_transfer` and
@@ -122,25 +107,19 @@ impl<'a> Nep245Transfer<'a> {
         count: usize,
         token_ids: impl IntoIterator<Item = impl Into<Cow<'a, TokenIdRef>>>,
         amounts: impl IntoIterator<Item = impl Into<u128>>,
-        approvals: Option<impl IntoIterator<Item = Option<MtTransferApproval>>>,
         memo: Option<impl Into<Cow<'a, str>>>,
     ) -> Result<Self, LengthMismatchError> {
         let mut payload = Vec::with_capacity(count);
         let mut token_ids = token_ids.into_iter();
         let mut amounts = amounts.into_iter();
-        let mut approvals: Option<_> = approvals.map(IntoIterator::into_iter);
 
         loop {
-            match (
-                token_ids.next(),
-                amounts.next(),
-                approvals.as_mut().map(Iterator::next),
-            ) {
-                (Some(token_id), Some(amount), None | Some(Some(_))) => payload.push(TokenAmount {
+            match (token_ids.next(), amounts.next()) {
+                (Some(token_id), Some(amount)) => payload.push(TokenAmount {
                     token_id: token_id.into(),
                     amount: amount.into(),
                 }),
-                (None, None, None) => break,
+                (None, None) => break,
                 _ => {
                     return Err(LengthMismatchError);
                 }
@@ -186,7 +165,6 @@ impl<'a> Nep245Transfer<'a> {
             payload: vec![TokenAmount {
                 token_id: token_id.into(),
                 amount,
-                // approval: None,
             }],
             memo: memo.map(Into::into),
             revert: false,
@@ -195,16 +173,10 @@ impl<'a> Nep245Transfer<'a> {
 
     /// Adds another token transfer to this action.
     #[must_use]
-    pub fn and_transfer(
-        mut self,
-        token_id: impl Into<Cow<'a, TokenIdRef>>,
-        amount: u128,
-        // approval: Option<TransferApproval<'a>>,
-    ) -> Self {
+    pub fn and_transfer(mut self, token_id: impl Into<Cow<'a, TokenIdRef>>, amount: u128) -> Self {
         self.payload.push(TokenAmount {
             token_id: token_id.into(),
             amount,
-            // approval,
         });
         self
     }
@@ -260,14 +232,6 @@ impl<'a> Nep245Transfer<'a> {
             .map(|token| token.amount.into())
             .collect()
     }
-
-    /// Returns a vector of the token approvals, as acompatible with the
-    /// standard arguments of [`Nep245Receiver::mt_on_transfer`].
-    #[must_use]
-    pub fn approvals(&self) -> Option<Vec<Option<MtResolveTransferApproval>>> {
-        // TODO: implement real approvals
-        Some(vec![None; self.payload.len()])
-    }
 }
 
 /// A wrapper type for transfers that includes contract invocation metadata.
@@ -298,8 +262,8 @@ impl<'a> Nep245TransferCall<'a> {
         let previous_owner_ids = self.previous_owner_ids();
         let token_ids = self.token_ids();
         let amounts = self.amounts();
-        let approvals = self.approvals();
         let msg = self.msg.to_string();
+
         ext_nep245_receiver::ext(receiver_id.clone())
             .with_unused_gas_weight(10)
             .mt_on_transfer(
@@ -313,7 +277,7 @@ impl<'a> Nep245TransferCall<'a> {
                 ext_nep245_resolver::ext(current_account_id)
                     .with_static_gas(GAS_FOR_MT_RESOLVE_TRANSFER)
                     .with_unused_gas_weight(1)
-                    .mt_resolve_transfer(sender_id, receiver_id, token_ids, amounts, approvals),
+                    .mt_resolve_transfer(sender_id, receiver_id, token_ids, amounts),
             )
     }
 }
@@ -567,7 +531,6 @@ pub trait Nep245Controller {
         receiver_id: AccountId,
         token_ids: Vec<TokenId>,
         amounts: Vec<U128>,
-        _approvals: Option<Vec<Option<MtResolveTransferApproval>>>,
         mt_on_transfer_result: Option<Vec<U128>>,
     ) -> Vec<U128> {
         let reverts_bounded_by_transfer_value = if let Some(callback_returned) =

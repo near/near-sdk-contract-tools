@@ -63,13 +63,12 @@ pub trait Nep245Resolver {
         receiver_id: AccountId,
         token_ids: Vec<TokenId>,
         amounts: Vec<U128>,
-        approvals: Option<Vec<Option<MtResolveTransferApproval>>>,
     ) -> Vec<U128>;
 }
 
 #[derive(Debug, Clone)]
 #[near(serializers = [json, borsh])]
-pub struct MtTransferApproval(pub AccountId, pub ApprovalId);
+pub struct MtTransferApproval(pub AccountId, pub u32);
 
 impl MtTransferApproval {
     #[must_use]
