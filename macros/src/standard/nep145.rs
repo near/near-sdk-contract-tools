@@ -115,6 +115,7 @@ pub fn expand(meta: Nep145Meta) -> Result<TokenStream, darling::Error> {
                 new_balance
             }
 
+            #[payable]
             fn storage_unregister(&mut self, force: Option<bool>) -> bool {
                 use #me::standard::nep145::*;
                 use #near_sdk::{env, Promise};

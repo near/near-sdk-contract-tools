@@ -4,6 +4,7 @@ use near_sdk::{
     NearToken,
 };
 use near_sdk_contract_tools::{
+    ft::nep141::FtBurnData,
     nft::StorageBalance,
     standard::{
         nep141::{FtTransferData, Nep141Event},
@@ -534,4 +535,35 @@ async fn transfer_call_inner_panic() {
     assert_eq!(ft_balance_of(&contract, alice.id()).await, 1000);
     assert_eq!(ft_balance_of(&contract, bob.id()).await, 100);
     assert_eq!(ft_balance_of(&contract, charlie.id()).await, 10);
+}
+
+#[tokio::test]
+async fn force_unregister() {
+    let Setup {
+        contract, accounts, ..
+    } = setup_balances(3, |i| 10u128.pow(3 - i as u32).into()).await;
+    let alice = &accounts[0];
+
+    let result = alice
+        .call(contract.id(), "storage_unregister")
+        .deposit(ONE_YOCTO)
+        .args_json(json!({
+            "force": true,
+        }))
+        .transact()
+        .await
+        .unwrap()
+        .unwrap();
+
+    assert_eq!(
+        result.logs().to_vec(),
+        vec![Nep141Event::FtBurn(vec![FtBurnData {
+            owner_id: alice.id().into(),
+            amount: U128(1000),
+            memo: Some("storage forced unregistration".into()),
+        }])
+        .to_event_string(),]
+    );
+
+    assert_eq!(ft_balance_of(&contract, alice.id()).await, 0);
 }
