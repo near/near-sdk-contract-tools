@@ -13,6 +13,9 @@ use super::{ApprovalId, TokenId};
 pub struct Token {
     pub token_id: TokenId,
     pub owner_id: Option<AccountId>,
+    #[borsh(skip)]
+    #[serde(flatten)]
+    pub extensions_metadata: std::collections::HashMap<String, near_sdk::serde_json::Value>,
 }
 
 /// A contract that may be the recipient of an `mt_transfer_call` function

@@ -5,6 +5,8 @@
 
 use std::{
     borrow::Cow,
+    collections::HashMap,
+    error::Error,
     iter::{IntoIterator, Iterator},
 };
 
@@ -22,7 +24,7 @@ pub use event::*;
 mod ext;
 pub use ext::*;
 pub mod hooks;
-pub mod metadata;
+mod metadata;
 pub use metadata::*;
 
 /// Type of an approval ID.
@@ -51,6 +53,7 @@ enum StorageKey<'a> {
     Tokens,
     Token(&'a TokenIdRef),
     Balance(&'a TokenIdRef, &'a AccountIdRef),
+    Metadata,
 }
 
 /// Token-wide metadata storage.
@@ -392,6 +395,10 @@ pub trait Nep245ControllerInternal {
     type BurnHook: for<'a> Hook<Self, Nep245Burn<'a>>
     where
         Self: Sized;
+    /// Load additional token data into [`Token::extensions_metadata`].
+    type LoadTokenMetadata: LoadTokenMetadata<Self>
+    where
+        Self: Sized;
 
     /// Root storage slot.
     #[must_use]
@@ -432,6 +439,10 @@ pub trait Nep245Controller {
     type BurnHook: for<'a> Hook<Self, Nep245Burn<'a>>
     where
         Self: Sized;
+    /// Load additional token data into [`Token::extensions_metadata`].
+    type LoadTokenMetadata: LoadTokenMetadata<Self>
+    where
+        Self: Sized;
 
     /// Adds a token to the multi token contract.
     ///
@@ -439,6 +450,8 @@ pub trait Nep245Controller {
     ///
     /// - If the token ID is already in use.
     fn create_token(&mut self, token_id: TokenId) -> Result<(), TokenIdCollisionError>;
+
+    fn token_exists(&self, token_id: &TokenIdRef) -> bool;
 
     /// Get the list of all tokens in this contract.
     fn tokens(&self) -> Vector<TokenId>;
@@ -590,6 +603,7 @@ impl<T: Nep245ControllerInternal> Nep245Controller for T {
     type MintHook = T::MintHook;
     type TransferHook = T::TransferHook;
     type BurnHook = T::BurnHook;
+    type LoadTokenMetadata = T::LoadTokenMetadata;
 
     fn create_token(&mut self, token_id: TokenId) -> Result<(), TokenIdCollisionError> {
         let mut token_record = Self::slot_token(&token_id);
@@ -607,6 +621,10 @@ impl<T: Nep245ControllerInternal> Nep245Controller for T {
         }
     }
 
+    fn token_exists(&self, token_id: &TokenIdRef) -> bool {
+        Self::slot_token(token_id).exists()
+    }
+
     fn tokens(&self) -> Vector<TokenId> {
         Self::slot_tokens()
             .read()
@@ -614,9 +632,12 @@ impl<T: Nep245ControllerInternal> Nep245Controller for T {
     }
 
     fn token(&self, token_id: &TokenIdRef) -> Option<Token> {
+        let mut metadata = HashMap::new();
+        Self::LoadTokenMetadata::load(self, token_id, &mut metadata).ok()?;
         Self::slot_token(token_id).read().map(|token_record| Token {
             token_id: token_id.to_owned(),
             owner_id: token_record.owner_id,
+            extensions_metadata: metadata,
         })
     }
 
@@ -842,5 +863,41 @@ impl<T: Nep245ControllerInternal> Nep245Controller for T {
 
             Ok(())
         })
+    }
+}
+
+/// Trait for MT extensions to load token metadata.
+pub trait LoadTokenMetadata<C> {
+    /// Load token metadata into `metadata`.
+    ///
+    /// # Errors
+    ///
+    /// If the token metadata could not be loaded.
+    fn load(
+        contract: &C,
+        token_id: &TokenIdRef,
+        metadata: &mut std::collections::HashMap<String, near_sdk::serde_json::Value>,
+    ) -> Result<(), Box<dyn Error>>;
+}
+
+impl<C> LoadTokenMetadata<C> for () {
+    fn load(
+        _contract: &C,
+        _token_id: &TokenIdRef,
+        _metadata: &mut std::collections::HashMap<String, near_sdk::serde_json::Value>,
+    ) -> Result<(), Box<dyn Error>> {
+        Ok(())
+    }
+}
+
+impl<C, T: LoadTokenMetadata<C>, U: LoadTokenMetadata<C>> LoadTokenMetadata<C> for (T, U) {
+    fn load(
+        contract: &C,
+        token_id: &TokenIdRef,
+        metadata: &mut std::collections::HashMap<String, near_sdk::serde_json::Value>,
+    ) -> Result<(), Box<dyn Error>> {
+        T::load(contract, token_id, metadata)?;
+        U::load(contract, token_id, metadata)?;
+        Ok(())
     }
 }
