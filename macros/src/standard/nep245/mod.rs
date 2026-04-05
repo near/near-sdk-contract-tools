@@ -1,3 +1,5 @@
+pub mod metadata;
+
 use darling::FromDeriveInput;
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -11,6 +13,7 @@ pub struct Nep245Meta {
     pub mint_hook: Option<Type>,
     pub transfer_hook: Option<Type>,
     pub burn_hook: Option<Type>,
+    pub load_token_metadata: Option<Type>,
     pub generics: syn::Generics,
     pub ident: syn::Ident,
 
@@ -28,6 +31,7 @@ pub fn expand(meta: Nep245Meta) -> Result<TokenStream, darling::Error> {
         mint_hook,
         transfer_hook,
         burn_hook,
+        load_token_metadata,
         generics,
         ident,
 
@@ -48,6 +52,7 @@ pub fn expand(meta: Nep245Meta) -> Result<TokenStream, darling::Error> {
     let mint_hook = mint_hook.map_or_else(|| quote! { () }, |h| quote! { #h });
     let transfer_hook = transfer_hook.map_or_else(|| quote! { () }, |h| quote! { #h });
     let burn_hook = burn_hook.map_or_else(|| quote! { () }, |h| quote! { #h });
+    let load_token_metadata = load_token_metadata.map_or_else(|| quote! { () }, |h| quote! { #h });
 
     let default_hook = all_hooks.map_or_else(|| quote! { () }, |h| quote! { #h });
 
@@ -56,6 +61,7 @@ pub fn expand(meta: Nep245Meta) -> Result<TokenStream, darling::Error> {
             type MintHook = (#mint_hook, #default_hook);
             type TransferHook = (#transfer_hook, #default_hook);
             type BurnHook = (#burn_hook, #default_hook);
+            type LoadTokenMetadata = #load_token_metadata;
 
             #root
         }
@@ -71,6 +77,8 @@ pub fn expand(meta: Nep245Meta) -> Result<TokenStream, darling::Error> {
                 approval: Option<#me::standard::nep245::MtTransferApproval>,
                 memo: Option<String>,
             ) {
+                let _ = approval;
+
                 use #me::standard::nep245::*;
 
                 #near_sdk::assert_one_yocto();
@@ -98,6 +106,8 @@ pub fn expand(meta: Nep245Meta) -> Result<TokenStream, darling::Error> {
                 approvals: Option<Vec<Option<#me::standard::nep245::MtTransferApproval>>>,
                 memo: Option<String>,
             ) {
+                let _ = approvals;
+
                 use #me::standard::nep245::*;
 
                 #near_sdk::assert_one_yocto();
@@ -110,7 +120,6 @@ pub fn expand(meta: Nep245Meta) -> Result<TokenStream, darling::Error> {
                     count,
                     token_ids,
                     amounts,
-                    approvals,
                     memo,
                 ).unwrap_or_else(|e| {
                     #near_sdk::env::panic_str(&e.to_string())
@@ -130,6 +139,8 @@ pub fn expand(meta: Nep245Meta) -> Result<TokenStream, darling::Error> {
                 memo: Option<String>,
                 msg: String,
             ) -> #near_sdk::Promise {
+                let _ = approval;
+
                 use #me::standard::nep245::*;
 
                 #near_sdk::require!(
@@ -165,6 +176,8 @@ pub fn expand(meta: Nep245Meta) -> Result<TokenStream, darling::Error> {
                 memo: Option<String>,
                 msg: String,
             ) -> #near_sdk::Promise {
+                let _ = approvals;
+
                 use #me::standard::nep245::*;
 
                 #near_sdk::require!(
@@ -182,7 +195,6 @@ pub fn expand(meta: Nep245Meta) -> Result<TokenStream, darling::Error> {
                         count,
                         token_ids,
                         amounts,
-                        approvals,
                         memo,
                     )
                     .unwrap_or_else(|e| {
@@ -264,7 +276,6 @@ pub fn expand(meta: Nep245Meta) -> Result<TokenStream, darling::Error> {
                 receiver_id: #near_sdk::AccountId,
                 token_ids: Vec<#me::standard::nep245::TokenId>,
                 amounts: Vec<#near_sdk::json_types::U128>,
-                approvals: Option<Vec<Option<#me::standard::nep245::MtResolveTransferApproval>>>,
             ) -> Vec<#near_sdk::json_types::U128> {
                 use #near_sdk::{env, PromiseResult, serde_json, json_types::U128};
                 use #me::standard::nep245::*;
@@ -283,7 +294,6 @@ pub fn expand(meta: Nep245Meta) -> Result<TokenStream, darling::Error> {
                     receiver_id,
                     token_ids,
                     amounts,
-                    approvals,
                     mt_on_transfer_result,
                 )
             }

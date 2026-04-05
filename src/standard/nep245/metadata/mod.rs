@@ -1,58 +1,41 @@
-use near_sdk::{json_types::U64, near};
+//! NEP-245 metadata extension module.
+//!
+//! Reference: <https://github.com/near/NEPs/blob/master/neps/nep-0245/Metadata.md>
 
+mod base;
+pub use base::BaseMetadata;
+mod contract;
+pub use contract::ContractMetadata;
+pub mod error;
 mod ext;
-pub use ext::*;
+pub use ext::{nep245_metadata, Nep245Metadata};
+mod token;
+pub use token::{TokenMetadata, TokenMetadataAll};
 
-pub type MetadataId = String;
-pub type MetadataIdRef = str;
+use near_sdk::{borsh::BorshSerialize, env, near, BorshStorageKey};
+
+use crate::{
+    mt::{Nep245Controller, TokenIdRef},
+    slot::Slot,
+    DefaultStorageKey,
+};
+
+/// ID of base token metadata.
+pub type BaseMetadataId = String;
+/// Referenced ID of base token metadata.
+pub type BaseMetadataIdRef = str;
+
+const CONTRACT_METADATA_NOT_INITIALIZED_ERROR: &str = "Contract metadata not initialized";
+const ERR_INCONSISTENT_STATE_BASE_METADATA_MISSING: &str =
+    "Inconsistent state: base metadata missing";
 
 #[derive(BorshSerialize, BorshStorageKey)]
 #[borsh(crate = "near_sdk::borsh")]
 enum StorageKey<'a> {
     ContractMetadata,
-    BaseMetadata(&'a MetadataIdRef),
+    BaseMetadata(&'a BaseMetadataIdRef),
+    BaseMetadataUsage(&'a BaseMetadataIdRef),
     TokenMetadata(&'a TokenIdRef),
-}
-
-#[derive(PartialEq, Eq, Clone, Debug)]
-#[near(serializers = [borsh, json])]
-pub struct ContractMetadata {
-    pub spec: String,
-    pub name: String,
-}
-
-impl ContractMetadata {
-    pub const SPEC: &str = "mt-1.0.0";
-
-    pub fn new(name: impl Into<String>) -> Self {
-        Self {
-            spec: Self::SPEC.to_string(),
-            name: name.into(),
-        }
-    }
-}
-
-#[derive(PartialEq, Eq, Clone, Debug)]
-#[near(serializers = [borsh, json])]
-pub struct BaseTokenMetadata {
-    /// The name of the token, e.g. "Silver Swords" or "Metaverse 3".
-    pub name: String,
-    /// Unique identifier of the metadata.
-    pub id: MetadataId,
-    /// Token symbol, e.g. "MOCHI".
-    pub symbol: Option<String>,
-    /// Data URL of icon.
-    pub icon: Option<String>,
-    /// Number of decimals to use when representing quantities of this token (in the case of a fungible-like token).
-    pub decimals: Option<U64>,
-    /// Centralized gateway known to have reliable access to decentralized storage assets referenced by `reference` or `media` URLs.
-    pub base_uri: Option<String>,
-    /// URL to a JSON file with more information.
-    pub reference: Option<String>,
-    /// Base64-encoded SHA-256 hash of JSON from the `reference` field. Required if `reference` is not `None`.
-    pub reference_hash: Option<String>,
-    /// Number of copies of this set of metadata in existence when the token was minted.
-    pub copies: Option<U64>,
 }
 
 macro_rules! builder_fn {
@@ -64,102 +47,20 @@ macro_rules! builder_fn {
             self
         }
 
-        builder_fn! { $($tail)* }
+        $crate::standard::nep245::metadata::builder_fn! { $($tail)* }
     };
     () => {};
 }
+use builder_fn;
 
-impl BaseTokenMetadata {
-    pub fn new(name: impl Into<String>, id: impl Into<String>) -> Self {
-        Self {
-            name: name.into(),
-            id: id.into(),
-            symbol: None,
-            icon: None,
-            decimals: None,
-            base_uri: None,
-            reference: None,
-            reference_hash: None,
-            copies: None,
-        }
-    }
-
-    builder_fn! {
-        symbol: String;
-        icon: String;
-        decimals: U64;
-        base_uri: String;
-        reference: String;
-        reference_hash: String;
-        copies: U64;
-    }
-}
-
-#[derive(PartialEq, Eq, Clone, Debug, Default)]
-#[near(serializers = [json, borsh])]
-pub struct TokenMetadata {
-    /// The title of the token, e.g. "Arch Nemesis: Mail Carrier" or "Parcel #5055".
-    pub title: Option<String>,
-    /// Free-form description of the token.
-    pub description: Option<String>,
-    /// URL to associated media, preferably to decentralized, content-addressed storage.
-    pub media: Option<String>,
-    /// Base64-encoded SHA-256 hash of content referenced by the `media` field. Required if `media` is included.
-    pub media_hash: Option<String>,
-    /// When the token was issued or minted, Unix epoch in milliseconds.
-    pub issued_at: Option<U64>,
-    /// When the token expires, Unix epoch in milliseconds.
-    pub expires_at: Option<U64>,
-    /// When the token starts being valid, Unix epoch in milliseconds.
-    pub starts_at: Option<U64>,
-    /// When the token was last updated, Unix epoch in milliseconds.
-    pub updated_at: Option<U64>,
-    /// Anything extra the token wants to store on-chain. Can be stringified JSON.
-    pub extra: Option<String>,
-    /// URL to an off-chain JSON file with more info.
-    pub reference: Option<String>,
-    /// Base64-encoded SHA-256 hash of JSON from the `reference` field. Required if `reference` is included.
-    pub reference_hash: Option<String>,
-}
-
-impl TokenMetadata {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    builder_fn! {
-        title: String;
-        description: String;
-        media: String;
-        media_hash: String;
-        issued_at: U64;
-        expires_at: U64;
-        starts_at: U64;
-        updated_at: U64;
-        extra: String;
-        reference: String;
-        reference_hash: String;
-    }
-}
-
-/// Combined metadata for a token, including base metadata and token-specific metadata.
-#[derive(PartialEq, Eq, Clone, Debug)]
-#[near(serializers = [borsh, json])]
-pub struct TokenMetadataAll {
-    /// Base metadata that applies to all tokens of this type.
-    pub base: BaseTokenMetadata,
+/// Token metadata with a reference to the base token metadata by ID.
+#[derive(Debug, PartialEq, Eq, Clone)]
+#[near(serializers = [borsh])]
+pub struct TokenMetadataStore {
+    /// ID of the base token metadata.
+    pub base_id: BaseMetadataId,
     /// Token-specific metadata.
     pub token: TokenMetadata,
-}
-
-impl<C> LoadTokenMetadata<C> for TokenMetadata {
-    fn load(
-        contract: &C,
-        token_id: &TokenIdRef,
-        metadata: &mut std::collections::HashMap<String, near_sdk::serde_json::Value>,
-    ) -> Result<(), Box<dyn Error>> {
-        todo!()
-    }
 }
 
 /// Internal functions for [`MetadataController`].
@@ -176,85 +77,125 @@ pub trait MetadataControllerInternal {
         Self::root().field(StorageKey::ContractMetadata)
     }
 
-    /// Storage slot for token metadata.
+    /// Storage slot for base metadata.
     #[must_use]
-    fn slot_base_metadata(base_metadata_id: &MetadataIdRef) -> Slot<BaseTokenMetadata> {
+    fn slot_base_metadata(base_metadata_id: &BaseMetadataIdRef) -> Slot<BaseMetadata> {
         Self::root().field(StorageKey::BaseMetadata(base_metadata_id))
     }
 
+    /// Storage slot for base metadata usage.
+    #[must_use]
+    fn slot_base_metadata_usage(base_metadata_id: &BaseMetadataIdRef) -> Slot<u32> {
+        Self::root().field(StorageKey::BaseMetadataUsage(base_metadata_id))
+    }
+
     /// Storage slot for token metadata.
     #[must_use]
-    fn slot_token_metadata(token_id: &TokenIdRef) -> Slot<TokenMetadata> {
+    fn slot_token_metadata(token_id: &TokenIdRef) -> Slot<TokenMetadataStore> {
         Self::root().field(StorageKey::TokenMetadata(token_id))
-    }
-}
-
-pub mod error {
-    use super::MetadataId;
-
-    #[derive(Debug, thiserror::Error)]
-    #[error("The specified metadata ID already exists: {metadata_id}")]
-    pub struct MetadataIdAlreadyExistsError {
-        pub metadata_id: MetadataId,
-    }
-
-    #[derive(Debug, thiserror::Error)]
-    #[error("The specified metadata ID does not exist: {metadata_id}")]
-    pub struct MetadataIdDoesNotExistError {
-        pub metadata_id: MetadataId,
-    }
-
-    #[derive(Debug, thiserror::Error)]
-    #[error("Could not mint token with metadata: {0}")]
-    pub enum UpdateTokenMetadataError {
-        /// The token ID does not exist.
-        TokenIdDoesNotExist(#[from] super::TokenIdDoesNotExistError),
-        /// The metadata ID does not exist.
-        MetadataIdDoesNotExist(#[from] MetadataIdDoesNotExistError),
     }
 }
 
 /// Functions for managing non-fungible tokens with attached metadata, NEP-177.
 pub trait MetadataController {
+    /// Sets the contract metadata.
+    fn set_contract_metadata(&mut self, contract_metadata: &ContractMetadata);
+
+    /// Creates a base token metadata.
+    ///
+    /// # Errors
+    ///
+    /// - If the metadata ID already exists.
     fn create_base_metadata(
         &mut self,
-        base_metadata: BaseTokenMetadata,
-    ) -> Result<(), error::MetadataIdAlreadyExistsError>;
+        base_metadata: BaseMetadata,
+    ) -> Result<(), error::BaseMetadataIdAlreadyExistsError>;
 
-    fn base_metadata_exists(&self, base_metadata_id: &MetadataIdRef) -> bool;
+    /// Removes a base token metadata.
+    ///
+    /// # Errors
+    ///
+    /// - If the metadata ID does not exist.
+    /// - If there are token metadata that still reference this base metadata.
+    fn remove_base_metadata(
+        &mut self,
+        metadata_id: BaseMetadataId,
+    ) -> Result<(), error::RemoveBaseTokenMetadataError>;
 
+    /// Sets metadata for a token.
+    ///
+    /// # Errors
+    ///
+    /// - If the token ID does not exist.
+    /// - If the base token metadata ID does not exist.
     fn set_token_metadata(
         &mut self,
         token_id: &TokenIdRef,
-        base_metadata_id: &MetadataIdRef,
-        token_metadata: &TokenMetadata,
+        base_token_metadata_id: BaseMetadataId,
+        token_metadata: TokenMetadata,
     ) -> Result<(), error::UpdateTokenMetadataError>;
 
-    /// Sets the metadata for a token ID without checking whether the token
-    /// exists, etc.
-    fn set_token_metadata_unchecked(
-        &mut self,
-        token_id: &TokenId,
-        base_metadata_id: &MetadataIdRef,
-        metadata: Option<&TokenMetadata>,
-    );
-
-    /// Sets the contract metadata.
-    fn set_contract_metadata(&mut self, metadata: &ContractMetadata);
-
-    /// Returns the contract metadata.
+    /// Retrieves the contract metadata.
     fn contract_metadata(&self) -> ContractMetadata;
 
-    /// Returns the metadata for a token ID.
-    fn token_metadata(&self, token_id: &TokenId) -> Option<TokenMetadataAll>;
+    /// Retrieves base token metadata.
+    fn base_metadata(&self, base_metadata_id: &BaseMetadataIdRef) -> Option<BaseMetadata>;
+
+    /// Retrieves the metadata for a token ID.
+    fn token_metadata(&self, token_id: &TokenIdRef) -> Option<TokenMetadataStore>;
 }
 
 impl<T: MetadataControllerInternal + Nep245Controller> MetadataController for T {
+    fn set_contract_metadata(&mut self, contract_metadata: &ContractMetadata) {
+        Self::slot_contract_metadata().write(contract_metadata);
+    }
+
+    fn create_base_metadata(
+        &mut self,
+        base_metadata: BaseMetadata,
+    ) -> Result<(), error::BaseMetadataIdAlreadyExistsError> {
+        let mut slot = Self::slot_base_metadata(&base_metadata.id);
+        if slot.exists() {
+            return Err(error::BaseMetadataIdAlreadyExistsError {
+                base_metadata_id: base_metadata.id,
+            });
+        }
+
+        slot.write(&base_metadata);
+        Self::slot_base_metadata_usage(&base_metadata.id).write(&0);
+        Ok(())
+    }
+
+    fn remove_base_metadata(
+        &mut self,
+        base_metadata_id: BaseMetadataId,
+    ) -> Result<(), error::RemoveBaseTokenMetadataError> {
+        let mut slot = Self::slot_base_metadata(&base_metadata_id);
+        let mut usage_slot = Self::slot_base_metadata_usage(&base_metadata_id);
+        if !slot.exists() {
+            return Err(error::BaseMetadataIdDoesNotExistError { base_metadata_id }.into());
+        }
+        match usage_slot.read() {
+            Some(count) if count > 0 => {
+                return Err(error::BaseMetadataInUseError {
+                    base_metadata_id,
+                    count,
+                }
+                .into());
+            }
+            _ => {}
+        }
+
+        slot.remove();
+        usage_slot.remove();
+        Ok(())
+    }
+
     fn set_token_metadata(
         &mut self,
         token_id: &TokenIdRef,
-        base_metadata_id: &MetadataIdRef,
-        metadata: &TokenMetadata,
+        base_metadata_id: BaseMetadataId,
+        token_metadata: TokenMetadata,
     ) -> Result<(), error::UpdateTokenMetadataError> {
         if !self.token_exists(token_id) {
             return Err(super::TokenIdDoesNotExistError {
@@ -263,42 +204,52 @@ impl<T: MetadataControllerInternal + Nep245Controller> MetadataController for T 
             .into());
         }
 
-        if !self.base_metadata_exists(base_metadata_id) {
-            return Err(error::MetadataIdDoesNotExistError {
-                metadata_id: base_metadata_id.to_string(),
+        if !Self::slot_base_metadata(&base_metadata_id).exists() {
+            return Err(error::BaseMetadataIdDoesNotExistError {
+                base_metadata_id: base_metadata_id.to_string(),
             }
             .into());
         }
 
-        self.set_token_metadata_unchecked(token_id, Some(metadata));
+        let mut slot = Self::slot_token_metadata(token_id);
+
+        let old_base_metadata_id = slot.read().map(|m| m.base_id);
+
+        slot.set(Some(&TokenMetadataStore {
+            base_id: base_metadata_id.clone(),
+            token: token_metadata,
+        }));
+
+        if old_base_metadata_id.as_ref() != Some(&base_metadata_id) {
+            if let Some(old_id) = old_base_metadata_id {
+                let mut usage_slot = Self::slot_base_metadata_usage(&old_id);
+                let usage = usage_slot.read().unwrap_or_else(|| {
+                    env::panic_str(ERR_INCONSISTENT_STATE_BASE_METADATA_MISSING)
+                });
+                usage_slot.write(&(usage - 1));
+            }
+
+            let mut usage_slot = Self::slot_base_metadata_usage(&base_metadata_id);
+            let usage = usage_slot
+                .read()
+                .unwrap_or_else(|| env::panic_str(ERR_INCONSISTENT_STATE_BASE_METADATA_MISSING));
+            usage_slot.write(&(usage + 1));
+        }
+
         Ok(())
-    }
-
-    fn base_metadata_exists(&self, base_metadata_id: &MetadataIdRef) -> bool {
-        Self::slot_base_metadata(base_metadata_id).exists()
-    }
-
-    fn set_contract_metadata(&mut self, metadata: &ContractMetadata) {
-        Self::slot_contract_metadata().set(Some(metadata));
-        Nep171Event::ContractMetadataUpdate(vec![NftContractMetadataUpdateLog { memo: None }])
-            .emit();
-    }
-
-    fn set_token_metadata_unchecked(
-        &mut self,
-        token_id: &TokenId,
-        metadata: Option<&TokenMetadata>,
-    ) {
-        <Self as MetadataControllerInternal>::slot_token_metadata(token_id).set(metadata);
-    }
-
-    fn token_metadata(&self, token_id: &TokenId) -> Option<TokenMetadata> {
-        <Self as Nep177ControllerInternal>::slot_token_metadata(token_id).read()
     }
 
     fn contract_metadata(&self) -> ContractMetadata {
         Self::slot_contract_metadata()
             .read()
             .unwrap_or_else(|| env::panic_str(CONTRACT_METADATA_NOT_INITIALIZED_ERROR))
+    }
+
+    fn base_metadata(&self, base_metadata_id: &BaseMetadataIdRef) -> Option<BaseMetadata> {
+        Self::slot_base_metadata(base_metadata_id).read()
+    }
+
+    fn token_metadata(&self, token_id: &TokenIdRef) -> Option<TokenMetadataStore> {
+        Self::slot_token_metadata(token_id).read()
     }
 }

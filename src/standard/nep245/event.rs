@@ -1,4 +1,6 @@
 //! NEP-245 standard events for minting, burning, and transferring tokens.
+//!
+//! Reference: <https://github.com/near/NEPs/blob/master/neps/nep-0245/Events.md>
 
 use std::borrow::Cow;
 
@@ -21,16 +23,16 @@ use super::TokenIdRef;
 )]
 #[derive(Debug, Clone)]
 pub enum Nep245Event<'a> {
-    /// Token mint event. Emitted when tokens are created and total_supply is
+    /// Token mint event. Emitted when tokens are created and `total_supply` is
     /// increased.
     MtMint(Vec<MtMintData<'a>>),
 
     /// Token transfer event. Emitted when tokens are transferred between two
-    /// accounts. No change to total_supply.
+    /// accounts. No change to `total_supply`.
     MtTransfer(Vec<MtTransferData<'a>>),
 
     /// Token burn event. Emitted when tokens are burned (removed from supply).
-    /// Decrease in total_supply.
+    /// Decrease in `total_supply`.
     MtBurn(Vec<MtBurnData<'a>>),
 }
 

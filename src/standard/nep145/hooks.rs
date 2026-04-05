@@ -4,6 +4,7 @@ use near_sdk::{env, AccountIdRef};
 
 use crate::{
     hook::Hook,
+    mt::{Nep245Burn, Nep245Mint, Nep245Transfer},
     standard::{
         nep141::{Nep141Burn, Nep141Mint, Nep141Transfer},
         nep171::action::{Nep171Burn, Nep171Mint, Nep171Transfer},
@@ -82,6 +83,27 @@ impl<C: Nep145Controller> Hook<C, Nep171Transfer<'_>> for Nep171StorageAccountin
 
 impl<C: Nep145Controller> Hook<C, Nep171Burn<'_>> for Nep171StorageAccountingHook {
     fn hook<R>(contract: &mut C, _action: &Nep171Burn<'_>, f: impl FnOnce(&mut C) -> R) -> R {
+        f(contract)
+    }
+}
+
+/// NEP-245 support for NEP-145.
+pub struct Nep245StorageAccountingHook;
+
+impl<C: Nep145Controller> Hook<C, Nep245Mint<'_>> for Nep245StorageAccountingHook {
+    fn hook<R>(contract: &mut C, action: &Nep245Mint<'_>, f: impl FnOnce(&mut C) -> R) -> R {
+        apply_storage_accounting_hook(contract, &action.receiver_id, f)
+    }
+}
+
+impl<C: Nep145Controller> Hook<C, Nep245Transfer<'_>> for Nep245StorageAccountingHook {
+    fn hook<R>(contract: &mut C, action: &Nep245Transfer<'_>, f: impl FnOnce(&mut C) -> R) -> R {
+        apply_storage_accounting_hook(contract, &action.receiver_id, f)
+    }
+}
+
+impl<C: Nep145Controller> Hook<C, Nep245Burn<'_>> for Nep245StorageAccountingHook {
+    fn hook<R>(contract: &mut C, _action: &Nep245Burn<'_>, f: impl FnOnce(&mut C) -> R) -> R {
         f(contract)
     }
 }

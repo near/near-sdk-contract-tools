@@ -1,9 +1,17 @@
-use near_sdk::{json_types::U128, serde_json::json};
-use near_sdk_contract_tools::{mt::*, standard::nep297::Event};
-use near_workspaces::{operations::Function, Account, Contract};
+use near_sdk::{
+    json_types::{Base64VecU8, U128},
+    serde_json::json,
+    NearToken,
+};
+use near_sdk_contract_tools::{
+    mt::*, standard::nep145::error::InsufficientBalanceError, standard::nep297::Event,
+};
+use near_workspaces::{network::Sandbox, operations::Function, Account, Contract, Worker};
 use pretty_assertions::assert_eq;
 use tokio::task::JoinSet;
-use workspaces_tests_utils::{mt_balance_of, mt_batch_balance_of, ONE_YOCTO};
+use workspaces_tests_utils::{
+    expect_execution_error, mt_balance_of, mt_batch_balance_of, ONE_NEAR, ONE_YOCTO,
+};
 
 const WASM: &[u8] = include_bytes!("../../target/wasm32-unknown-unknown/release/multi_token.wasm");
 
@@ -13,7 +21,7 @@ const RECEIVER_WASM: &[u8] =
 struct Setup {
     pub contract: Contract,
     pub accounts: Vec<Account>,
-    // pub worker: Worker<Sandbox>,
+    pub worker: Worker<Sandbox>,
 }
 
 /// Setup for individual tests
@@ -22,7 +30,7 @@ async fn setup(num_accounts: usize) -> Setup {
 
     // Initialize contract
     let contract = worker.dev_deploy(WASM).await.unwrap();
-    // contract.call("new").transact().await.unwrap().unwrap();
+    contract.call("new").transact().await.unwrap().unwrap();
 
     // Initialize user accounts
     let mut accounts = vec![];
@@ -33,7 +41,7 @@ async fn setup(num_accounts: usize) -> Setup {
     Setup {
         contract,
         accounts,
-        // worker,
+        worker,
     }
 }
 
@@ -45,11 +53,11 @@ async fn setup_balances(num_accounts: usize, amount: impl Fn(usize) -> U128) -> 
     for (i, account) in setup.accounts.iter().enumerate() {
         let transaction = account
             .batch(setup.contract.id())
-            // .call(
-            //     Function::new("storage_deposit")
-            //         .args_json(json!({}))
-            //         .deposit(ONE_NEAR.saturating_div(100)),
-            // )
+            .call(
+                Function::new("storage_deposit")
+                    .args_json(json!({}))
+                    .deposit(ONE_NEAR.saturating_div(100)),
+            )
             .call(
                 Function::new("mint")
                     .args_json(json!({ "token_id": "my_token", "amount": amount(i) })),
@@ -75,6 +83,105 @@ async fn start_empty() {
     for account in accounts.iter() {
         assert_eq!(mt_balance_of(&contract, account.id(), "my_token").await, 0);
     }
+}
+
+#[tokio::test]
+async fn contract_metadata() {
+    let Setup { contract, .. } = setup(3).await;
+
+    let contract_metadata = contract
+        .view("mt_metadata_contract")
+        .await
+        .unwrap()
+        .json::<ContractMetadata>()
+        .unwrap();
+    assert_eq!(
+        contract_metadata,
+        ContractMetadata {
+            spec: ContractMetadata::SPEC.to_string(),
+            name: "My MultiToken".to_string()
+        },
+    );
+}
+
+#[tokio::test]
+async fn token_metadata() {
+    let Setup {
+        contract, accounts, ..
+    } = setup_balances(3, |i| 10u128.pow(3 - i as u32).into()).await;
+    let alice = &accounts[0];
+
+    let base_metadata = BaseMetadata::new("Base Metadata", "base_0");
+
+    alice
+        .call(contract.id(), "create_base_meta")
+        .args_json(json!({
+            "base_metadata": base_metadata,
+        }))
+        .transact()
+        .await
+        .unwrap()
+        .into_result()
+        .unwrap();
+
+    let token_metadata = TokenMetadata::new()
+        .title("Token Title")
+        .description("Token Description");
+
+    alice
+        .call(contract.id(), "set_token_meta")
+        .args_json(json!({
+            "token_id": "my_token",
+            "base_metadata_id": "base_0",
+            "token_metadata": token_metadata,
+        }))
+        .transact()
+        .await
+        .unwrap()
+        .into_result()
+        .unwrap();
+
+    let metadata_token_all = contract
+        .view("mt_metadata_token_all")
+        .args_json(json!({ "token_ids": ["my_token"] }))
+        .await
+        .unwrap()
+        .json::<Vec<TokenMetadataAll>>()
+        .unwrap();
+    assert_eq!(
+        metadata_token_all,
+        vec![TokenMetadataAll {
+            base: base_metadata.clone(),
+            token: token_metadata.clone()
+        }],
+    );
+
+    let metadata_token_by_token_id = contract
+        .view("mt_metadata_token_by_token_id")
+        .args_json(json!({ "token_ids": ["my_token"] }))
+        .await
+        .unwrap()
+        .json::<Vec<TokenMetadata>>()
+        .unwrap();
+    assert_eq!(metadata_token_by_token_id, vec![token_metadata.clone()]);
+
+    let metadata_base_by_token_id = contract
+        .view("mt_metadata_base_by_token_id")
+        .args_json(json!({ "token_ids": ["my_token"] }))
+        .await
+        .unwrap()
+        .json::<Vec<BaseMetadata>>()
+        .unwrap();
+    assert_eq!(metadata_base_by_token_id, vec![base_metadata.clone()]);
+
+    let metadata_base_by_metadata_id = contract
+        .view("mt_metadata_base_by_metadata_id")
+        .args_json(json!({ "base_metadata_ids": ["base_0"] }))
+        .await
+        .unwrap()
+        .json::<Vec<BaseMetadata>>()
+        .unwrap();
+    assert_eq!(metadata_base_by_metadata_id, vec![base_metadata.clone()]);
 }
 
 #[tokio::test]
@@ -302,73 +409,74 @@ async fn transfer_overflow_u128() {
         .unwrap();
 }
 
-// #[tokio::test]
-// async fn transfer_fail_not_registered() {
-//     let Setup {
-//         contract,
-//         accounts,
-//         worker,
-//     } = setup_balances(2, |i| 10u128.pow(3 - i as u32).into()).await;
-//     let alice = &accounts[0];
-//     let charlie = worker.dev_create_account().await.unwrap();
+#[tokio::test]
+async fn transfer_fail_not_registered() {
+    let Setup {
+        contract,
+        accounts,
+        worker,
+    } = setup_balances(2, |i| 10u128.pow(3 - i as u32).into()).await;
+    let alice = &accounts[0];
+    let charlie = worker.dev_create_account().await.unwrap();
 
-//     let result = alice
-//         .call(contract.id(), "mt_transfer")
-//         .deposit(ONE_YOCTO)
-//         .args_json(json!({
-//             "receiver_id": charlie.id(),
-//             "amount": "10",
-//         }))
-//         .transact()
-//         .await
-//         .unwrap();
+    let result = alice
+        .call(contract.id(), "mt_transfer")
+        .deposit(ONE_YOCTO)
+        .args_json(json!({
+            "receiver_id": charlie.id(),
+            "token_id": "my_token",
+            "amount": "10",
+        }))
+        .transact()
+        .await
+        .unwrap();
 
-//     expect_execution_error(
-//         &result,
-//         format!(
-//             "Smart contract panicked: Account {} is not registered",
-//             charlie.id(),
-//         ),
-//     );
-// }
+    expect_execution_error(
+        &result,
+        format!(
+            "Smart contract panicked: Account {} is not registered",
+            charlie.id(),
+        ),
+    );
+}
 
-// #[tokio::test]
-// async fn fail_run_out_of_space() {
-//     let Setup {
-//         contract, accounts, ..
-//     } = setup_balances(2, |i| 10u128.pow(3 - i as u32).into()).await;
-//     let alice = &accounts[0];
+#[tokio::test]
+async fn fail_run_out_of_space() {
+    let Setup {
+        contract, accounts, ..
+    } = setup_balances(2, |i| 10u128.pow(3 - i as u32).into()).await;
+    let alice = &accounts[0];
 
-//     let balance = contract
-//         .view("storage_balance_of")
-//         .args_json(json!({ "account_id": alice.id() }))
-//         .await
-//         .unwrap()
-//         .json::<Option<StorageBalance>>()
-//         .unwrap()
-//         .unwrap();
+    let balance = contract
+        .view("storage_balance_of")
+        .args_json(json!({ "account_id": alice.id() }))
+        .await
+        .unwrap()
+        .json::<Option<StorageBalance>>()
+        .unwrap()
+        .unwrap();
 
-//     let result = alice
-//         .call(contract.id(), "use_storage")
-//         .args_json(json!({
-//             "blob": Base64VecU8::from(vec![1u8; 10000]),
-//         }))
-//         .transact()
-//         .await
-//         .unwrap();
+    let result = alice
+        .call(contract.id(), "use_storage")
+        .args_json(json!({
+            "blob": Base64VecU8::from(vec![1u8; 10000]),
+        }))
+        .transact()
+        .await
+        .unwrap();
 
-//     expect_execution_error(
-//         &result,
-//         format!(
-//             "Smart contract panicked: Storage lock error: {}",
-//             InsufficientBalanceError {
-//                 account_id: alice.id().clone(),
-//                 available: balance.available,
-//                 attempted_to_use: NearToken::from_yoctonear(100490000000000000000000),
-//             }
-//         ),
-//     );
-// }
+    expect_execution_error(
+        &result,
+        format!(
+            "Smart contract panicked: Storage lock error: {}",
+            InsufficientBalanceError {
+                account_id: alice.id().clone(),
+                available: balance.available,
+                attempted_to_use: NearToken::from_yoctonear(100490000000000000000000),
+            },
+        ),
+    );
+}
 
 #[tokio::test]
 async fn transfer_call_normal() {

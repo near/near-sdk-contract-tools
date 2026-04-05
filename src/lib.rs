@@ -72,14 +72,25 @@ pub mod utils;
 /// Re-exports of the MT standard traits.
 pub mod mt {
     pub use crate::{
-        standard::nep245::{
-            self, ext_nep245, ext_nep245_approval, ext_nep245_receiver, ext_nep245_resolver,
-            ApprovalId, MtBurnData, MtMintData, MtResolveTransferApproval, MtTransferApproval,
-            MtTransferData, Nep245, Nep245Burn, Nep245Controller, Nep245ControllerInternal,
-            Nep245Event, Nep245Mint, Nep245Receiver, Nep245Resolver, Nep245Transfer, Token,
-            TokenId, TokenIdRef,
+        standard::{
+            nep145::{
+                self, ext_nep145, Nep145, Nep145Controller, Nep145ControllerInternal,
+                StorageBalance, StorageBalanceBounds,
+            },
+            nep245::{
+                self, ext_nep245, ext_nep245_approval, ext_nep245_receiver, ext_nep245_resolver,
+                metadata::{
+                    self, nep245_metadata, BaseMetadata, BaseMetadataId, BaseMetadataIdRef,
+                    ContractMetadata, MetadataController, MetadataControllerInternal,
+                    Nep245Metadata, TokenMetadata, TokenMetadataAll,
+                },
+                ApprovalId, MtBurnData, MtMintData, MtResolveTransferApproval, MtTransferApproval,
+                MtTransferData, Nep245, Nep245Burn, Nep245Controller, Nep245ControllerInternal,
+                Nep245Event, Nep245Mint, Nep245Receiver, Nep245Resolver, Nep245Transfer, Token,
+                TokenId, TokenIdRef,
+            },
         },
-        Nep245,
+        MultiToken, Nep245, Nep245Metadata,
     };
 }
 

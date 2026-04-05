@@ -217,6 +217,21 @@ pub fn derive_nep245(input: TokenStream) -> TokenStream {
     make_derive(input, standard::nep245::expand)
 }
 
+/// Adds NEP-245 multi token metadata functionality to a contract.
+///
+/// The storage key prefix for the fields can be optionally specified (default:
+/// `"~$245"`) using `#[nep245_metadata(storage_key = "<expression>")]`.
+#[proc_macro_derive(Nep245Metadata, attributes(nep245_metadata))]
+pub fn derive_nep245_metadata(input: TokenStream) -> TokenStream {
+    make_derive(input, standard::nep245::metadata::expand)
+}
+
+/// Implements all MT functionality at once, like `#[derive(Nep145, Nep245, Nep245Metadata)]`.
+#[proc_macro_derive(MultiToken, attributes(multi_token))]
+pub fn derive_multi_token(input: TokenStream) -> TokenStream {
+    make_derive(input, standard::multi_token::expand)
+}
+
 /// Migrate a contract's default struct from one schema to another.
 ///
 /// Fields may be specified in the `#[migrate(...)]` attribute.

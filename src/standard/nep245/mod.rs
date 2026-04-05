@@ -1,7 +1,8 @@
 //! NEP-245 fungible token core implementation
-//! <https://github.com/near/NEPs/blob/master/neps/nep-0245.md>
 //!
-//! NOTE: This library does not implement the Approval Management standard.
+//! Reference: <https://github.com/near/NEPs/blob/master/neps/nep-0245.md>
+//!
+//! NOTE: This library does not implement [the Approval Management extension](https://github.com/near/NEPs/blob/master/neps/nep-0245/ApprovalManagement.md).
 
 use std::{
     borrow::Cow,
@@ -24,8 +25,7 @@ pub use event::*;
 mod ext;
 pub use ext::*;
 pub mod hooks;
-mod metadata;
-pub use metadata::*;
+pub mod metadata;
 
 /// Type of an approval ID.
 pub type ApprovalId = u32;
@@ -451,6 +451,7 @@ pub trait Nep245Controller {
     /// - If the token ID is already in use.
     fn create_token(&mut self, token_id: TokenId) -> Result<(), TokenIdCollisionError>;
 
+    /// Does this token ID exist?
     fn token_exists(&self, token_id: &TokenIdRef) -> bool;
 
     /// Get the list of all tokens in this contract.
