@@ -72,76 +72,76 @@ pub mod utils;
 /// Re-exports of the MT standard traits.
 pub mod mt {
     pub use crate::{
+        MultiToken, Nep245, Nep245Metadata,
         standard::{
             nep145::{
-                self, ext_nep145, Nep145, Nep145Controller, Nep145ControllerInternal,
-                StorageBalance, StorageBalanceBounds,
+                self, Nep145, Nep145Controller, Nep145ControllerInternal, StorageBalance,
+                StorageBalanceBounds, ext_nep145,
             },
             nep245::{
-                self, ext_nep245, ext_nep245_approval, ext_nep245_receiver, ext_nep245_resolver,
+                self, ApprovalId, MtBurnData, MtMintData, MtResolveTransferApproval,
+                MtTransferApproval, MtTransferData, Nep245, Nep245Burn, Nep245Controller,
+                Nep245ControllerInternal, Nep245Event, Nep245Mint, Nep245Receiver, Nep245Resolver,
+                Nep245Transfer, Token, TokenId, TokenIdRef, ext_nep245, ext_nep245_approval,
+                ext_nep245_receiver, ext_nep245_resolver,
                 metadata::{
-                    self, nep245_metadata, BaseMetadata, BaseMetadataId, BaseMetadataIdRef,
-                    ContractMetadata, MetadataController, MetadataControllerInternal,
-                    Nep245Metadata, TokenMetadata, TokenMetadataAll,
+                    self, BaseMetadata, BaseMetadataId, BaseMetadataIdRef, ContractMetadata,
+                    MetadataController, MetadataControllerInternal, Nep245Metadata, TokenMetadata,
+                    TokenMetadataAll, nep245_metadata,
                 },
-                ApprovalId, MtBurnData, MtMintData, MtResolveTransferApproval, MtTransferApproval,
-                MtTransferData, Nep245, Nep245Burn, Nep245Controller, Nep245ControllerInternal,
-                Nep245Event, Nep245Mint, Nep245Receiver, Nep245Resolver, Nep245Transfer, Token,
-                TokenId, TokenIdRef,
             },
         },
-        MultiToken, Nep245, Nep245Metadata,
     };
 }
 
 /// Re-exports of the NFT standard traits.
 pub mod nft {
     pub use crate::{
+        Nep171, Nep177, Nep178, Nep181, NonFungibleToken,
         standard::{
             nep145::{
-                self, ext_nep145, Nep145, Nep145Controller, Nep145ControllerInternal,
-                StorageBalance, StorageBalanceBounds,
+                self, Nep145, Nep145Controller, Nep145ControllerInternal, StorageBalance,
+                StorageBalanceBounds, ext_nep145,
             },
             nep171::{
-                self, action::*, ext_nep171, ext_nep171_receiver, ext_nep171_resolver, Nep171,
-                Nep171Controller, Nep171ControllerInternal, Nep171Receiver, Nep171Resolver, Token,
-                TokenId,
+                self, Nep171, Nep171Controller, Nep171ControllerInternal, Nep171Receiver,
+                Nep171Resolver, Token, TokenId, action::*, ext_nep171, ext_nep171_receiver,
+                ext_nep171_resolver,
             },
             nep177::{
-                self, ext_nep177, ContractMetadata, Nep177, Nep177Controller,
-                Nep177ControllerInternal, TokenMetadata,
+                self, ContractMetadata, Nep177, Nep177Controller, Nep177ControllerInternal,
+                TokenMetadata, ext_nep177,
             },
             nep178::{
-                self, action::*, ext_nep178, ext_nep178_receiver, ApprovalId, Nep178,
-                Nep178Controller, Nep178ControllerInternal, Nep178Receiver, TokenApprovals,
+                self, ApprovalId, Nep178, Nep178Controller, Nep178ControllerInternal,
+                Nep178Receiver, TokenApprovals, action::*, ext_nep178, ext_nep178_receiver,
             },
             nep181::{
-                self, ext_nep181, Nep181, Nep181Controller, Nep181ControllerInternal,
-                TokenEnumeration,
+                self, Nep181, Nep181Controller, Nep181ControllerInternal, TokenEnumeration,
+                ext_nep181,
             },
         },
-        Nep171, Nep177, Nep178, Nep181, NonFungibleToken,
     };
 }
 
 /// Re-exports of the FT standard traits.
 pub mod ft {
     pub use crate::{
+        FungibleToken, Nep141, Nep145, Nep148,
         standard::{
             nep141::{
-                self, ext_nep141, ext_nep141_receiver, ext_nep141_resolver, Nep141, Nep141Burn,
-                Nep141Controller, Nep141ControllerInternal, Nep141Mint, Nep141Receiver,
-                Nep141Resolver, Nep141Transfer,
+                self, Nep141, Nep141Burn, Nep141Controller, Nep141ControllerInternal, Nep141Mint,
+                Nep141Receiver, Nep141Resolver, Nep141Transfer, ext_nep141, ext_nep141_receiver,
+                ext_nep141_resolver,
             },
             nep145::{
-                self, ext_nep145, Nep145, Nep145Controller, Nep145ControllerInternal,
-                StorageBalance, StorageBalanceBounds,
+                self, Nep145, Nep145Controller, Nep145ControllerInternal, StorageBalance,
+                StorageBalanceBounds, ext_nep145,
             },
             nep148::{
-                self, ext_nep148, ContractMetadata, Nep148, Nep148Controller,
-                Nep148ControllerInternal,
+                self, ContractMetadata, Nep148, Nep148Controller, Nep148ControllerInternal,
+                ext_nep148,
             },
         },
-        FungibleToken, Nep141, Nep145, Nep148,
     };
 }

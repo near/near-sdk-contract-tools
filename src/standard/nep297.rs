@@ -3,8 +3,9 @@
 use std::borrow::Cow;
 
 use near_sdk::{
+    NearSchema,
     serde::{self, Deserialize, Serialize},
-    serde_json, NearSchema,
+    serde_json,
 };
 
 /// Emit events according to the [NEP-297 event standard](https://nomicon.io/Standards/EventsFormat).
@@ -145,7 +146,10 @@ mod tests {
 
         let string = event.to_event_string();
 
-        assert_eq!(string, "EVENT_JSON:{\"standard\":\"nep171\",\"version\":\"1.0.0\",\"event\":\"nft_mint\",\"data\":1}");
+        assert_eq!(
+            string,
+            "EVENT_JSON:{\"standard\":\"nep171\",\"version\":\"1.0.0\",\"event\":\"nft_mint\",\"data\":1}"
+        );
 
         let from_event_log_str = EventLog::<u32>::from_event_log_string(&string).unwrap();
 

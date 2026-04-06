@@ -1,5 +1,5 @@
-use near_sdk::{json_types::Base64VecU8, near, PanicOnDefault};
-use near_sdk_contract_tools::{standard::nep148::*, Nep148};
+use near_sdk::{PanicOnDefault, json_types::Base64VecU8, near};
+use near_sdk_contract_tools::{Nep148, standard::nep148::*};
 
 #[derive(Nep148, PanicOnDefault)]
 #[near(contract_state)]

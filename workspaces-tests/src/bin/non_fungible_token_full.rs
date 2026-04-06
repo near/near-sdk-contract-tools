@@ -1,6 +1,6 @@
 workspaces_tests::predicate!();
 
-use near_sdk::{env, log, near, serde_json::json, PanicOnDefault};
+use near_sdk::{PanicOnDefault, env, log, near, serde_json::json};
 use near_sdk_contract_tools::{
     hook::Hook,
     nft::{

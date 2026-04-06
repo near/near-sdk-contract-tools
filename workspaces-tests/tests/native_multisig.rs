@@ -1,13 +1,13 @@
 use std::{future::IntoFuture, time::Duration};
 
 use near_crypto::{KeyType, SecretKey};
-use near_sdk::{serde_json::json, Gas};
+use near_sdk::{Gas, serde_json::json};
 use near_sdk_contract_tools::approval::native_transaction_action::PromiseAction;
 use near_workspaces::{
+    Account, AccountDetailsPatch, Contract, DevNetwork, Worker,
     result::{ExecutionResult, Value},
     sandbox,
     types::{AccessKeyPermission, Finality, NearToken},
-    Account, AccountDetailsPatch, Contract, DevNetwork, Worker,
 };
 use pretty_assertions::assert_eq;
 use tokio::{join, time::sleep};

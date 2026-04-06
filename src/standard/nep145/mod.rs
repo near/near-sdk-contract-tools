@@ -3,9 +3,9 @@
 
 use std::{borrow::Cow, cmp::Ordering};
 
-use near_sdk::{borsh::BorshSerialize, env, near, AccountIdRef, BorshStorageKey, NearToken};
+use near_sdk::{AccountIdRef, BorshStorageKey, NearToken, borsh::BorshSerialize, env, near};
 
-use crate::{hook::Hook, slot::Slot, DefaultStorageKey};
+use crate::{DefaultStorageKey, hook::Hook, slot::Slot};
 
 pub mod error;
 use error::*;
@@ -244,7 +244,7 @@ pub trait Nep145Controller {
 
                 Nep145Controller::unlock_storage(self, account_id, storage_credit)?;
             }
-        };
+        }
 
         Ok(())
     }
@@ -419,7 +419,7 @@ impl<T: Nep145ControllerInternal> Nep145Controller for T {
                     account_id: account_id.to_owned(),
                     locked_balance,
                 }
-                .into())
+                .into());
             }
             None => env::panic_str(PANIC_MESSAGE_INCONSISTENT_STATE_AVAILABLE),
             _ => {}

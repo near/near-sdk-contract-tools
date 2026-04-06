@@ -3,8 +3,8 @@
 use std::borrow::Cow;
 
 use near_sdk::{
-    serde::{Deserialize, Serialize},
     AccountIdRef,
+    serde::{Deserialize, Serialize},
 };
 use near_sdk_contract_tools_macros::event;
 

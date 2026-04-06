@@ -1,7 +1,7 @@
 workspaces_tests::predicate!();
 
-use near_sdk::{env, near, AccountId, PanicOnDefault};
-use near_sdk_contract_tools::{escrow::Escrow, Escrow};
+use near_sdk::{AccountId, PanicOnDefault, env, near};
+use near_sdk_contract_tools::{Escrow, escrow::Escrow};
 
 #[derive(Clone)]
 #[near(serializers = [borsh, json])]

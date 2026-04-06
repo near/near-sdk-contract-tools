@@ -83,7 +83,7 @@ pub fn expand(meta: Nep145Meta) -> Result<TokenStream, darling::Error> {
                 .unwrap_or_else(|e| env::panic_str(&format!("Storage deposit error: {}", e)));
 
                 if !refund.is_zero() {
-                    Promise::new(predecessor).transfer(refund);
+                    Promise::new(predecessor).transfer(refund).detach();
                 }
 
                 storage_balance
@@ -110,7 +110,7 @@ pub fn expand(meta: Nep145Meta) -> Result<TokenStream, darling::Error> {
                 let new_balance = Nep145Controller::withdraw_from_storage_account(self, &predecessor, amount)
                     .unwrap_or_else(|e| env::panic_str(&format!("Storage withdraw error: {}", e)));
 
-                Promise::new(predecessor).transfer(amount);
+                Promise::new(predecessor).transfer(amount).detach();
 
                 new_balance
             }
@@ -141,7 +141,7 @@ pub fn expand(meta: Nep145Meta) -> Result<TokenStream, darling::Error> {
                     }
                 };
 
-                Promise::new(predecessor).transfer(refund);
+                Promise::new(predecessor).transfer(refund).detach();
                 true
             }
 

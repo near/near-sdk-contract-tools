@@ -1,11 +1,10 @@
 workspaces_tests::predicate!();
 
 use near_sdk::{
-    env,
+    PanicOnDefault, env,
     json_types::{Base64VecU8, U128},
     near,
     store::Vector,
-    PanicOnDefault,
 };
 use near_sdk_contract_tools::ft::*;
 

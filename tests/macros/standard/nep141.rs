@@ -1,8 +1,8 @@
 use near_sdk::{
-    borsh, collections::Vector, env, json_types::U128, log, near, test_utils::VMContextBuilder,
-    testing_env, AccountId, NearToken, PanicOnDefault, PromiseOrValue,
+    AccountId, NearToken, PanicOnDefault, PromiseOrValue, borsh, collections::Vector, env,
+    json_types::U128, log, near, test_utils::VMContextBuilder, testing_env,
 };
-use near_sdk_contract_tools::{hook::Hook, standard::nep141::*, Nep141};
+use near_sdk_contract_tools::{Nep141, hook::Hook, standard::nep141::*};
 
 #[derive(Nep141, PanicOnDefault)]
 #[nep141(transfer_hook = "TransferHook")]

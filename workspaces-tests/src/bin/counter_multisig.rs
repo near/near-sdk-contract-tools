@@ -1,10 +1,10 @@
 workspaces_tests::predicate!();
 
-use near_sdk::{env, near, BorshStorageKey, PanicOnDefault};
+use near_sdk::{BorshStorageKey, PanicOnDefault, env, near};
 use near_sdk_contract_tools::{
+    Rbac, SimpleMultisig,
     approval::{simple_multisig::Configuration, *},
     rbac::Rbac,
-    Rbac, SimpleMultisig,
 };
 use std::string::ToString;
 use strum_macros::Display;

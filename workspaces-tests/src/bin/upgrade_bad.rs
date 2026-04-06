@@ -1,6 +1,6 @@
 workspaces_tests::predicate!();
 
-use near_sdk::{near, PanicOnDefault};
+use near_sdk::{PanicOnDefault, near};
 
 #[derive(PanicOnDefault)]
 #[near(contract_state)]

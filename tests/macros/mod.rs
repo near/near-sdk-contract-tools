@@ -1,10 +1,10 @@
 use near_sdk::{
-    env, near, test_utils::VMContextBuilder, testing_env, AccountId, BorshStorageKey,
-    PanicOnDefault,
+    AccountId, BorshStorageKey, PanicOnDefault, env, near, test_utils::VMContextBuilder,
+    testing_env,
 };
 use near_sdk_contract_tools::{
-    escrow::Escrow, migrate::MigrateHook, owner::Owner, pause::Pause, rbac::Rbac,
-    standard::nep297::Event, Escrow, Migrate, Owner, Pause, Rbac,
+    Escrow, Migrate, Owner, Pause, Rbac, escrow::Escrow, migrate::MigrateHook, owner::Owner,
+    pause::Pause, rbac::Rbac, standard::nep297::Event,
 };
 
 mod escrow;
@@ -15,7 +15,7 @@ mod pause;
 mod standard;
 
 mod my_event {
-    use near_sdk::{serde::Serialize, AccountId};
+    use near_sdk::{AccountId, serde::Serialize};
     use near_sdk_contract_tools::Nep297;
 
     #[derive(Serialize, Nep297)]
@@ -391,13 +391,13 @@ fn integration_fail_cannot_lock_twice() {
 #[cfg(test)]
 mod pausable_fungible_token {
     use near_sdk::{
-        env, near, test_utils::VMContextBuilder, testing_env, AccountId, NearToken, PanicOnDefault,
+        AccountId, NearToken, PanicOnDefault, env, near, test_utils::VMContextBuilder, testing_env,
     };
     use near_sdk_contract_tools::{
+        Pause,
         ft::*,
         hook::Hook,
-        pause::{hooks::Pausable, Pause},
-        Pause,
+        pause::{Pause, hooks::Pausable},
     };
 
     #[derive(FungibleToken, Pause, PanicOnDefault)]
@@ -497,13 +497,13 @@ mod pausable_fungible_token {
 #[cfg(test)]
 mod owned_fungible_token {
     use near_sdk::{
-        env, json_types::U128, near, test_utils::VMContextBuilder, testing_env, AccountId,
+        AccountId, env, json_types::U128, near, test_utils::VMContextBuilder, testing_env,
     };
     use near_sdk::{NearToken, PanicOnDefault};
     use near_sdk_contract_tools::{
+        Owner,
         ft::*,
         owner::{hooks::OnlyOwner, *},
-        Owner,
     };
 
     #[derive(Owner, FungibleToken, PanicOnDefault)]
@@ -535,9 +535,11 @@ mod owned_fungible_token {
     fn mint_and_transfer() {
         let alice: AccountId = "alice".parse().unwrap();
         let bob: AccountId = "bob".parse().unwrap();
-        testing_env!(VMContextBuilder::new()
-            .predecessor_account_id(alice.clone())
-            .build());
+        testing_env!(
+            VMContextBuilder::new()
+                .predecessor_account_id(alice.clone())
+                .build()
+        );
 
         let mut contract = Contract::new(); // since alice is the predecessor during init, alice is the owner
 
@@ -555,10 +557,12 @@ mod owned_fungible_token {
         assert_eq!(contract.ft_balance_of(alice.clone()), U128(100));
         assert_eq!(contract.ft_balance_of(bob.clone()), U128(0));
 
-        testing_env!(VMContextBuilder::new()
-            .predecessor_account_id(alice.clone())
-            .attached_deposit(NearToken::from_yoctonear(1u128))
-            .build());
+        testing_env!(
+            VMContextBuilder::new()
+                .predecessor_account_id(alice.clone())
+                .attached_deposit(NearToken::from_yoctonear(1u128))
+                .build()
+        );
         contract.ft_transfer(bob.clone(), U128(10), None);
 
         assert_eq!(contract.ft_balance_of(alice), U128(90));
@@ -570,9 +574,11 @@ mod owned_fungible_token {
     fn mint_fail_not_owner() {
         let alice: AccountId = "alice".parse().unwrap();
         let bob: AccountId = "bob".parse().unwrap();
-        testing_env!(VMContextBuilder::new()
-            .predecessor_account_id(alice.clone())
-            .build());
+        testing_env!(
+            VMContextBuilder::new()
+                .predecessor_account_id(alice.clone())
+                .build()
+        );
 
         let mut contract = Contract::new(); // since alice is the predecessor during init, alice is the owner
 
@@ -594,9 +600,11 @@ mod owned_fungible_token {
     fn transfer_fail_not_owner() {
         let alice: AccountId = "alice".parse().unwrap();
         let bob: AccountId = "bob".parse().unwrap();
-        testing_env!(VMContextBuilder::new()
-            .predecessor_account_id(alice.clone())
-            .build());
+        testing_env!(
+            VMContextBuilder::new()
+                .predecessor_account_id(alice.clone())
+                .build()
+        );
 
         let mut contract = Contract::new(); // since alice is the predecessor during init, alice is the owner
 
@@ -610,10 +618,12 @@ mod owned_fungible_token {
 
         Nep141Controller::deposit_unchecked(&mut contract, &bob, 100).unwrap();
 
-        testing_env!(VMContextBuilder::new()
-            .predecessor_account_id(bob)
-            .attached_deposit(NearToken::from_yoctonear(1))
-            .build());
+        testing_env!(
+            VMContextBuilder::new()
+                .predecessor_account_id(bob)
+                .attached_deposit(NearToken::from_yoctonear(1))
+                .build()
+        );
         contract.ft_transfer(alice, U128(10), None);
     }
 }

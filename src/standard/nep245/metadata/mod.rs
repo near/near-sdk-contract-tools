@@ -8,16 +8,16 @@ mod contract;
 pub use contract::ContractMetadata;
 pub mod error;
 mod ext;
-pub use ext::{nep245_metadata, Nep245Metadata};
+pub use ext::{Nep245Metadata, nep245_metadata};
 mod token;
 pub use token::{TokenMetadata, TokenMetadataAll};
 
-use near_sdk::{borsh::BorshSerialize, env, near, BorshStorageKey};
+use near_sdk::{BorshStorageKey, borsh::BorshSerialize, env, near};
 
 use crate::{
+    DefaultStorageKey,
     mt::{Nep245Controller, TokenIdRef},
     slot::Slot,
-    DefaultStorageKey,
 };
 
 /// ID of base token metadata.

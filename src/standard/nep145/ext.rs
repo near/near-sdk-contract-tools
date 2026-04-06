@@ -2,7 +2,7 @@
 #![allow(missing_docs)] // ext_contract doesn't play nice with #![warn(missing_docs)]
 
 use super::{StorageBalance, StorageBalanceBounds};
-use near_sdk::{ext_contract, AccountId, NearToken};
+use near_sdk::{AccountId, NearToken, ext_contract};
 
 /// NEAR uses storage staking which means that a contract account must have
 /// sufficient balance to cover all storage added over time. This standard

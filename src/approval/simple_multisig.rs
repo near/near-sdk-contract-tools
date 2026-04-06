@@ -5,7 +5,7 @@
 
 use std::marker::PhantomData;
 
-use near_sdk::{env, near, AccountId};
+use near_sdk::{AccountId, env, near};
 use thiserror::Error;
 
 use super::{ActionRequest, ApprovalConfiguration};
@@ -217,19 +217,19 @@ pub mod macro_types {
 #[cfg(test)]
 mod tests {
     use near_sdk::{
-        env, near, test_utils::VMContextBuilder, testing_env, AccountId, BorshStorageKey,
-        PanicOnDefault,
+        AccountId, BorshStorageKey, PanicOnDefault, env, near, test_utils::VMContextBuilder,
+        testing_env,
     };
     use thiserror::Error;
 
     use crate::{
+        Rbac,
         approval::{
-            simple_multisig::{AccountAuthorizer, ApprovalState, Configuration},
             ApprovalManager, ApprovalManagerInternal,
+            simple_multisig::{AccountAuthorizer, ApprovalState, Configuration},
         },
         rbac::Rbac,
         slot::Slot,
-        Rbac,
     };
 
     #[near]

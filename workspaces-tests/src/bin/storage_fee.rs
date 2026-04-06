@@ -1,6 +1,6 @@
 workspaces_tests::predicate!();
 
-use near_sdk::{env, near, store::Vector, NearToken, PanicOnDefault, Promise};
+use near_sdk::{NearToken, PanicOnDefault, Promise, env, near, store::Vector};
 use near_sdk_contract_tools::utils::apply_storage_fee_and_refund;
 
 #[derive(PanicOnDefault)]

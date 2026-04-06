@@ -1,7 +1,7 @@
 workspaces_tests::predicate!();
 
 use near_sdk::{
-    env, json_types::U128, log, near, serde_json, AccountId, NearToken, PromiseOrValue,
+    AccountId, NearToken, PromiseOrValue, env, json_types::U128, log, near, serde_json,
 };
 use near_sdk_contract_tools::mt::*;
 

@@ -3,9 +3,9 @@
 use std::borrow::Cow;
 
 use near_sdk::{
+    AccountIdRef,
     json_types::U128,
     serde::{Deserialize, Serialize},
-    AccountIdRef,
 };
 
 use near_sdk_contract_tools_macros::event;

@@ -1,5 +1,5 @@
-use near_sdk::{env, log, near, store::LookupMap, AccountId, NearToken, PanicOnDefault};
-use near_sdk_contract_tools::{hook::Hook, standard::nep145::*, Nep145};
+use near_sdk::{AccountId, NearToken, PanicOnDefault, env, log, near, store::LookupMap};
+use near_sdk_contract_tools::{Nep145, hook::Hook, standard::nep145::*};
 
 #[derive(Nep145, PanicOnDefault)]
 #[nep145(force_unregister_hook = "ForceUnregisterHook")]
@@ -61,7 +61,7 @@ impl Contract {
 
 #[cfg(test)]
 mod tests {
-    use near_sdk::{test_utils::VMContextBuilder, testing_env, NearToken};
+    use near_sdk::{NearToken, test_utils::VMContextBuilder, testing_env};
 
     use super::*;
 
@@ -76,10 +76,12 @@ mod tests {
 
         let mut contract = Contract::new();
 
-        testing_env!(VMContextBuilder::new()
-            .predecessor_account_id(alice())
-            .attached_deposit(one_near)
-            .build());
+        testing_env!(
+            VMContextBuilder::new()
+                .predecessor_account_id(alice())
+                .attached_deposit(one_near)
+                .build()
+        );
 
         Nep145::storage_deposit(&mut contract, None, None);
 
@@ -91,9 +93,11 @@ mod tests {
             }),
         );
 
-        testing_env!(VMContextBuilder::new()
-            .predecessor_account_id(alice())
-            .build());
+        testing_env!(
+            VMContextBuilder::new()
+                .predecessor_account_id(alice())
+                .build()
+        );
 
         contract.use_storage(1000);
 
@@ -119,10 +123,12 @@ mod tests {
         let available = second.available;
         let half_available = available.saturating_div(2);
 
-        testing_env!(VMContextBuilder::new()
-            .predecessor_account_id(alice())
-            .attached_deposit(NearToken::from_yoctonear(1))
-            .build());
+        testing_env!(
+            VMContextBuilder::new()
+                .predecessor_account_id(alice())
+                .attached_deposit(NearToken::from_yoctonear(1))
+                .build()
+        );
 
         Nep145::storage_withdraw(&mut contract, Some(half_available));
 
@@ -147,16 +153,20 @@ mod tests {
 
         let mut contract = Contract::new();
 
-        testing_env!(VMContextBuilder::new()
-            .predecessor_account_id(alice())
-            .attached_deposit(one_near)
-            .build());
+        testing_env!(
+            VMContextBuilder::new()
+                .predecessor_account_id(alice())
+                .attached_deposit(one_near)
+                .build()
+        );
 
         Nep145::storage_deposit(&mut contract, None, None);
 
-        testing_env!(VMContextBuilder::new()
-            .predecessor_account_id(alice())
-            .build());
+        testing_env!(
+            VMContextBuilder::new()
+                .predecessor_account_id(alice())
+                .build()
+        );
 
         #[allow(clippy::cast_possible_truncation)]
         contract.use_storage(
@@ -172,19 +182,23 @@ mod tests {
     fn storage_over_withdraw_fail() {
         let mut contract = Contract::new();
 
-        testing_env!(VMContextBuilder::new()
-            .predecessor_account_id(alice())
-            .attached_deposit(NearToken::from_near(1))
-            .build());
+        testing_env!(
+            VMContextBuilder::new()
+                .predecessor_account_id(alice())
+                .attached_deposit(NearToken::from_near(1))
+                .build()
+        );
 
         Nep145::storage_deposit(&mut contract, None, None);
 
         let balance = Nep145::storage_balance_of(&contract, alice()).unwrap();
 
-        testing_env!(VMContextBuilder::new()
-            .predecessor_account_id(alice())
-            .attached_deposit(NearToken::from_yoctonear(1))
-            .build());
+        testing_env!(
+            VMContextBuilder::new()
+                .predecessor_account_id(alice())
+                .attached_deposit(NearToken::from_yoctonear(1))
+                .build()
+        );
 
         Nep145::storage_withdraw(
             &mut contract,

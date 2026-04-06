@@ -1,6 +1,6 @@
 workspaces_tests::predicate!();
 
-use near_sdk::{env, log, near, AccountId, NearToken, PanicOnDefault, PromiseOrValue};
+use near_sdk::{AccountId, NearToken, PanicOnDefault, PromiseOrValue, env, log, near};
 use near_sdk_contract_tools::standard::nep171::*;
 
 #[derive(PanicOnDefault)]

@@ -1,9 +1,9 @@
-use near_sdk::{env, near, PanicOnDefault};
+use near_sdk::{PanicOnDefault, env, near};
 use near_sdk_contract_tools::{
+    Owner, Pause,
     nft::*,
     owner::Owner,
-    pause::{hooks::Pausable, Pause},
-    Owner, Pause,
+    pause::{Pause, hooks::Pausable},
 };
 
 #[derive(NonFungibleToken, Pause, Owner, PanicOnDefault)]

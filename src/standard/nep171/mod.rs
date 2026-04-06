@@ -40,13 +40,13 @@
 use std::error::Error;
 
 use near_sdk::{
+    AccountId, AccountIdRef, BorshStorageKey, Gas, NearSchema,
     borsh::BorshSerialize,
     near,
     serde::{Deserialize, Serialize},
-    AccountId, AccountIdRef, BorshStorageKey, Gas, NearSchema,
 };
 
-use crate::{hook::Hook, slot::Slot, standard::nep297::Event, DefaultStorageKey};
+use crate::{DefaultStorageKey, hook::Hook, slot::Slot, standard::nep297::Event};
 
 pub mod action;
 use action::*;
@@ -259,7 +259,7 @@ impl<T: Nep171Controller> CheckExternalTransfer<T> for DefaultCheckExternalTrans
                     token_id: transfer.token_id.clone(),
                     approval_id,
                 }
-                .into())
+                .into());
             }
         }
 

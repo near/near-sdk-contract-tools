@@ -22,7 +22,7 @@
 //! * (ERR) [`Pause::require_paused`] may only be called when the contract is paused.
 //! * (ERR) [`Pause::require_unpaused`] may only be called when the contract is unpaused.
 
-use crate::{slot::Slot, standard::nep297::Event, DefaultStorageKey};
+use crate::{DefaultStorageKey, slot::Slot, standard::nep297::Event};
 use near_sdk::require;
 use near_sdk_contract_tools_macros::event;
 

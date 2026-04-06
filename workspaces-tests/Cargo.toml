@@ -85,6 +85,12 @@ thiserror.workspace = true
 
 [dev-dependencies]
 near-crypto.workspace = true
+near-sdk = { workspace = true, default-features = false, features = [
+    "unstable",
+    "unit-testing",
+    "legacy",
+    "non-contract-usage"
+] }
 tokio.workspace = true
 pretty_assertions.workspace = true
 near-workspaces = { workspace = true, features = ["unstable"] }

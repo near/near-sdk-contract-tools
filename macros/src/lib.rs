@@ -1,9 +1,9 @@
 #![allow(clippy::too_many_lines, clippy::unnecessary_wraps)]
 //! Macros for near-sdk-contract-tools.
 
-use darling::{ast::NestedMeta, FromDeriveInput, FromMeta};
+use darling::{FromDeriveInput, FromMeta, ast::NestedMeta};
 use proc_macro::TokenStream;
-use syn::{parse_macro_input, DeriveInput, Item};
+use syn::{DeriveInput, Item, parse_macro_input};
 
 mod approval;
 mod escrow;
@@ -167,9 +167,9 @@ pub fn derive_fungible_token(input: TokenStream) -> TokenStream {
 ///
 /// Fields:
 /// - `no_hooks`: Flag. Removes the requirement for the contract to implement
-///     transfer hooks.
+///   transfer hooks.
 /// - `token_data`: specify the token metadata loading extensions invoked by
-///     `nft_token`.
+///   `nft_token`.
 #[proc_macro_derive(Nep171, attributes(nep171))]
 pub fn derive_nep171(input: TokenStream) -> TokenStream {
     make_derive(input, standard::nep171::expand)
@@ -240,11 +240,11 @@ pub fn derive_multi_token(input: TokenStream) -> TokenStream {
 ///  - `from` Old default struct type to convert from. (required)
 ///  - `to` New default struct type to convert into. (optional, default: `Self`)
 ///  - `convert` Identifier of a function that converts from the old schema to
-///     the new schema. Mutually exclusive with `convert_with_args`. (optional,
-///     default: `<Self::NewSchema as From<Self::OldSchema>>::from`)
+///    the new schema. Mutually exclusive with `convert_with_args`. (optional,
+///    default: `<Self::NewSchema as From<Self::OldSchema>>::from`)
 ///  - `convert_with_args` Identifier of a function that converts from the old
-///     schema to the new schema and accepts a single `String` argument.
-///     Mutually exclusive with `convert`. (optional)
+///    schema to the new schema and accepts a single `String` argument.
+///    Mutually exclusive with `convert`. (optional)
 ///  - `allow` Expression to evaluate before allowing
 #[proc_macro_derive(Migrate, attributes(migrate))]
 pub fn derive_migrate(input: TokenStream) -> TokenStream {
@@ -260,7 +260,7 @@ pub fn derive_migrate(input: TokenStream) -> TokenStream {
 /// Fields include:
 ///  - `storage_key` Storage prefix for multisig data (optional, default: `b"~sm"`)
 ///  - `action` What sort of approval `Action` can be approved by the multisig
-///     component?
+///    component?
 ///  - `role` Approving accounts are required to have this `Rbac` role.
 #[proc_macro_derive(SimpleMultisig, attributes(simple_multisig))]
 pub fn derive_simple_multisig(input: TokenStream) -> TokenStream {

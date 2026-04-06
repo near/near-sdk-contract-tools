@@ -1,7 +1,7 @@
-use near_sdk::{near, BorshStorageKey, PanicOnDefault};
+use near_sdk::{BorshStorageKey, PanicOnDefault, near};
 use near_sdk_contract_tools::{
-    pause::{Pause, PauseExternal},
     Pause,
+    pause::{Pause, PauseExternal},
 };
 
 #[derive(BorshStorageKey)]

@@ -1,7 +1,7 @@
 workspaces_tests::predicate!();
 
-use near_sdk::{env, log, near, PanicOnDefault};
-use near_sdk_contract_tools::{hook::Hook, nft::Nep171Mint, standard::nep171::*, Nep171};
+use near_sdk::{PanicOnDefault, env, log, near};
+use near_sdk_contract_tools::{Nep171, hook::Hook, nft::Nep171Mint, standard::nep171::*};
 
 #[derive(Nep171, PanicOnDefault)]
 #[nep171(transfer_hook = "Self")]

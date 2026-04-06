@@ -28,30 +28,34 @@ use super::PostUpgrade;
 #[allow(clippy::needless_pass_by_value)]
 pub unsafe fn upgrade(post_upgrade: PostUpgrade) {
     // Create a promise batch
-    let promise_id = sys::promise_batch_create(
-        env::current_account_id().as_bytes().len() as u64,
-        env::current_account_id().as_bytes().as_ptr() as u64,
-    );
+    let promise_id = unsafe {
+        sys::promise_batch_create(
+            env::current_account_id().as_bytes().len() as u64,
+            env::current_account_id().as_bytes().as_ptr() as u64,
+        )
+    };
 
-    sys::input(0);
+    unsafe { sys::input(0) };
 
     // Deploy the contract code
-    sys::promise_batch_action_deploy_contract(promise_id, u64::MAX, 0);
+    unsafe { sys::promise_batch_action_deploy_contract(promise_id, u64::MAX, 0) };
 
     let gas = post_upgrade.minimum_gas.as_gas();
 
     // Call promise to migrate the state.
     // Batched together to fail upgrade if migration fails.
-    sys::promise_batch_action_function_call_weight(
-        promise_id,
-        post_upgrade.method.len() as u64,
-        post_upgrade.method.as_ptr() as u64,
-        post_upgrade.args.len() as u64,
-        post_upgrade.args.as_ptr() as u64,
-        0,
-        gas,
-        u64::MAX,
-    );
+    unsafe {
+        sys::promise_batch_action_function_call_weight(
+            promise_id,
+            post_upgrade.method.len() as u64,
+            post_upgrade.method.as_ptr() as u64,
+            post_upgrade.args.len() as u64,
+            post_upgrade.args.as_ptr() as u64,
+            0,
+            gas,
+            u64::MAX,
+        );
+    };
 
-    sys::promise_return(promise_id);
+    unsafe { sys::promise_return(promise_id) };
 }

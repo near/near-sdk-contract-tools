@@ -1,7 +1,7 @@
 workspaces_tests::predicate!();
 
-use near_sdk::{env, near, PanicOnDefault};
-use near_sdk_contract_tools::{owner::*, upgrade::PostUpgrade, Owner};
+use near_sdk::{PanicOnDefault, env, near};
+use near_sdk_contract_tools::{Owner, owner::*, upgrade::PostUpgrade};
 
 #[derive(Owner, PanicOnDefault)]
 #[near(contract_state)]
@@ -28,7 +28,7 @@ impl ContractOld {
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub fn upgrade() {
     near_sdk::env::setup_panic_hook();
 

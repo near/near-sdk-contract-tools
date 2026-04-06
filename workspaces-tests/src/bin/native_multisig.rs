@@ -1,14 +1,14 @@
 workspaces_tests::predicate!();
 
-use near_sdk::{env, near, AccountId, BorshStorageKey, PanicOnDefault, Promise};
+use near_sdk::{AccountId, BorshStorageKey, PanicOnDefault, Promise, env, near};
 use near_sdk_contract_tools::{
+    Rbac, SimpleMultisig,
     approval::{
+        ApprovalManager,
         native_transaction_action::{self, NativeTransactionAction},
         simple_multisig::{ApprovalState, Configuration},
-        ApprovalManager,
     },
     rbac::Rbac,
-    Rbac, SimpleMultisig,
 };
 
 #[derive(BorshStorageKey, Clone, Debug)]

@@ -1,5 +1,5 @@
 use near_sdk::serde_json::json;
-use near_workspaces::{sandbox, types::NearToken, Account, Contract, DevNetwork, Worker};
+use near_workspaces::{Account, Contract, DevNetwork, Worker, sandbox, types::NearToken};
 use workspaces_tests_utils::ONE_NEAR;
 
 const WASM: &[u8] = include_bytes!("../../target/wasm32-unknown-unknown/release/storage_fee.wasm");

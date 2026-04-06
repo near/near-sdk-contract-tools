@@ -1,10 +1,10 @@
 use near_sdk::{
-    env, near, test_utils::VMContextBuilder, testing_env, AccountId, BorshStorageKey,
-    PanicOnDefault,
+    AccountId, BorshStorageKey, PanicOnDefault, env, near, test_utils::VMContextBuilder,
+    testing_env,
 };
 use near_sdk_contract_tools::{
-    owner::{Owner, OwnerExternal},
     Owner,
+    owner::{Owner, OwnerExternal},
 };
 
 mod implicit_key {

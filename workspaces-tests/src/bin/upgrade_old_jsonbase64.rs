@@ -1,7 +1,7 @@
 workspaces_tests::predicate!();
 
-use near_sdk::{env, near, PanicOnDefault};
-use near_sdk_contract_tools::{owner::*, Owner, Upgrade};
+use near_sdk::{PanicOnDefault, env, near};
+use near_sdk_contract_tools::{Owner, Upgrade, owner::*};
 
 #[derive(Owner, Upgrade, PanicOnDefault)]
 #[upgrade(serializer = "jsonbase64", hook = "owner")]

@@ -1,11 +1,11 @@
 workspaces_tests::predicate!();
 
-use near_sdk::{env, json_types::Base64VecU8, near, BorshStorageKey, PanicOnDefault};
+use near_sdk::{BorshStorageKey, PanicOnDefault, env, json_types::Base64VecU8, near};
 use near_sdk_contract_tools::{
+    Owner, Rbac, SimpleMultisig, Upgrade,
     approval::{self, ApprovalManager},
     owner::*,
     rbac::Rbac,
-    Owner, Rbac, SimpleMultisig, Upgrade,
 };
 
 #[derive(BorshStorageKey, Debug, Clone)]

@@ -1,6 +1,6 @@
 workspaces_tests::predicate!();
 
-use near_sdk::{env, near, require, AccountId, PanicOnDefault};
+use near_sdk::{AccountId, PanicOnDefault, env, near, require};
 
 #[derive(PanicOnDefault)]
 #[near(contract_state)]

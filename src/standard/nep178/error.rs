@@ -1,6 +1,6 @@
 //! NEP-178 errors.
 
-use super::{TokenId, MAX_APPROVALS};
+use super::{MAX_APPROVALS, TokenId};
 use near_sdk::AccountId;
 use thiserror::Error;
 

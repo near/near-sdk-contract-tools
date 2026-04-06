@@ -1,7 +1,7 @@
 use near_sdk::{
+    NearToken,
     json_types::{Base64VecU8, U128},
     serde_json::json,
-    NearToken,
 };
 use near_sdk_contract_tools::{
     ft::nep141::FtBurnData,
@@ -12,10 +12,10 @@ use near_sdk_contract_tools::{
         nep297::Event,
     },
 };
-use near_workspaces::{network::Sandbox, operations::Function, Account, Contract, Worker};
+use near_workspaces::{Account, Contract, Worker, network::Sandbox, operations::Function};
 use pretty_assertions::assert_eq;
 use tokio::task::JoinSet;
-use workspaces_tests_utils::{expect_execution_error, ft_balance_of, ONE_NEAR, ONE_YOCTO};
+use workspaces_tests_utils::{ONE_NEAR, ONE_YOCTO, expect_execution_error, ft_balance_of};
 
 const WASM: &[u8] =
     include_bytes!("../../target/wasm32-unknown-unknown/release/fungible_token.wasm");
@@ -557,12 +557,14 @@ async fn force_unregister() {
 
     assert_eq!(
         result.logs().to_vec(),
-        vec![Nep141Event::FtBurn(vec![FtBurnData {
-            owner_id: alice.id().into(),
-            amount: U128(1000),
-            memo: Some("storage forced unregistration".into()),
-        }])
-        .to_event_string(),]
+        vec![
+            Nep141Event::FtBurn(vec![FtBurnData {
+                owner_id: alice.id().into(),
+                amount: U128(1000),
+                memo: Some("storage forced unregistration".into()),
+            }])
+            .to_event_string(),
+        ]
     );
 
     assert_eq!(ft_balance_of(&contract, alice.id()).await, 0);

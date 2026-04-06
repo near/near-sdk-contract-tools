@@ -1,5 +1,5 @@
-use near_sdk::{env, near, PanicOnDefault};
-use near_sdk_contract_tools::{migrate::MigrateHook, Migrate};
+use near_sdk::{PanicOnDefault, env, near};
+use near_sdk_contract_tools::{Migrate, migrate::MigrateHook};
 
 mod old {
     use super::*;

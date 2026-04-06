@@ -1,11 +1,11 @@
 use near_sdk::{json_types::U64, near, serde_json};
 
 use crate::mt::{
-    nep245::{
-        metadata::{BaseMetadata, MetadataController},
-        LoadTokenMetadata,
-    },
     TokenIdRef,
+    nep245::{
+        LoadTokenMetadata,
+        metadata::{BaseMetadata, MetadataController},
+    },
 };
 
 /// Token-specific metadata.

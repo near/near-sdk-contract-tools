@@ -2,9 +2,9 @@ workspaces_tests::predicate!();
 
 use std::str::FromStr;
 
-use near_sdk_contract_tools::{rbac::Rbac, Rbac};
+use near_sdk_contract_tools::{Rbac, rbac::Rbac};
 
-use near_sdk::{env, near, AccountId, BorshStorageKey, PanicOnDefault};
+use near_sdk::{AccountId, BorshStorageKey, PanicOnDefault, env, near};
 
 #[derive(BorshStorageKey)]
 #[near]

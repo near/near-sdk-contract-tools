@@ -3,9 +3,8 @@ use std::collections::HashMap;
 use near_sdk::{json_types::U128, serde_json::json};
 use near_sdk_contract_tools::standard::{
     nep171::{
-        self,
+        self, Token,
         event::{Nep171Event, NftTransferLog},
-        Token,
     },
     nep177::{self, TokenMetadata},
     nep178::error::{
@@ -17,7 +16,7 @@ use near_workspaces::{operations::Function, types::Gas};
 use pretty_assertions::assert_eq;
 use tokio::task::JoinSet;
 use workspaces_tests_utils::{
-    expect_execution_error, nft_token, setup, Setup, ONE_NEAR, ONE_YOCTO,
+    ONE_NEAR, ONE_YOCTO, Setup, expect_execution_error, nft_token, setup,
 };
 
 const WASM_171_ONLY: &[u8] =
@@ -492,7 +491,13 @@ async fn transfer_fail_reflexive_transfer(wasm: &[u8], storage_deposit: bool) {
         .await
         .unwrap();
 
-    expect_execution_error(&result, format!("Smart contract panicked: Receiver must be different from current owner `{}` to transfer token `token_0`", alice.id()));
+    expect_execution_error(
+        &result,
+        format!(
+            "Smart contract panicked: Receiver must be different from current owner `{}` to transfer token `token_0`",
+            alice.id()
+        ),
+    );
 }
 
 #[tokio::test]

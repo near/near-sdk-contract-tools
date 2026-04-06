@@ -1,7 +1,7 @@
 workspaces_tests::predicate!();
 
-use near_sdk::{near, PanicOnDefault};
-use near_sdk_contract_tools::{migrate::*, Migrate};
+use near_sdk::{PanicOnDefault, near};
+use near_sdk_contract_tools::{Migrate, migrate::*};
 
 #[near]
 pub struct ContractOld {

@@ -5,8 +5,9 @@
 use std::{marker::PhantomData, ops::Deref};
 
 use near_sdk::{
+    IntoStorageKey,
     borsh::{self, BorshDeserialize, BorshSerialize},
-    env, near, IntoStorageKey,
+    env, near,
 };
 
 use crate::utils::prefix_key;

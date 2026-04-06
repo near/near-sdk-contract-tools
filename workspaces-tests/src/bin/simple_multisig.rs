@@ -2,16 +2,15 @@ workspaces_tests::predicate!();
 
 use std::fmt::Display;
 
-use near_sdk::{env, near, AccountId, BorshStorageKey, PanicOnDefault};
+use near_sdk::{AccountId, BorshStorageKey, PanicOnDefault, env, near};
 use near_sdk_contract_tools::{
+    Rbac,
     approval::{
-        self,
+        self, ApprovalManager, ApprovalManagerInternal,
         simple_multisig::{AccountAuthorizer, ApprovalState, Configuration},
-        ApprovalManager, ApprovalManagerInternal,
     },
     rbac::Rbac,
     slot::Slot,
-    Rbac,
 };
 use thiserror::Error;
 
