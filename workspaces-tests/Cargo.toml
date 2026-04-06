@@ -24,6 +24,12 @@ name = "fungible_token"
 name = "fungible_token_receiver"
 
 [[bin]]
+name = "multi_token"
+
+[[bin]]
+name = "multi_token_receiver"
+
+[[bin]]
 name = "native_multisig"
 
 [[bin]]
