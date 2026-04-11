@@ -5,12 +5,7 @@ use std::{sync::Arc, time::Duration};
 use cargo_near_build::camino::{Utf8Path, Utf8PathBuf};
 use near_api::{Account, Contract, NetworkConfig};
 use near_sandbox::Sandbox;
-use near_sdk::{
-    AccountId, AccountIdRef, NearToken,
-    json_types::U128,
-    serde::{Serialize, de::DeserializeOwned},
-    serde_json::json,
-};
+use near_sdk::{AccountId, NearToken, serde::Serialize};
 use testresult::TestResult;
 
 pub const ONE_YOCTO: NearToken = NearToken::from_yoctonear(1);
@@ -111,65 +106,6 @@ impl Handle {
         Self { sandbox, network }
     }
 
-    pub async fn nft_token<T: DeserializeOwned + Sync + Send>(
-        &self,
-        contract: &Contract,
-        token_id: &str,
-    ) -> Option<T> {
-        contract
-            .call_function("nft_token", json!({ "token_id": token_id }))
-            .read_only()
-            .fetch_from(&self.network)
-            .await
-            .unwrap()
-            .data
-    }
-
-    pub async fn ft_balance_of(&self, contract: &Contract, account: &AccountId) -> u128 {
-        contract
-            .call_function("ft_balance_of", json!({ "account_id": account }))
-            .read_only::<U128>()
-            .fetch_from(&self.network)
-            .await
-            .unwrap()
-            .data
-            .0
-    }
-
-    pub async fn mt_balance_of(
-        &self,
-        contract: &Contract,
-        account: &AccountId,
-        token_id: &str,
-    ) -> u128 {
-        contract
-            .call_function(
-                "mt_balance_of",
-                json!({ "token_id": token_id, "account_id": account }),
-            )
-            .read_only::<U128>()
-            .fetch_from(&self.network)
-            .await
-            .unwrap()
-            .data
-            .0
-    }
-
-    pub async fn mt_batch_balance_of(
-        &self,
-        contract: &Contract,
-        account_id: &AccountIdRef,
-        token_ids: impl IntoIterator<Item = &str>,
-    ) -> Vec<u128> {
-        contract
-            .call_function("mt_batch_balance_of", json!({ "token_ids": token_ids.into_iter().collect::<Vec<_>>(), "account_id": account_id, }))
-            .read_only::<Vec<U128>>()
-            .fetch_from(&self.network)
-            .await
-            .unwrap()
-            .data.into_iter().map(u128::from).collect()
-    }
-
     pub fn default_signer(&self) -> Arc<near_api::Signer> {
         near_api::Signer::from_secret_key(
             near_sandbox::config::DEFAULT_GENESIS_ACCOUNT_PRIVATE_KEY
@@ -268,23 +204,3 @@ pub struct Setup {
     pub contract: Contract,
     pub accounts: Vec<Account>,
 }
-
-// /// For dynamic should_panic messages
-// pub fn expect_execution_error(result: &ExecutionFinalResult, expected_error: impl AsRef<str>) {
-//     let failures = result.failures();
-
-//     assert_eq!(failures.len(), 1);
-
-//     let actual_error_string = failures[0]
-//         .clone()
-//         .into_result()
-//         .unwrap_err()
-//         .into_inner()
-//         .unwrap()
-//         .to_string();
-
-//     assert_eq!(
-//         format!("Action #0: ExecutionError(\"{}\")", expected_error.as_ref()),
-//         actual_error_string
-//     );
-// }

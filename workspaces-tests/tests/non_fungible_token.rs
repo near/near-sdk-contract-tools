@@ -626,7 +626,6 @@ async fn transfer_call_receiver_send_return() -> TestResult<()> {
         )
         .await?;
 
-    // maybe needs extra gas??
     let msg = format!("transfer:{}", charlie.account_id());
     let result = s
         .nft_transfer_call(&alice, Y, bob.account_id(), "token_0", None, None, msg)
@@ -693,7 +692,6 @@ async fn transfer_approval_success() -> TestResult<()> {
         .await?;
 
     let view_token = s.nft_token("token_0").await?;
-    // let view_token = nft_token::<Token>(&contract, "token_0").await;
 
     let expected_view_token = Token {
         token_id: "token_0".into(),
