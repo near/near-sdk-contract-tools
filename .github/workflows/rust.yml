@@ -32,6 +32,7 @@ jobs:
         with:
           toolchain: 1.86
           components: clippy
+          targets: wasm32-unknown-unknown
       - name: Run linter
         run: cargo clippy --target wasm32-unknown-unknown -- -D warnings
   test:
