@@ -5,98 +5,22 @@ name = "workspaces-tests"
 publish = false
 version = "0.1.0"
 
-[[bin]]
-name = "basic_adder"
-
-[[bin]]
-name = "counter_multisig"
-
-[[bin]]
-name = "cross_target"
-
-[[bin]]
-name = "escrow"
-
-[[bin]]
-name = "fungible_token"
-
-[[bin]]
-name = "fungible_token_receiver"
-
-[[bin]]
-name = "multi_token"
-
-[[bin]]
-name = "multi_token_receiver"
-
-[[bin]]
-name = "native_multisig"
-
-[[bin]]
-name = "non_fungible_token_full"
-
-[[bin]]
-name = "non_fungible_token_nep171"
-
-[[bin]]
-name = "non_fungible_token_receiver"
-
-[[bin]]
-name = "rbac"
-
-[[bin]]
-name = "simple_multisig"
-
-[[bin]]
-name = "storage_fee"
-
-[[bin]]
-name = "upgrade_bad"
-
-[[bin]]
-name = "upgrade_new"
-
-[[bin]]
-name = "upgrade_old_borsh"
-
-[[bin]]
-name = "upgrade_old_jsonbase64"
-
-[[bin]]
-name = "upgrade_old_multisig"
-
-[[bin]]
-name = "upgrade_old_raw"
-
-[lints.clippy]
-# pedantic = "warn"
-new-without-default = "allow"
-# must-use-candidate = "allow"
-# missing-panics-doc = "allow"
-
 [dependencies]
-near-sdk.workspace = true
-near-sdk-contract-tools = { path = "../", default-features = false, features = [
-    "unstable",
-] }
-strum.workspace = true
-strum_macros.workspace = true
-thiserror.workspace = true
+cargo-near-build = "0.11.0"
+near-api = "0.8"
+near-crypto = "0.34"
+near-sandbox = "0.3"
+pretty_assertions = "1"
+tokio = { version = "1", features = ["full"] }
+testresult = "0.4.1"
 
-[dev-dependencies]
-near-crypto.workspace = true
 near-sdk = { workspace = true, default-features = false, features = [
     "unstable",
     "unit-testing",
     "legacy",
     "non-contract-usage"
 ] }
-tokio.workspace = true
-pretty_assertions.workspace = true
-near-workspaces = { workspace = true, features = ["unstable"] }
-workspaces-tests-utils = { path = "../workspaces-tests-utils", default-features = false, features = [
-    "unstable",
-] }
+near-sdk-contract-tools = { workspace = true, features = ["unstable"] }
 
 [features]
 unstable = ["near-sdk/unstable"]

@@ -1,12 +1,13 @@
+use near_api::Contract;
 use near_sdk::{
+    AccountId,
     serde::{Deserialize, Serialize},
-    serde_json::{self, json},
+    serde_json::json,
 };
-use near_workspaces::{Account, AccountId, Contract};
 use pretty_assertions::assert_eq;
+use testresult::TestResult;
 use tokio::join;
-
-const WASM: &[u8] = include_bytes!("../../target/wasm32-unknown-unknown/release/escrow.wasm");
+use workspaces_tests::{Handle, read_only, transaction};
 
 #[derive(Deserialize, Clone, Default, Debug, PartialEq, Eq)]
 #[serde(crate = "near_sdk::serde")]
@@ -29,115 +30,56 @@ pub enum SecondaryColour {
 }
 
 struct Setup {
+    pub handle: Handle,
     pub contract: Contract,
-    pub accounts: Vec<Account>,
 }
 
 /// Setup for individual tests
-async fn setup(num_accounts: usize, wasm: &[u8]) -> Setup {
-    let worker = near_workspaces::sandbox().await.unwrap();
+async fn setup() -> TestResult<Setup> {
+    let handle = Handle::new().await;
+    let contract = handle.make_contract("escrow", "escrow", json!({})).await?;
 
-    // Initialize user accounts
-    let mut accounts = vec![];
-    for _ in 0..(num_accounts + 1) {
-        accounts.push(worker.dev_create_account().await.unwrap());
-    }
+    Ok(Setup { contract, handle })
+}
 
-    let alice = &accounts[0].clone();
-
-    let contract = alice.deploy(wasm).await.unwrap().unwrap();
-    contract.call("new").transact().await.unwrap().unwrap();
-
-    Setup { contract, accounts }
+impl Setup {
+    transaction! { fn assign(colour: PrimaryColour) }
+    transaction! { fn mix(colour: PrimaryColour, with: PrimaryColour) -> (AccountId, AccountId, SecondaryColour) }
+    read_only! { fn get_locked(colour: PrimaryColour) -> bool }
 }
 
 #[tokio::test]
-async fn happy() {
-    let Setup { contract, accounts } = setup(2, WASM).await;
+async fn happy() -> TestResult<()> {
+    let s = setup().await?;
 
-    let alice = &accounts[0];
-    let bob = &accounts[1];
+    let alice = s.handle.make_account("alice").await?;
+    let bob = s.handle.make_account("bob").await?;
 
-    let call = |who: Account, contract: AccountId, method: String, args: Vec<u8>| async move {
-        who.call(&contract, &method)
-            .args(args)
-            .transact()
-            .await
-            .unwrap()
-            .unwrap()
-    };
-
-    let assign = |who: Account, colour: PrimaryColour| {
-        call(
-            who,
-            contract.id().clone(),
-            "assign".to_string(),
-            serde_json::to_vec(&json!({ "colour": colour })).unwrap(),
-        )
-    };
-    let mix = |who: Account, contract: AccountId, colour: PrimaryColour, with: PrimaryColour| async move {
-        who.call(&contract, "mix")
-            .args(serde_json::to_vec(&json!({ "colour": colour, "with": with })).unwrap())
-            .transact()
-            .await
-            .unwrap()
-            .json::<(AccountId, AccountId, SecondaryColour)>()
-            .unwrap()
-    };
     let alice_colour = PrimaryColour::Red;
     join!(
-        assign(alice.clone(), alice_colour.clone()),
-        assign(bob.clone(), PrimaryColour::Blue),
+        async { s.assign(&alice, None, alice_colour.clone()).await.unwrap() },
+        async { s.assign(&bob, None, PrimaryColour::Blue).await.unwrap() },
     );
-    let (pair_x, pair_y, mixed_colour) = mix(
-        bob.clone(),
-        contract.id().clone(),
-        PrimaryColour::Blue,
-        alice_colour.clone(),
-    )
-    .await;
+    let (pair_x, pair_y, mixed_colour) = s
+        .mix(&bob, None, PrimaryColour::Blue, alice_colour.clone())
+        .await?;
 
-    let locked = contract
-        .view("get_locked")
-        .args(serde_json::to_vec(&json!({ "colour": alice_colour })).unwrap())
-        .await
-        .unwrap()
-        .json::<bool>()
-        .unwrap();
+    let locked = s.get_locked(alice_colour).await?;
 
     assert!(!locked);
-    assert_eq!(pair_x, bob.clone().id().to_owned());
-    assert_eq!(pair_y, alice.clone().id().to_owned());
+    assert_eq!(pair_x, bob.account_id().to_owned());
+    assert_eq!(pair_y, alice.account_id().to_owned());
     assert_eq!(mixed_colour, SecondaryColour::Purple);
+
+    Ok(())
 }
 
 #[tokio::test]
 #[should_panic(expected = "Already locked")]
 async fn unhappy_cant_lock() {
-    let Setup { contract, accounts } = setup(1, WASM).await;
+    let s = setup().await.unwrap();
+    let alice = s.handle.make_account("alice").await.unwrap();
 
-    let alice = &accounts[0];
-
-    let call = |who: Account, contract: AccountId, method: String, args: Vec<u8>| async move {
-        who.call(&contract, &method)
-            .args(args)
-            .transact()
-            .await
-            .unwrap()
-            .unwrap()
-    };
-
-    let assign = |who: Account, colour: PrimaryColour| {
-        call(
-            who,
-            contract.id().clone(),
-            "assign".to_string(),
-            serde_json::to_vec(&json!({ "colour": colour })).unwrap(),
-        )
-    };
-
-    join!(
-        assign(alice.clone(), PrimaryColour::Red),
-        assign(alice.clone(), PrimaryColour::Red),
-    );
+    s.assign(&alice, None, PrimaryColour::Red).await.unwrap();
+    s.assign(&alice, None, PrimaryColour::Red).await.unwrap();
 }

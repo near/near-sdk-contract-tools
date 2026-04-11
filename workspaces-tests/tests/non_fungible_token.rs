@@ -1,91 +1,103 @@
 use std::collections::HashMap;
 
-use near_sdk::{json_types::U128, serde_json::json};
-use near_sdk_contract_tools::standard::{
-    nep171::{
-        self, Token,
-        event::{Nep171Event, NftTransferLog},
+use near_api::{Account, Contract};
+use near_sdk::{AccountId, json_types::U128, serde_json::json};
+use near_sdk_contract_tools::{
+    nft::{ApprovalId, ContractMetadata, TokenId},
+    standard::{
+        nep171::{
+            Token,
+            event::{Nep171Event, NftTransferLog},
+        },
+        nep177::{self, TokenMetadata},
+        nep297::Event,
     },
-    nep177::{self, TokenMetadata},
-    nep178::error::{
-        AccountAlreadyApprovedError, Nep178ApproveError, TooManyApprovalsError, UnauthorizedError,
-    },
-    nep297::Event,
 };
-use near_workspaces::{operations::Function, types::Gas};
 use pretty_assertions::assert_eq;
-use tokio::task::JoinSet;
-use workspaces_tests_utils::{
-    ONE_NEAR, ONE_YOCTO, Setup, expect_execution_error, nft_token, setup,
-};
+use testresult::TestResult;
+use workspaces_tests::{Handle, ONE_NEAR, Y, read_only, transaction};
 
-const WASM_171_ONLY: &[u8] =
-    include_bytes!("../../target/wasm32-unknown-unknown/release/non_fungible_token_nep171.wasm");
-
-const WASM_FULL: &[u8] =
-    include_bytes!("../../target/wasm32-unknown-unknown/release/non_fungible_token_full.wasm");
-
-const RECEIVER_WASM: &[u8] =
-    include_bytes!("../../target/wasm32-unknown-unknown/release/non_fungible_token_receiver.wasm");
-
-const THIRTY_TERAGAS: Gas = Gas::from_gas(30_000_000_000_000);
+const CONTRACT_171: &str = "non_fungible_token_nep171";
+const CONTRACT_FULL: &str = "non_fungible_token_full";
+const CONTRACT_RECEIVER: &str = "non_fungible_token_receiver";
 
 fn token_meta(id: impl Into<String>) -> near_sdk::serde_json::Value {
     near_sdk::serde_json::to_value(TokenMetadata::new().title(id).description("description"))
         .unwrap()
 }
 
-async fn setup_balances(
-    wasm: &[u8],
-    num_accounts: usize,
-    token_ids: impl Fn(usize) -> Vec<String>,
-    storage_deposit: bool,
-) -> Setup {
-    let s = setup(wasm, num_accounts).await;
+struct Setup {
+    pub handle: Handle,
+    pub contract: Contract,
+}
 
-    for (i, account) in s.accounts.iter().enumerate() {
-        let batch = if storage_deposit {
-            account.batch(s.contract.id()).call(
-                Function::new("storage_deposit")
-                    .args_json(json!({}))
-                    .deposit(ONE_NEAR.saturating_div(100)),
-            )
-        } else {
-            account.batch(s.contract.id())
-        };
+async fn setup(contract: &str) -> TestResult<Setup> {
+    let handle = Handle::new().await;
+    let contract = handle.make_contract(contract, contract, json!({})).await?;
+    Ok(Setup { handle, contract })
+}
 
-        batch
-            .call(Function::new("mint").args_json(json!({ "token_ids": token_ids(i) })))
-            .transact()
-            .await
-            .unwrap()
-            .unwrap();
+impl Setup {
+    async fn setup_account(
+        &self,
+        account: impl Into<String>,
+        storage_deposit: bool,
+        token_ids: impl IntoIterator<Item = impl Into<String>>,
+    ) -> TestResult<Account> {
+        let account = self.handle.make_account(account).await?;
+        if storage_deposit {
+            self.storage_deposit(&account, Some(ONE_NEAR.saturating_div(100)), None)
+                .await?;
+        }
+        self.mint(
+            &account,
+            None,
+            token_ids.into_iter().map(Into::into).collect::<Vec<_>>(),
+        )
+        .await?;
+        Ok(account)
     }
 
-    s
+    transaction! { fn storage_deposit(registration_only: Option<bool>) }
+    transaction! { fn mint(token_ids: Vec<String>) }
+
+    transaction! { fn nft_transfer(receiver_id: AccountId, token_id: TokenId, approval_id: Option<u32>, memo: Option<String>) }
+    transaction! { fn nft_transfer_call(receiver_id: AccountId, token_id: TokenId, approval_id: Option<u32>, memo: Option<String>, msg: String) }
+    read_only! { fn nft_token(token_id: TokenId) -> Option<Token> }
+    read_only! { fn nft_metadata() -> ContractMetadata }
+
+    read_only! { fn nft_total_supply() -> U128 }
+    read_only! { fn nft_tokens(from_index: Option<U128>, limit: Option<u32>) -> Vec<Token> }
+    read_only! { fn nft_supply_for_owner(account_id: AccountId) -> U128 }
+    read_only! { fn nft_tokens_for_owner(account_id: AccountId, from_index: Option<U128>, limit: Option<u32>) -> Vec<Token> }
+
+    transaction! { fn nft_approve(token_id: TokenId, account_id: AccountId, msg: Option<String>) }
+
+    transaction! { fn nft_revoke(token_id: TokenId, account_id: AccountId) }
+
+    transaction! { fn nft_revoke_all(token_id: TokenId) }
+
+    read_only! { fn nft_is_approved(token_id: TokenId, approved_account_id: AccountId, approval_id: Option<ApprovalId>) -> bool }
 }
 
 #[tokio::test]
-async fn create_and_mint() {
-    let Setup { contract, accounts } =
-        setup_balances(WASM_171_ONLY, 3, |i| vec![format!("token_{i}")], false).await;
-    let alice = &accounts[0];
-    let bob = &accounts[1];
-    let charlie = &accounts[2];
+async fn create_and_mint() -> TestResult<()> {
+    let s = setup(CONTRACT_171).await?;
+    let alice = s.setup_account("alice", false, ["token_0"]).await?;
+    let bob = s.setup_account("bob", false, ["token_1"]).await?;
+    let charlie = s.setup_account("charlie", false, ["token_2"]).await?;
 
-    let (token_0, token_1, token_2, token_3) = tokio::join!(
-        nft_token(&contract, "token_0"),
-        nft_token(&contract, "token_1"),
-        nft_token(&contract, "token_2"),
-        nft_token(&contract, "token_3"),
-    );
+    let token_0 = s.nft_token("token_0").await?;
+    let token_1 = s.nft_token("token_1").await?;
+    let token_2 = s.nft_token("token_2").await?;
+    let token_3 = s.nft_token("token_3").await?;
 
     // Verify minted tokens
     assert_eq!(
         token_0,
         Some(Token {
             token_id: "token_0".to_string(),
-            owner_id: alice.id().clone(),
+            owner_id: alice.account_id().clone(),
             extensions_metadata: Default::default(),
         }),
     );
@@ -93,7 +105,7 @@ async fn create_and_mint() {
         token_1,
         Some(Token {
             token_id: "token_1".to_string(),
-            owner_id: bob.id().clone(),
+            owner_id: bob.account_id().clone(),
             extensions_metadata: Default::default(),
         }),
     );
@@ -101,28 +113,23 @@ async fn create_and_mint() {
         token_2,
         Some(Token {
             token_id: "token_2".to_string(),
-            owner_id: charlie.id().clone(),
+            owner_id: charlie.account_id().clone(),
             extensions_metadata: Default::default(),
         }),
     );
     assert_eq!(token_3, None::<Token>);
+
+    Ok(())
 }
 
 #[tokio::test]
-async fn create_and_mint_with_metadata_and_enumeration() {
-    let Setup { contract, accounts } =
-        setup_balances(WASM_FULL, 3, |i| vec![format!("token_{i}")], true).await;
-    let alice = &accounts[0];
-    let bob = &accounts[1];
-    let charlie = &accounts[2];
+async fn create_and_mint_with_metadata_and_enumeration() -> TestResult<()> {
+    let s = setup(CONTRACT_FULL).await?;
+    let alice = s.setup_account("alice", true, ["token_0"]).await?;
+    let bob = s.setup_account("bob", true, ["token_1"]).await?;
+    let charlie = s.setup_account("charlie", true, ["token_2"]).await?;
 
-    let metadata = contract
-        .view("nft_metadata")
-        .await
-        .unwrap()
-        .json::<Option<nep177::ContractMetadata>>()
-        .unwrap()
-        .unwrap();
+    let metadata = s.nft_metadata().await?;
 
     assert_eq!(
         metadata,
@@ -137,19 +144,17 @@ async fn create_and_mint_with_metadata_and_enumeration() {
         },
     );
 
-    let (token_0, token_1, token_2, token_3) = tokio::join!(
-        nft_token(&contract, "token_0"),
-        nft_token(&contract, "token_1"),
-        nft_token(&contract, "token_2"),
-        nft_token(&contract, "token_3"),
-    );
+    let token_0 = s.nft_token("token_0").await?;
+    let token_1 = s.nft_token("token_1").await?;
+    let token_2 = s.nft_token("token_2").await?;
+    let token_3 = s.nft_token("token_3").await?;
 
     // Verify minted tokens
     assert_eq!(
         token_0,
         Some(Token {
             token_id: "token_0".to_string(),
-            owner_id: alice.id().clone(),
+            owner_id: alice.account_id().clone(),
             extensions_metadata: [
                 ("metadata".to_string(), token_meta("token_0")),
                 ("approved_account_ids".to_string(), json!({})),
@@ -162,7 +167,7 @@ async fn create_and_mint_with_metadata_and_enumeration() {
         token_1,
         Some(Token {
             token_id: "token_1".to_string(),
-            owner_id: bob.id().clone(),
+            owner_id: bob.account_id().clone(),
             extensions_metadata: [
                 ("metadata".to_string(), token_meta("token_1")),
                 ("approved_account_ids".to_string(), json!({})),
@@ -175,7 +180,7 @@ async fn create_and_mint_with_metadata_and_enumeration() {
         token_2,
         Some(Token {
             token_id: "token_2".to_string(),
-            owner_id: charlie.id().clone(),
+            owner_id: charlie.account_id().clone(),
             extensions_metadata: [
                 ("metadata".to_string(), token_meta("token_2")),
                 ("approved_account_ids".to_string(), json!({})),
@@ -187,75 +192,35 @@ async fn create_and_mint_with_metadata_and_enumeration() {
     assert_eq!(token_3, None::<Token>);
 
     // indeterminate order, so hashmap for equality instead of vec
-    let (
-        all_tokens_enumeration,
-        all_tokens_enumeration_limit,
-        alice_supply,
-        alice_tokens_all,
-        alice_tokens_offset,
-        nonexistent_account_tokens,
-    ) = tokio::join!(
-        async {
-            contract
-                .view("nft_tokens")
-                .args_json(json!({}))
-                .await
-                .unwrap()
-                .json::<Vec<Token>>()
-                .unwrap()
-                .into_iter()
-                .map(|token| (token.token_id.clone(), token))
-                .collect::<HashMap<_, _>>()
-        },
-        async {
-            contract
-                .view("nft_tokens")
-                .args_json(json!({ "from_index": "0", "limit": 100 }))
-                .await
-                .unwrap()
-                .json::<Vec<Token>>()
-                .unwrap()
-                .into_iter()
-                .map(|token| (token.token_id.clone(), token))
-                .collect::<HashMap<_, _>>()
-        },
-        async {
-            contract
-                .view("nft_supply_for_owner")
-                .args_json(json!({ "account_id": alice.id() }))
-                .await
-                .unwrap()
-                .json::<U128>()
-                .unwrap()
-        },
-        async {
-            contract
-                .view("nft_tokens_for_owner")
-                .args_json(json!({ "account_id": alice.id(), "limit": 100 }))
-                .await
-                .unwrap()
-                .json::<Vec<Token>>()
-                .unwrap()
-        },
-        async {
-            contract
-                .view("nft_tokens_for_owner")
-                .args_json(json!({ "account_id": alice.id(), "from_index": "1" }))
-                .await
-                .unwrap()
-                .json::<Vec<Token>>()
-                .unwrap()
-        },
-        async {
-            contract
-                .view("nft_tokens_for_owner")
-                .args_json(json!({ "account_id": "0000000000000000000000000000000000000000000000000000000000000000", "from_index": "1" }))
-                .await
-                .unwrap()
-                .json::<Vec<Token>>()
-                .unwrap()
-        },
-    );
+
+    let all_tokens_enumeration = s
+        .nft_tokens(None, None)
+        .await?
+        .into_iter()
+        .map(|token| (token.token_id.clone(), token))
+        .collect::<HashMap<_, _>>();
+    let all_tokens_enumeration_limit = s
+        .nft_tokens(Some(U128(0)), Some(100))
+        .await?
+        .into_iter()
+        .map(|token| (token.token_id.clone(), token))
+        .collect::<HashMap<_, _>>();
+    let alice_supply = s.nft_supply_for_owner(alice.account_id()).await?;
+    let alice_tokens_all = s
+        .nft_tokens_for_owner(alice.account_id(), None, Some(100))
+        .await?;
+    let alice_tokens_offset = s
+        .nft_tokens_for_owner(alice.account_id(), Some(U128(1)), None)
+        .await?;
+    let nonexistent_account_tokens = s
+        .nft_tokens_for_owner(
+            "0000000000000000000000000000000000000000000000000000000000000000"
+                .parse::<AccountId>()
+                .unwrap(),
+            Some(U128(1)),
+            None,
+        )
+        .await?;
 
     assert_eq!(
         all_tokens_enumeration,
@@ -296,35 +261,28 @@ async fn create_and_mint_with_metadata_and_enumeration() {
         vec![],
         "nonexistent account should return empty",
     );
+
+    Ok(())
 }
 
 #[tokio::test]
-async fn transfer_success() {
-    let Setup { contract, accounts } =
-        setup_balances(WASM_171_ONLY, 3, |i| vec![format!("token_{i}")], false).await;
-    let alice = &accounts[0];
-    let bob = &accounts[1];
-    let charlie = &accounts[2];
+async fn transfer_success() -> TestResult<()> {
+    let s = setup(CONTRACT_171).await?;
+    let alice = s.setup_account("alice", false, ["token_0"]).await?;
+    let bob = s.setup_account("bob", false, ["token_1"]).await?;
+    let charlie = s.setup_account("charlie", false, ["token_2"]).await?;
 
-    let result = alice
-        .call(contract.id(), "nft_transfer")
-        .args_json(json!({
-            "token_id": "token_0",
-            "receiver_id": bob.id(),
-        }))
-        .deposit(ONE_YOCTO)
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
+    let result = s
+        .nft_transfer(&alice, Y, bob.account_id(), "token_0", None, None)
+        .await?;
 
     assert_eq!(
         result.logs(),
         vec![
             "before_nft_transfer(token_0)".to_string(),
             Nep171Event::NftTransfer(vec![NftTransferLog {
-                old_owner_id: alice.id().into(),
-                new_owner_id: bob.id().into(),
+                old_owner_id: alice.account_id().into(),
+                new_owner_id: bob.account_id().into(),
                 authorized_id: None,
                 memo: None,
                 token_ids: vec!["token_0".into()],
@@ -334,17 +292,15 @@ async fn transfer_success() {
         ],
     );
 
-    let (token_0, token_1, token_2) = tokio::join!(
-        nft_token(&contract, "token_0"),
-        nft_token(&contract, "token_1"),
-        nft_token(&contract, "token_2"),
-    );
+    let token_0 = s.nft_token("token_0").await?;
+    let token_1 = s.nft_token("token_1").await?;
+    let token_2 = s.nft_token("token_2").await?;
 
     assert_eq!(
         token_0,
         Some(Token {
             token_id: "token_0".to_string(),
-            owner_id: bob.id().clone(),
+            owner_id: bob.account_id().clone(),
             extensions_metadata: Default::default(),
         }),
     );
@@ -352,7 +308,7 @@ async fn transfer_success() {
         token_1,
         Some(Token {
             token_id: "token_1".to_string(),
-            owner_id: bob.id().clone(),
+            owner_id: bob.account_id().clone(),
             extensions_metadata: Default::default(),
         }),
     );
@@ -360,174 +316,137 @@ async fn transfer_success() {
         token_2,
         Some(Token {
             token_id: "token_2".to_string(),
-            owner_id: charlie.id().clone(),
+            owner_id: charlie.account_id().clone(),
             extensions_metadata: Default::default(),
         }),
     );
+
+    Ok(())
 }
 
 #[tokio::test]
 #[should_panic = "Smart contract panicked: Requires attached deposit of exactly 1 yoctoNEAR"]
 async fn transfer_fail_no_deposit_full() {
-    transfer_fail_no_deposit(WASM_FULL, true).await;
+    transfer_fail_no_deposit(CONTRACT_FULL, true).await.unwrap();
 }
 
 #[tokio::test]
 #[should_panic = "Smart contract panicked: Requires attached deposit of exactly 1 yoctoNEAR"]
 async fn transfer_fail_no_deposit_171() {
-    transfer_fail_no_deposit(WASM_171_ONLY, false).await;
+    transfer_fail_no_deposit(CONTRACT_171, false).await.unwrap();
 }
 
-async fn transfer_fail_no_deposit(wasm: &[u8], storage_deposit: bool) {
-    let Setup { contract, accounts } =
-        setup_balances(wasm, 2, |i| vec![format!("token_{i}")], storage_deposit).await;
-    let alice = &accounts[0];
-    let bob = &accounts[1];
+async fn transfer_fail_no_deposit(wasm: &str, storage_deposit: bool) -> TestResult<()> {
+    let s = setup(wasm).await?;
+    let alice = s
+        .setup_account("alice", storage_deposit, ["token_0"])
+        .await?;
+    let bob = s.setup_account("bob", storage_deposit, ["token_1"]).await?;
 
-    alice
-        .call(contract.id(), "nft_transfer")
-        .args_json(json!({
-            "token_id": "token_0",
-            "receiver_id": bob.id(),
-        }))
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
+    s.nft_transfer(&alice, None, bob.account_id(), "token_0", None, None)
+        .await?;
+
+    Ok(())
 }
 
 #[tokio::test]
 #[should_panic = "Smart contract panicked: Token `token_5` does not exist"]
 async fn transfer_fail_token_dne_full() {
-    transfer_fail_token_dne(WASM_FULL, true).await;
+    transfer_fail_token_dne(CONTRACT_FULL, true).await.unwrap();
 }
 
 #[tokio::test]
 #[should_panic = "Smart contract panicked: Token `token_5` does not exist"]
 async fn transfer_fail_token_dne_171() {
-    transfer_fail_token_dne(WASM_171_ONLY, false).await;
+    transfer_fail_token_dne(CONTRACT_171, false).await.unwrap();
 }
 
-async fn transfer_fail_token_dne(wasm: &[u8], storage_deposit: bool) {
-    let Setup { contract, accounts } =
-        setup_balances(wasm, 2, |i| vec![format!("token_{i}")], storage_deposit).await;
-    let alice = &accounts[0];
-    let bob = &accounts[1];
+async fn transfer_fail_token_dne(wasm: &str, storage_deposit: bool) -> TestResult<()> {
+    let s = setup(wasm).await?;
+    let alice = s
+        .setup_account("alice", storage_deposit, ["token_0"])
+        .await?;
+    let bob = s.setup_account("bob", storage_deposit, ["token_1"]).await?;
 
-    alice
-        .call(contract.id(), "nft_transfer")
-        .args_json(json!({
-            "token_id": "token_5",
-            "receiver_id": bob.id(),
-        }))
-        .deposit(ONE_YOCTO)
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
+    s.nft_transfer(&alice, Y, bob.account_id(), "token_5", None, None)
+        .await?;
+
+    Ok(())
 }
 
 #[tokio::test]
+#[should_panic = "Smart contract panicked: Token `token_2` is owned by `charlie` instead of expected `alice`"]
 async fn transfer_fail_not_owner_full() {
-    transfer_fail_not_owner(WASM_FULL, true).await;
+    transfer_fail_not_owner(CONTRACT_FULL, true).await.unwrap();
 }
 
 #[tokio::test]
+#[should_panic = "Smart contract panicked: Token `token_2` is owned by `charlie` instead of expected `alice`"]
 async fn transfer_fail_not_owner_171() {
-    transfer_fail_not_owner(WASM_171_ONLY, false).await;
+    transfer_fail_not_owner(CONTRACT_171, false).await.unwrap();
 }
 
-async fn transfer_fail_not_owner(wasm: &[u8], storage_deposit: bool) {
-    let Setup { contract, accounts } =
-        setup_balances(wasm, 3, |i| vec![format!("token_{i}")], storage_deposit).await;
-    let alice = &accounts[0];
-    let bob = &accounts[1];
-    let charlie = &accounts[2];
+async fn transfer_fail_not_owner(wasm: &str, storage_deposit: bool) -> TestResult<()> {
+    let s = setup(wasm).await?;
+    let alice = s
+        .setup_account("alice", storage_deposit, ["token_0"])
+        .await?;
+    let bob = s.setup_account("bob", storage_deposit, ["token_1"]).await?;
+    let _charlie = s
+        .setup_account("charlie", storage_deposit, ["token_2"])
+        .await?;
 
-    let result = alice
-        .call(contract.id(), "nft_transfer")
-        .args_json(json!({
-            "token_id": "token_2", // charlie's token
-            "receiver_id": bob.id(),
-        }))
-        .deposit(ONE_YOCTO)
-        .transact()
-        .await
-        .unwrap();
+    s.nft_transfer(&alice, Y, bob.account_id(), "token_2", None, None)
+        .await?;
 
-    expect_execution_error(
-        &result,
-        format!(
-            "Smart contract panicked: Token `token_2` is owned by `{}` instead of expected `{}`",
-            charlie.id(),
-            alice.id(),
-        ),
-    );
+    Ok(())
 }
 
 #[tokio::test]
+#[should_panic = "Smart contract panicked: Receiver must be different from current owner `alice` to transfer token `token_0`"]
 async fn transfer_fail_reflexive_transfer_full() {
-    transfer_fail_reflexive_transfer(WASM_FULL, true).await;
+    transfer_fail_reflexive_transfer(CONTRACT_FULL, true)
+        .await
+        .unwrap();
 }
 
 #[tokio::test]
+#[should_panic = "Smart contract panicked: Receiver must be different from current owner `alice` to transfer token `token_0`"]
 async fn transfer_fail_reflexive_transfer_171() {
-    transfer_fail_reflexive_transfer(WASM_171_ONLY, false).await;
-}
-
-async fn transfer_fail_reflexive_transfer(wasm: &[u8], storage_deposit: bool) {
-    let Setup { contract, accounts } =
-        setup_balances(wasm, 2, |i| vec![format!("token_{i}")], storage_deposit).await;
-    let alice = &accounts[0];
-
-    let result = alice
-        .call(contract.id(), "nft_transfer")
-        .args_json(json!({
-            "token_id": "token_0",
-            "receiver_id": alice.id(),
-        }))
-        .deposit(ONE_YOCTO)
-        .transact()
+    transfer_fail_reflexive_transfer(CONTRACT_171, false)
         .await
         .unwrap();
+}
 
-    expect_execution_error(
-        &result,
-        format!(
-            "Smart contract panicked: Receiver must be different from current owner `{}` to transfer token `token_0`",
-            alice.id()
-        ),
-    );
+async fn transfer_fail_reflexive_transfer(wasm: &str, storage_deposit: bool) -> TestResult<()> {
+    let s = setup(wasm).await?;
+    let alice = s
+        .setup_account("alice", storage_deposit, ["token_0"])
+        .await?;
+
+    s.nft_transfer(&alice, Y, alice.account_id(), "token_0", None, None)
+        .await?;
+
+    Ok(())
 }
 
 #[tokio::test]
-async fn transfer_call_success() {
-    let Setup { contract, accounts } =
-        setup_balances(WASM_171_ONLY, 2, |i| vec![format!("token_{i}")], false).await;
-    let alice = &accounts[0];
-    let bob = &accounts[1];
+async fn transfer_call_success() -> TestResult<()> {
+    let s = setup(CONTRACT_171).await?;
+    let alice = s.setup_account("alice", false, ["token_0"]).await?;
+    let bob = s.setup_account("bob", false, ["token_1"]).await?;
 
-    bob.batch(bob.id())
-        .deploy(RECEIVER_WASM)
-        .call(Function::new("new"))
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
+    s.handle
+        .deploy(
+            bob.account_id().clone(),
+            &s.handle.load_wasm(CONTRACT_RECEIVER).await?,
+            json!({}),
+        )
+        .await?;
 
-    let result = alice
-        .call(contract.id(), "nft_transfer_call")
-        .args_json(json!({
-            "token_id": "token_0",
-            "receiver_id": bob.id(),
-            "msg": "",
-        }))
-        .gas(THIRTY_TERAGAS)
-        .deposit(ONE_YOCTO)
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
+    let result = s
+        .nft_transfer_call(&alice, Y, bob.account_id(), "token_0", None, None, "")
+        .await?;
 
     let logs = result.logs();
 
@@ -537,56 +456,51 @@ async fn transfer_call_success() {
             Nep171Event::NftTransfer(vec![NftTransferLog {
                 token_ids: vec!["token_0".into()],
                 authorized_id: None,
-                old_owner_id: alice.id().into(),
-                new_owner_id: bob.id().into(),
+                old_owner_id: alice.account_id().into(),
+                new_owner_id: bob.account_id().into(),
                 memo: None,
             }])
             .to_event_string(),
             "after_nft_transfer(token_0)".to_string(),
-            format!("Received token_0 from {} via {}", alice.id(), alice.id()),
+            format!(
+                "Received token_0 from {} via {}",
+                alice.account_id(),
+                alice.account_id()
+            ),
         ],
         logs
     );
 
     // not returned
     assert_eq!(
-        nft_token(&contract, "token_0").await,
+        s.nft_token("token_0").await?,
         Some(Token {
             token_id: "token_0".to_string(),
-            owner_id: bob.id().clone(),
+            owner_id: bob.account_id().clone(),
             extensions_metadata: Default::default(),
         }),
     );
+
+    Ok(())
 }
 
 #[tokio::test]
-async fn transfer_call_return_success() {
-    let Setup { contract, accounts } =
-        setup_balances(WASM_171_ONLY, 2, |i| vec![format!("token_{i}")], false).await;
-    let alice = &accounts[0];
-    let bob = &accounts[1];
+async fn transfer_call_return_success() -> TestResult<()> {
+    let s = setup(CONTRACT_171).await?;
+    let alice = s.setup_account("alice", false, ["token_0"]).await?;
+    let bob = s.setup_account("bob", false, ["token_1"]).await?;
 
-    bob.batch(bob.id())
-        .deploy(RECEIVER_WASM)
-        .call(Function::new("new"))
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
+    s.handle
+        .deploy(
+            bob.account_id().clone(),
+            &s.handle.load_wasm(CONTRACT_RECEIVER).await?,
+            json!({}),
+        )
+        .await?;
 
-    let result = alice
-        .call(contract.id(), "nft_transfer_call")
-        .args_json(json!({
-            "token_id": "token_0",
-            "receiver_id": bob.id(),
-            "msg": "return",
-        }))
-        .gas(THIRTY_TERAGAS)
-        .deposit(ONE_YOCTO)
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
+    let result = s
+        .nft_transfer_call(&alice, Y, bob.account_id(), "token_0", None, None, "return")
+        .await?;
 
     let logs = result.logs();
 
@@ -596,19 +510,23 @@ async fn transfer_call_return_success() {
             Nep171Event::NftTransfer(vec![NftTransferLog {
                 token_ids: vec!["token_0".into()],
                 authorized_id: None,
-                old_owner_id: alice.id().into(),
-                new_owner_id: bob.id().into(),
+                old_owner_id: alice.account_id().into(),
+                new_owner_id: bob.account_id().into(),
                 memo: None,
             }])
             .to_event_string(),
             "after_nft_transfer(token_0)".to_string(),
-            format!("Received token_0 from {} via {}", alice.id(), alice.id()),
+            format!(
+                "Received token_0 from {} via {}",
+                alice.account_id(),
+                alice.account_id()
+            ),
             "before_nft_transfer(token_0)".to_string(),
             Nep171Event::NftTransfer(vec![NftTransferLog {
                 token_ids: vec!["token_0".into()],
                 authorized_id: None,
-                old_owner_id: bob.id().into(),
-                new_owner_id: alice.id().into(),
+                old_owner_id: bob.account_id().into(),
+                new_owner_id: alice.account_id().into(),
                 memo: None,
             }])
             .to_event_string(),
@@ -619,43 +537,33 @@ async fn transfer_call_return_success() {
 
     // returned
     assert_eq!(
-        nft_token(&contract, "token_0").await,
+        s.nft_token("token_0").await?,
         Some(Token {
             token_id: "token_0".to_string(),
-            owner_id: alice.id().clone(),
+            owner_id: alice.account_id().clone(),
             extensions_metadata: Default::default(),
         }),
     );
+
+    Ok(())
 }
 
 #[tokio::test]
-async fn transfer_call_receiver_panic() {
-    let Setup { contract, accounts } =
-        setup_balances(WASM_171_ONLY, 2, |i| vec![format!("token_{i}")], false).await;
-    let alice = &accounts[0];
-    let bob = &accounts[1];
+async fn transfer_call_receiver_panic() -> TestResult<()> {
+    let s = setup(CONTRACT_171).await?;
+    let alice = s.setup_account("alice", false, ["token_0"]).await?;
+    let bob = s.setup_account("bob", false, ["token_1"]).await?;
+    s.handle
+        .deploy(
+            bob.account_id().clone(),
+            &s.handle.load_wasm(CONTRACT_RECEIVER).await?,
+            json!({}),
+        )
+        .await?;
 
-    bob.batch(bob.id())
-        .deploy(RECEIVER_WASM)
-        .call(Function::new("new"))
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
-
-    let result = alice
-        .call(contract.id(), "nft_transfer_call")
-        .args_json(json!({
-            "token_id": "token_0",
-            "receiver_id": bob.id(),
-            "msg": "panic",
-        }))
-        .gas(THIRTY_TERAGAS)
-        .deposit(ONE_YOCTO)
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
+    let result = s
+        .nft_transfer_call(&alice, Y, bob.account_id(), "token_0", None, None, "panic")
+        .await?;
 
     let logs = result.logs();
 
@@ -665,19 +573,23 @@ async fn transfer_call_receiver_panic() {
             Nep171Event::NftTransfer(vec![NftTransferLog {
                 token_ids: vec!["token_0".into()],
                 authorized_id: None,
-                old_owner_id: alice.id().into(),
-                new_owner_id: bob.id().into(),
+                old_owner_id: alice.account_id().into(),
+                new_owner_id: bob.account_id().into(),
                 memo: None,
             }])
             .to_event_string(),
             "after_nft_transfer(token_0)".to_string(),
-            format!("Received token_0 from {} via {}", alice.id(), alice.id()),
+            format!(
+                "Received token_0 from {} via {}",
+                alice.account_id(),
+                alice.account_id()
+            ),
             "before_nft_transfer(token_0)".to_string(),
             Nep171Event::NftTransfer(vec![NftTransferLog {
                 token_ids: vec!["token_0".into()],
                 authorized_id: None,
-                old_owner_id: bob.id().into(),
-                new_owner_id: alice.id().into(),
+                old_owner_id: bob.account_id().into(),
+                new_owner_id: alice.account_id().into(),
                 memo: None,
             }])
             .to_event_string(),
@@ -688,44 +600,37 @@ async fn transfer_call_receiver_panic() {
 
     // returned
     assert_eq!(
-        nft_token(&contract, "token_0").await,
+        s.nft_token("token_0").await?,
         Some(Token {
             token_id: "token_0".to_string(),
-            owner_id: alice.id().clone(),
+            owner_id: alice.account_id().clone(),
             extensions_metadata: Default::default(),
         }),
     );
+
+    Ok(())
 }
 
 #[tokio::test]
-async fn transfer_call_receiver_send_return() {
-    let Setup { contract, accounts } =
-        setup_balances(WASM_171_ONLY, 3, |i| vec![format!("token_{i}")], false).await;
-    let alice = &accounts[0];
-    let bob = &accounts[1];
-    let charlie = &accounts[2];
+async fn transfer_call_receiver_send_return() -> TestResult<()> {
+    let s = setup(CONTRACT_171).await?;
+    let alice = s.setup_account("alice", false, ["token_0"]).await?;
+    let bob = s.setup_account("bob", false, ["token_1"]).await?;
+    let charlie = s.setup_account("charlie", false, ["token_2"]).await?;
 
-    bob.batch(bob.id())
-        .deploy(RECEIVER_WASM)
-        .call(Function::new("new"))
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
+    s.handle
+        .deploy(
+            bob.account_id().clone(),
+            &s.handle.load_wasm(CONTRACT_RECEIVER).await?,
+            json!({}),
+        )
+        .await?;
 
-    let result = alice
-        .call(contract.id(), "nft_transfer_call")
-        .args_json(json!({
-            "token_id": "token_0",
-            "receiver_id": bob.id(),
-            "msg": format!("transfer:{}", charlie.id()),
-        }))
-        .gas(THIRTY_TERAGAS.saturating_mul(10)) // xtra gas
-        .deposit(ONE_YOCTO)
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
+    // maybe needs extra gas??
+    let msg = format!("transfer:{}", charlie.account_id());
+    let result = s
+        .nft_transfer_call(&alice, Y, bob.account_id(), "token_0", None, None, msg)
+        .await?;
 
     let logs = result.logs();
 
@@ -737,20 +642,24 @@ async fn transfer_call_receiver_send_return() {
             Nep171Event::NftTransfer(vec![NftTransferLog {
                 token_ids: vec!["token_0".into()],
                 authorized_id: None,
-                old_owner_id: alice.id().into(),
-                new_owner_id: bob.id().into(),
+                old_owner_id: alice.account_id().into(),
+                new_owner_id: bob.account_id().into(),
                 memo: None,
             }])
             .to_event_string(),
             "after_nft_transfer(token_0)".to_string(),
-            format!("Received token_0 from {} via {}", alice.id(), alice.id()),
-            format!("Transferring token_0 to {}", charlie.id()),
+            format!(
+                "Received token_0 from {} via {}",
+                alice.account_id(),
+                alice.account_id()
+            ),
+            format!("Transferring token_0 to {}", charlie.account_id()),
             "before_nft_transfer(token_0)".to_string(),
             Nep171Event::NftTransfer(vec![NftTransferLog {
                 token_ids: vec!["token_0".into()],
                 authorized_id: None,
-                old_owner_id: bob.id().into(),
-                new_owner_id: charlie.id().into(),
+                old_owner_id: bob.account_id().into(),
+                new_owner_id: charlie.account_id().into(),
                 memo: None,
             }])
             .to_event_string(),
@@ -762,46 +671,39 @@ async fn transfer_call_receiver_send_return() {
 
     // not returned
     assert_eq!(
-        nft_token(&contract, "token_0").await,
+        s.nft_token("token_0").await?,
         Some(Token {
             token_id: "token_0".to_string(),
-            owner_id: charlie.id().clone(),
+            owner_id: charlie.account_id().clone(),
             extensions_metadata: Default::default(),
         }),
     );
+
+    Ok(())
 }
 
 #[tokio::test]
-async fn transfer_approval_success() {
-    let Setup { contract, accounts } =
-        setup_balances(WASM_FULL, 3, |i| vec![format!("token_{i}")], true).await;
-    let alice = &accounts[0];
-    let bob = &accounts[1];
-    let charlie = &accounts[2];
+async fn transfer_approval_success() -> TestResult<()> {
+    let s = setup(CONTRACT_FULL).await?;
+    let alice = s.setup_account("alice", true, ["token_0"]).await?;
+    let bob = s.setup_account("bob", true, ["token_1"]).await?;
+    let charlie = s.setup_account("charlie", true, ["token_2"]).await?;
 
-    alice
-        .call(contract.id(), "nft_approve")
-        .args_json(json!({
-            "token_id": "token_0",
-            "account_id": bob.id(),
-        }))
-        .deposit(ONE_YOCTO)
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
+    s.nft_approve(&alice, Y, "token_0", bob.account_id(), None)
+        .await?;
 
-    let view_token = nft_token::<Token>(&contract, "token_0").await;
+    let view_token = s.nft_token("token_0").await?;
+    // let view_token = nft_token::<Token>(&contract, "token_0").await;
 
     let expected_view_token = Token {
         token_id: "token_0".into(),
-        owner_id: alice.id().clone(),
+        owner_id: alice.account_id().clone(),
         extensions_metadata: [
             ("metadata".to_string(), token_meta("token_0")),
             (
                 "approved_account_ids".to_string(),
                 json!({
-                    bob.id().to_string(): 0,
+                    bob.account_id().to_string(): 0,
                 }),
             ),
             ("funky_data".to_string(), json!({"funky": "data"})),
@@ -811,36 +713,18 @@ async fn transfer_approval_success() {
 
     assert_eq!(view_token, Some(expected_view_token));
 
-    let is_approved = contract
-        .view("nft_is_approved")
-        .args_json(json!({
-            "token_id": "token_0",
-            "approved_account_id": bob.id().to_string(),
-        }))
-        .await
-        .unwrap()
-        .json::<bool>()
-        .unwrap();
+    let is_approved = s.nft_is_approved("token_0", bob.account_id(), None).await?;
 
     assert!(is_approved);
 
-    bob.call(contract.id(), "nft_transfer")
-        .args_json(json!({
-            "token_id": "token_0",
-            "approval_id": 0,
-            "receiver_id": charlie.id().to_string(),
-        }))
-        .deposit(ONE_YOCTO)
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
+    s.nft_transfer(&bob, Y, charlie.account_id(), "token_0", Some(0), None)
+        .await?;
 
     assert_eq!(
-        nft_token(&contract, "token_0").await,
+        s.nft_token("token_0").await?,
         Some(Token {
             token_id: "token_0".to_string(),
-            owner_id: charlie.id().clone(),
+            owner_id: charlie.account_id().clone(),
             extensions_metadata: [
                 ("metadata".to_string(), token_meta("token_0")),
                 ("approved_account_ids".to_string(), json!({})),
@@ -849,270 +733,116 @@ async fn transfer_approval_success() {
             .into(),
         }),
     );
+
+    Ok(())
 }
 
 #[tokio::test]
+#[should_panic = "Smart contract panicked: Sender `bob` does not have permission to transfer token `token_0`, owned by `alice`, with approval ID 0"]
 async fn transfer_approval_unapproved_fail() {
-    let Setup { contract, accounts } =
-        setup_balances(WASM_FULL, 4, |i| vec![format!("token_{i}")], true).await;
-    let alice = &accounts[0];
-    let bob = &accounts[1];
-    let charlie = &accounts[2];
-    let debbie = &accounts[3];
+    let s = setup(CONTRACT_FULL).await.unwrap();
+    let alice = s.setup_account("alice", true, ["token_0"]).await.unwrap();
+    let bob = s.setup_account("bob", true, ["token_1"]).await.unwrap();
+    let charlie = s.setup_account("charlie", true, ["token_2"]).await.unwrap();
+    let debbie = s.setup_account("debbie", true, ["token_3"]).await.unwrap();
 
-    alice
-        .call(contract.id(), "nft_approve")
-        .args_json(json!({
-            "token_id": "token_0",
-            "account_id": debbie.id(),
-        }))
-        .deposit(ONE_YOCTO)
-        .transact()
+    s.nft_approve(&alice, Y, "token_0", debbie.account_id(), None)
         .await
-        .unwrap()
         .unwrap();
 
-    let is_approved = contract
-        .view("nft_is_approved")
-        .args_json(json!({
-            "token_id": "token_0",
-            "approved_account_id": bob.id().to_string(),
-        }))
+    let is_approved = s
+        .nft_is_approved("token_0", bob.account_id(), None)
         .await
-        .unwrap()
-        .json::<bool>()
         .unwrap();
 
     assert!(!is_approved);
 
-    let result = bob
-        .call(contract.id(), "nft_transfer")
-        .args_json(json!({
-            "token_id": "token_0",
-            "approval_id": 0,
-            "receiver_id": charlie.id().to_string(),
-        }))
-        .deposit(ONE_YOCTO)
-        .transact()
+    s.nft_transfer(&bob, Y, charlie.account_id(), "token_0", Some(0), None)
         .await
         .unwrap();
-
-    let expected_error_message = format!(
-        "Smart contract panicked: {}",
-        nep171::error::SenderNotApprovedError {
-            owner_id: alice.id().clone(),
-            sender_id: bob.id().clone(),
-            token_id: "token_0".to_string(),
-            approval_id: 0,
-        }
-    );
-
-    expect_execution_error(&result, expected_error_message);
 }
 
 #[tokio::test]
-#[should_panic = "Attached deposit must be greater than zero"]
+#[should_panic = "Smart contract panicked: Attached deposit must be greater than zero"]
 async fn transfer_approval_no_deposit_fail() {
-    let Setup { contract, accounts } =
-        setup_balances(WASM_FULL, 2, |i| vec![format!("token_{i}")], true).await;
-    let alice = &accounts[0];
-    let bob = &accounts[1];
+    let s = setup(CONTRACT_FULL).await.unwrap();
+    let alice = s.setup_account("alice", true, ["token_0"]).await.unwrap();
+    let bob = s.setup_account("bob", true, ["token_1"]).await.unwrap();
 
-    alice
-        .call(contract.id(), "nft_approve")
-        .args_json(json!({
-            "token_id": "token_0",
-            "account_id": bob.id(),
-        }))
-        .transact()
+    s.nft_approve(&alice, None, "token_0", bob.account_id(), None)
         .await
-        .unwrap()
         .unwrap();
 }
 
 #[tokio::test]
+#[should_panic = "Smart contract panicked: Account bob is already approved for token token_0."]
 async fn transfer_approval_double_approval_fail() {
-    let Setup { contract, accounts } =
-        setup_balances(WASM_FULL, 2, |i| vec![format!("token_{i}")], true).await;
-    let alice = &accounts[0];
-    let bob = &accounts[1];
+    let s = setup(CONTRACT_FULL).await.unwrap();
+    let alice = s.setup_account("alice", true, ["token_0"]).await.unwrap();
+    let bob = s.setup_account("bob", true, ["token_1"]).await.unwrap();
 
-    alice
-        .call(contract.id(), "nft_approve")
-        .args_json(json!({
-            "token_id": "token_0",
-            "account_id": bob.id(),
-        }))
-        .deposit(ONE_YOCTO)
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
-
-    let result = alice
-        .call(contract.id(), "nft_approve")
-        .args_json(json!({
-            "token_id": "token_0",
-            "account_id": bob.id(),
-        }))
-        .deposit(ONE_YOCTO)
-        .transact()
+    s.nft_approve(&alice, Y, "token_0", bob.account_id(), None)
         .await
         .unwrap();
-
-    let expected_error = format!(
-        "Smart contract panicked: {}",
-        Nep178ApproveError::AccountAlreadyApproved(AccountAlreadyApprovedError {
-            account_id: bob.id().clone(),
-            token_id: "token_0".to_string(),
-        }),
-    );
-
-    expect_execution_error(&result, expected_error);
+    s.nft_approve(&alice, Y, "token_0", bob.account_id(), None)
+        .await
+        .unwrap();
 }
 
 #[tokio::test]
+#[should_panic = "Smart contract panicked: Account `bob` is not authorized to manage approvals for token `token_0`"]
 async fn transfer_approval_unauthorized_approval_fail() {
-    let Setup { contract, accounts } =
-        setup_balances(WASM_FULL, 2, |i| vec![format!("token_{i}")], true).await;
-    let _alice = &accounts[0];
-    let bob = &accounts[1];
+    let s = setup(CONTRACT_FULL).await.unwrap();
+    let _alice = s.setup_account("alice", true, ["token_0"]).await.unwrap();
+    let bob = s.setup_account("bob", true, ["token_1"]).await.unwrap();
 
-    let result = bob
-        .call(contract.id(), "nft_approve")
-        .args_json(json!({
-            "token_id": "token_0",
-            "account_id": bob.id(),
-        }))
-        .deposit(ONE_YOCTO)
-        .transact()
+    s.nft_approve(&bob, Y, "token_0", bob.account_id(), None)
         .await
         .unwrap();
-
-    let expected_error = format!(
-        "Smart contract panicked: {}",
-        Nep178ApproveError::Unauthorized(UnauthorizedError {
-            account_id: bob.id().clone(),
-            token_id: "token_0".to_string(),
-        }),
-    );
-
-    expect_execution_error(&result, expected_error);
 }
 
 #[tokio::test]
+#[should_panic = "Smart contract panicked: Too many approvals for token token_0, maximum is 32."]
 async fn transfer_approval_too_many_approvals_fail() {
-    let Setup { contract, accounts } =
-        setup_balances(WASM_FULL, 2, |i| vec![format!("token_{i}")], true).await;
-    let alice = &accounts[0];
-    let bob = &accounts[1];
-
-    let mut set = JoinSet::new();
+    let s = setup(CONTRACT_FULL).await.unwrap();
+    let alice = s.setup_account("alice", true, ["token_0"]).await.unwrap();
+    let bob = s.setup_account("bob", true, ["token_1"]).await.unwrap();
 
     for i in 0..32 {
-        let contract = contract.clone();
-        let alice = alice.clone();
-        set.spawn(async move {
-            alice
-                .call(contract.id(), "nft_approve")
-                .args_json(json!({
-                    "token_id": "token_0",
-                    "account_id": format!("account_{}", i),
-                }))
-                .deposit(ONE_YOCTO)
-                .transact()
-                .await
-                .unwrap()
-                .unwrap();
-        });
+        let id: AccountId = format!("account_{i}").parse().unwrap();
+        s.nft_approve(&alice, Y, "token_0", id, None).await.unwrap();
     }
 
-    while (set.join_next().await).is_some() {}
-
-    let result = alice
-        .call(contract.id(), "nft_approve")
-        .args_json(json!({
-            "token_id": "token_0",
-            "account_id": bob.id(),
-        }))
-        .deposit(ONE_YOCTO)
-        .transact()
+    s.nft_approve(&alice, Y, "token_0", bob.account_id(), None)
         .await
         .unwrap();
-
-    let expected_error = format!(
-        "Smart contract panicked: {}",
-        Nep178ApproveError::TooManyApprovals(TooManyApprovalsError {
-            token_id: "token_0".to_string(),
-        }),
-    );
-
-    expect_execution_error(&result, expected_error);
 }
 
 #[tokio::test]
+#[should_panic = "Smart contract panicked: Sender `bob` does not have permission to transfer token `token_0`, owned by `alice`, with approval ID 1"]
 async fn transfer_approval_approved_but_wrong_approval_id_fail() {
-    let Setup { contract, accounts } =
-        setup_balances(WASM_FULL, 3, |i| vec![format!("token_{i}")], true).await;
-    let alice = &accounts[0];
-    let bob = &accounts[1];
-    let charlie = &accounts[2];
+    let s = setup(CONTRACT_FULL).await.unwrap();
+    let alice = s.setup_account("alice", true, ["token_0"]).await.unwrap();
+    let bob = s.setup_account("bob", true, ["token_1"]).await.unwrap();
+    let charlie = s.setup_account("charlie", true, ["token_2"]).await.unwrap();
 
-    alice
-        .call(contract.id(), "nft_approve")
-        .args_json(json!({
-            "token_id": "token_0",
-            "account_id": bob.id(),
-        }))
-        .deposit(ONE_YOCTO)
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
-
-    let result = bob
-        .call(contract.id(), "nft_transfer")
-        .args_json(json!({
-            "token_id": "token_0",
-            "approval_id": 1,
-            "receiver_id": charlie.id().to_string(),
-        }))
-        .deposit(ONE_YOCTO)
-        .transact()
+    s.nft_approve(&alice, Y, "token_0", bob.account_id(), None)
         .await
         .unwrap();
 
-    let expected_error = format!(
-        "Smart contract panicked: {}",
-        nep171::error::Nep171TransferError::SenderNotApproved(
-            nep171::error::SenderNotApprovedError {
-                sender_id: bob.id().clone(),
-                owner_id: alice.id().clone(),
-                token_id: "token_0".to_string(),
-                approval_id: 1,
-            }
-        ),
-    );
-
-    expect_execution_error(&result, expected_error);
+    s.nft_transfer(&bob, Y, charlie.account_id(), "token_0", Some(1), None)
+        .await
+        .unwrap();
 }
 
 #[tokio::test]
 #[should_panic = "Account this_account_is_not_registered.near is not registered"]
 async fn transfer_fail_not_registered_nep145() {
-    let Setup { contract, accounts } =
-        setup_balances(WASM_FULL, 1, |i| vec![format!("token_{i}")], true).await;
-    let alice = &accounts[0];
+    let s = setup(CONTRACT_FULL).await.unwrap();
+    let alice = s.setup_account("alice", true, ["token_0"]).await.unwrap();
 
-    alice
-        .call(contract.id(), "nft_transfer")
-        .args_json(json!({
-            "token_id": "token_0",
-            "receiver_id": "this_account_is_not_registered.near",
-        }))
-        .deposit(ONE_YOCTO)
-        .transact()
+    let id: AccountId = "this_account_is_not_registered.near".parse().unwrap();
+    s.nft_transfer(&alice, Y, id, "token_0", None, None)
         .await
-        .unwrap()
         .unwrap();
 }

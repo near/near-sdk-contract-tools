@@ -1,100 +1,87 @@
+use near_api::{Account, Contract};
 use near_sdk::{
-    NearToken,
+    AccountId,
     json_types::{Base64VecU8, U128},
     serde_json::json,
 };
-use near_sdk_contract_tools::{
-    mt::*, standard::nep145::error::InsufficientBalanceError, standard::nep297::Event,
-};
-use near_workspaces::{Account, Contract, Worker, network::Sandbox, operations::Function};
+use near_sdk_contract_tools::{mt::*, standard::nep297::Event};
 use pretty_assertions::assert_eq;
-use tokio::task::JoinSet;
-use workspaces_tests_utils::{
-    ONE_NEAR, ONE_YOCTO, expect_execution_error, mt_balance_of, mt_batch_balance_of,
-};
-
-const WASM: &[u8] = include_bytes!("../../target/wasm32-unknown-unknown/release/multi_token.wasm");
-
-const RECEIVER_WASM: &[u8] =
-    include_bytes!("../../target/wasm32-unknown-unknown/release/multi_token_receiver.wasm");
+use testresult::TestResult;
+use workspaces_tests::{Handle, ONE_NEAR, ONE_YOCTO, Y, read_only, transaction};
 
 struct Setup {
+    pub handle: Handle,
     pub contract: Contract,
-    pub accounts: Vec<Account>,
-    pub worker: Worker<Sandbox>,
 }
 
 /// Setup for individual tests
-async fn setup(num_accounts: usize) -> Setup {
-    let worker = near_workspaces::sandbox().await.unwrap();
+async fn setup() -> TestResult<Setup> {
+    let handle = Handle::new().await;
+    let contract = handle
+        .make_contract("multi_token", "multi_token", json!({}))
+        .await?;
 
-    // Initialize contract
-    let contract = worker.dev_deploy(WASM).await.unwrap();
-    contract.call("new").transact().await.unwrap().unwrap();
-
-    // Initialize user accounts
-    let mut accounts = vec![];
-    for _ in 0..num_accounts {
-        accounts.push(worker.dev_create_account().await.unwrap());
-    }
-
-    Setup {
-        contract,
-        accounts,
-        worker,
-    }
+    Ok(Setup { contract, handle })
 }
 
-async fn setup_balances(num_accounts: usize, amount: impl Fn(usize) -> U128) -> Setup {
-    let setup = setup(num_accounts).await;
-
-    let mut transaction_set = JoinSet::new();
-
-    for (i, account) in setup.accounts.iter().enumerate() {
-        let transaction = account
-            .batch(setup.contract.id())
-            .call(
-                Function::new("storage_deposit")
-                    .args_json(json!({}))
-                    .deposit(ONE_NEAR.saturating_div(100)),
-            )
-            .call(
-                Function::new("mint")
-                    .args_json(json!({ "token_id": "my_token", "amount": amount(i) })),
-            )
-            .transact();
-        transaction_set.spawn(async move {
-            transaction.await.unwrap().unwrap();
-        });
+impl Setup {
+    async fn setup_account(&self, name: impl Into<String>, amount: u128) -> TestResult<Account> {
+        let account = self.handle.make_account(name).await?;
+        self.storage_deposit(&account, Some(ONE_NEAR.saturating_div(100)))
+            .await?;
+        self.mint(&account, None, "my_token", amount).await?;
+        Ok(account)
     }
 
-    while transaction_set.join_next().await.is_some() {}
+    transaction! { fn storage_deposit() }
+    read_only! { fn storage_balance_of(account_id: AccountId) -> Option<StorageBalance> }
+    transaction! { fn mint(token_id: String, amount: U128) }
+    transaction! { fn use_storage(blob: Base64VecU8) }
+    transaction! { fn create_base_meta(base_metadata: BaseMetadata) }
+    transaction! { fn remove_base_meta(base_metadata_id: BaseMetadataId) }
+    transaction! { fn set_token_meta(token_id: TokenId, base_metadata_id: BaseMetadataId, token_metadata: TokenMetadata) }
+    transaction! { fn mt_transfer( receiver_id: AccountId, token_id: TokenId, amount: U128, approval: Option<MtTransferApproval>, memo: Option<String>) }
+    transaction! { fn mt_batch_transfer( receiver_id: AccountId, token_ids: Vec<TokenId>, amounts: Vec<U128>, approvals: Option<Vec<Option<MtTransferApproval>>>, memo: Option<String>) }
+    transaction! { fn mt_transfer_call( receiver_id: AccountId, token_id: TokenId, amount: U128, approval: Option<MtTransferApproval>, memo: Option<String>, msg: String) }
+    transaction! { fn mt_batch_transfer_call( receiver_id: AccountId, token_ids: Vec<TokenId>, amounts: Vec<U128>, approvals: Option<Vec<Option<MtTransferApproval>>>, memo: Option<String>, msg: String) }
+    read_only! { fn mt_token(token_ids: Vec<TokenId>) -> Vec<Option<Token>> }
+    read_only! { fn mt_balance_of(account_id: AccountId, token_id: TokenId) -> U128 }
+    read_only! { fn mt_batch_balance_of(account_id: AccountId, token_ids: Vec<TokenId>) -> Vec<U128> }
+    read_only! { fn mt_supply(token_id: TokenId) -> Option<U128> }
+    read_only! { fn mt_batch_supply(token_ids: Vec<TokenId>) -> Vec<Option<U128>> }
 
-    setup
+    read_only! { fn mt_metadata_contract() -> ContractMetadata }
+    read_only! { fn mt_metadata_token_all(token_ids: Vec<TokenId>) -> Vec<TokenMetadataAll> }
+    read_only! { fn mt_metadata_token_by_token_id(token_ids: Vec<TokenId>) -> Vec<TokenMetadata> }
+    read_only! { fn mt_metadata_base_by_token_id(token_ids: Vec<TokenId>) -> Vec<BaseMetadata> }
+    read_only! { fn mt_metadata_base_by_metadata_id( base_metadata_ids: Vec<BaseMetadataId>) -> Vec<BaseMetadata> }
 }
 
 #[tokio::test]
-async fn start_empty() {
-    let Setup {
-        contract, accounts, ..
-    } = setup(3).await;
+async fn start_empty() -> TestResult<()> {
+    let s = setup().await?;
+
+    let alice = s.handle.make_account("alice").await?;
+    let bob = s.handle.make_account("bob").await?;
+    let charlie = s.handle.make_account("charlie").await?;
 
     // All accounts must start with 0 balance
-    for account in accounts.iter() {
-        assert_eq!(mt_balance_of(&contract, account.id(), "my_token").await, 0);
-    }
+    assert_eq!(s.mt_balance_of(alice.account_id(), "my_token").await?.0, 0);
+    assert_eq!(s.mt_balance_of(bob.account_id(), "my_token").await?.0, 0);
+    assert_eq!(
+        s.mt_balance_of(charlie.account_id(), "my_token").await?.0,
+        0
+    );
+
+    Ok(())
 }
 
 #[tokio::test]
-async fn contract_metadata() {
-    let Setup { contract, .. } = setup(3).await;
+async fn contract_metadata() -> TestResult<()> {
+    let s = setup().await?;
 
-    let contract_metadata = contract
-        .view("mt_metadata_contract")
-        .await
-        .unwrap()
-        .json::<ContractMetadata>()
-        .unwrap();
+    let contract_metadata = s.mt_metadata_contract().await?;
+
     assert_eq!(
         contract_metadata,
         ContractMetadata {
@@ -102,52 +89,29 @@ async fn contract_metadata() {
             name: "My MultiToken".to_string()
         },
     );
+
+    Ok(())
 }
 
 #[tokio::test]
-async fn token_metadata() {
-    let Setup {
-        contract, accounts, ..
-    } = setup_balances(3, |i| 10u128.pow(3 - i as u32).into()).await;
-    let alice = &accounts[0];
+async fn token_metadata() -> TestResult<()> {
+    let s = setup().await?;
+
+    let alice = s.setup_account("alice", 1000).await?;
 
     let base_metadata = BaseMetadata::new("Base Metadata", "base_0");
 
-    alice
-        .call(contract.id(), "create_base_meta")
-        .args_json(json!({
-            "base_metadata": base_metadata,
-        }))
-        .transact()
-        .await
-        .unwrap()
-        .into_result()
-        .unwrap();
+    s.create_base_meta(&alice, None, base_metadata.clone())
+        .await?;
 
     let token_metadata = TokenMetadata::new()
         .title("Token Title")
         .description("Token Description");
 
-    alice
-        .call(contract.id(), "set_token_meta")
-        .args_json(json!({
-            "token_id": "my_token",
-            "base_metadata_id": "base_0",
-            "token_metadata": token_metadata,
-        }))
-        .transact()
-        .await
-        .unwrap()
-        .into_result()
-        .unwrap();
+    s.set_token_meta(&alice, None, "my_token", "base_0", token_metadata.clone())
+        .await?;
 
-    let metadata_token_all = contract
-        .view("mt_metadata_token_all")
-        .args_json(json!({ "token_ids": ["my_token"] }))
-        .await
-        .unwrap()
-        .json::<Vec<TokenMetadataAll>>()
-        .unwrap();
+    let metadata_token_all = s.mt_metadata_token_all(["my_token".to_string()]).await?;
     assert_eq!(
         metadata_token_all,
         vec![TokenMetadataAll {
@@ -156,361 +120,279 @@ async fn token_metadata() {
         }],
     );
 
-    let metadata_token_by_token_id = contract
-        .view("mt_metadata_token_by_token_id")
-        .args_json(json!({ "token_ids": ["my_token"] }))
-        .await
-        .unwrap()
-        .json::<Vec<TokenMetadata>>()
-        .unwrap();
+    let metadata_token_by_token_id = s
+        .mt_metadata_token_by_token_id(["my_token".to_string()])
+        .await?;
     assert_eq!(metadata_token_by_token_id, vec![token_metadata.clone()]);
 
-    let metadata_base_by_token_id = contract
-        .view("mt_metadata_base_by_token_id")
-        .args_json(json!({ "token_ids": ["my_token"] }))
-        .await
-        .unwrap()
-        .json::<Vec<BaseMetadata>>()
-        .unwrap();
+    let metadata_base_by_token_id = s
+        .mt_metadata_base_by_token_id(["my_token".to_string()])
+        .await?;
     assert_eq!(metadata_base_by_token_id, vec![base_metadata.clone()]);
 
-    let metadata_base_by_metadata_id = contract
-        .view("mt_metadata_base_by_metadata_id")
-        .args_json(json!({ "base_metadata_ids": ["base_0"] }))
-        .await
-        .unwrap()
-        .json::<Vec<BaseMetadata>>()
-        .unwrap();
+    let metadata_base_by_metadata_id = s
+        .mt_metadata_base_by_metadata_id(["base_0".to_string()])
+        .await?;
     assert_eq!(metadata_base_by_metadata_id, vec![base_metadata.clone()]);
+
+    Ok(())
 }
 
 #[tokio::test]
-async fn mint() {
-    let Setup {
-        contract, accounts, ..
-    } = setup_balances(3, |i| 10u128.pow(3 - i as u32).into()).await;
-    let alice = &accounts[0];
-    let bob = &accounts[1];
-    let charlie = &accounts[2];
+async fn mint() -> TestResult<()> {
+    let s = setup().await?;
+
+    let alice = s.setup_account("alice", 1000).await?;
+    let bob = s.setup_account("bob", 100).await?;
+    let charlie = s.setup_account("charlie", 10).await?;
 
     // Verify issued balances
-    assert_eq!(mt_balance_of(&contract, alice.id(), "my_token").await, 1000);
-    assert_eq!(mt_balance_of(&contract, bob.id(), "my_token").await, 100);
-    assert_eq!(mt_balance_of(&contract, charlie.id(), "my_token").await, 10);
+    assert_eq!(
+        s.mt_balance_of(alice.account_id(), "my_token").await?.0,
+        1000
+    );
+    assert_eq!(s.mt_balance_of(bob.account_id(), "my_token").await?.0, 100);
+    assert_eq!(
+        s.mt_balance_of(charlie.account_id(), "my_token").await?.0,
+        10
+    );
+
+    Ok(())
 }
 
 #[tokio::test]
-async fn transfer_normal() {
-    let Setup {
-        contract, accounts, ..
-    } = setup_balances(3, |i| 10u128.pow(3 - i as u32).into()).await;
-    let alice = &accounts[0];
-    let bob = &accounts[1];
-    let charlie = &accounts[2];
+async fn transfer_normal() -> TestResult<()> {
+    let s = setup().await?;
 
-    alice
-        .call(contract.id(), "mt_transfer")
-        .deposit(ONE_YOCTO)
-        .args_json(json!({
-            "receiver_id": bob.id(),
-            "token_id": "my_token",
-            "amount": "10",
-        }))
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
-    assert_eq!(mt_balance_of(&contract, alice.id(), "my_token").await, 990);
-    assert_eq!(mt_balance_of(&contract, bob.id(), "my_token").await, 110);
-    assert_eq!(mt_balance_of(&contract, charlie.id(), "my_token").await, 10);
+    let alice = s.setup_account("alice", 1000).await?;
+    let bob = s.setup_account("bob", 100).await?;
+    let charlie = s.setup_account("charlie", 10).await?;
+
+    s.mt_transfer(&alice, Y, bob.account_id(), "my_token", 10, None, None)
+        .await?;
+    assert_eq!(
+        s.mt_balance_of(alice.account_id(), "my_token").await?.0,
+        990
+    );
+    assert_eq!(s.mt_balance_of(bob.account_id(), "my_token").await?.0, 110);
+    assert_eq!(
+        s.mt_balance_of(charlie.account_id(), "my_token").await?.0,
+        10
+    );
+
+    Ok(())
 }
 
 #[tokio::test]
 #[should_panic = "Smart contract panicked: Token ID token_dne does not exist."]
 async fn transfer_token_id_dne() {
-    let Setup {
-        contract, accounts, ..
-    } = setup_balances(2, |i| 10u128.pow(3 - i as u32).into()).await;
-    let alice = &accounts[0];
-    let bob = &accounts[1];
+    let s = setup().await.unwrap();
 
-    alice
-        .call(contract.id(), "mt_transfer")
-        .deposit(ONE_YOCTO)
-        .args_json(json!({
-            "receiver_id": bob.id(),
-            "token_id": "token_dne",
-            "amount": "1",
-        }))
-        .transact()
+    let alice = s.setup_account("alice", 1000).await.unwrap();
+    let bob = s.setup_account("bob", 100).await.unwrap();
+
+    s.mt_transfer(&alice, Y, bob.account_id(), "token_dne", 1, None, None)
         .await
-        .unwrap()
         .unwrap();
 }
 
 #[tokio::test]
-async fn batch_transfer_normal() {
-    let Setup {
-        contract, accounts, ..
-    } = setup_balances(3, |i| 10u128.pow(3 - i as u32).into()).await;
-    let alice = &accounts[0];
-    let bob = &accounts[1];
-    let charlie = &accounts[2];
+async fn batch_transfer_normal() -> TestResult<()> {
+    let s = setup().await?;
 
-    alice
-        .call(contract.id(), "mint")
-        .args_json(json!({
-            "token_id": "my_token_2",
-            "amount": "1000",
-        }))
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
+    let alice = s.setup_account("alice", 1000).await?;
+    let bob = s.setup_account("bob", 100).await?;
+    let charlie = s.setup_account("charlie", 10).await?;
 
-    alice
-        .call(contract.id(), "mt_batch_transfer")
-        .deposit(ONE_YOCTO)
-        .args_json(json!({
-            "receiver_id": bob.id(),
-            "token_ids": ["my_token", "my_token_2"],
-            "amounts": ["3", "33"],
-        }))
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
+    s.mint(&alice, None, "my_token_2", 1000).await?;
+    let token_ids = ["my_token".to_string(), "my_token_2".to_string()];
+    s.mt_batch_transfer(
+        &alice,
+        Y,
+        bob.account_id(),
+        token_ids.clone(),
+        [U128(3), U128(33)],
+        None,
+        None,
+    )
+    .await?;
 
     assert_eq!(
-        mt_batch_balance_of(&contract, alice.id(), ["my_token", "my_token_2"]).await,
-        [997, 967],
+        s.mt_batch_balance_of(alice.account_id(), token_ids.clone())
+            .await?,
+        [U128(997), U128(967)],
     );
     assert_eq!(
-        mt_batch_balance_of(&contract, bob.id(), ["my_token", "my_token_2"]).await,
-        [103, 33],
+        s.mt_batch_balance_of(bob.account_id(), token_ids.clone())
+            .await?,
+        [U128(103), U128(33)],
     );
     assert_eq!(
-        mt_batch_balance_of(&contract, charlie.id(), ["my_token", "my_token_2"]).await,
-        [10, 0],
+        s.mt_batch_balance_of(charlie.account_id(), token_ids.clone())
+            .await?,
+        [U128(10), U128(0)],
     );
+
+    Ok(())
 }
 
 #[tokio::test]
-async fn transfer_zero() {
-    let Setup {
-        contract, accounts, ..
-    } = setup_balances(3, |i| 10u128.pow(3 - i as u32).into()).await;
-    let alice = &accounts[0];
-    let bob = &accounts[1];
-    let charlie = &accounts[2];
+async fn transfer_zero() -> TestResult<()> {
+    let s = setup().await?;
 
-    alice
-        .call(contract.id(), "mt_transfer")
-        .deposit(ONE_YOCTO)
-        .args_json(json!({
-            "receiver_id": bob.id(),
-            "token_id": "my_token",
-            "amount": "0",
-        }))
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
-    assert_eq!(mt_balance_of(&contract, alice.id(), "my_token").await, 1000);
-    assert_eq!(mt_balance_of(&contract, bob.id(), "my_token").await, 100);
-    assert_eq!(mt_balance_of(&contract, charlie.id(), "my_token").await, 10);
+    let alice = s.setup_account("alice", 1000).await?;
+    let bob = s.setup_account("bob", 100).await?;
+    let charlie = s.setup_account("charlie", 10).await?;
+
+    s.mt_transfer(&alice, Y, bob.account_id(), "my_token", 0, None, None)
+        .await?;
+    assert_eq!(
+        s.mt_balance_of(alice.account_id(), "my_token").await?.0,
+        1000
+    );
+    assert_eq!(s.mt_balance_of(bob.account_id(), "my_token").await?.0, 100);
+    assert_eq!(
+        s.mt_balance_of(charlie.account_id(), "my_token").await?.0,
+        10
+    );
+
+    Ok(())
 }
 
 #[tokio::test]
 #[should_panic(expected = "invalid digit found in string")]
 async fn transfer_negative() {
-    let Setup {
-        contract, accounts, ..
-    } = setup_balances(3, |i| 10u128.pow(3 - i as u32).into()).await;
-    let alice = &accounts[0];
-    let bob = &accounts[1];
+    let s = setup().await.unwrap();
 
-    alice
-        .call(contract.id(), "mt_transfer")
+    let alice = s.setup_account("alice", 1000).await.unwrap();
+    let bob = s.setup_account("bob", 100).await.unwrap();
+
+    s.contract
+        .call_function(
+            "mt_transfer",
+            json!({
+                "receiver_id": bob.account_id(),
+                "token_id": "my_token",
+                "amount": "-10",
+            }),
+        )
+        .transaction()
         .deposit(ONE_YOCTO)
-        .args_json(json!({
-            "receiver_id": bob.id(),
-            "token_id": "my_token",
-            "amount": "-10",
-        }))
-        .transact()
+        .with_signer(alice.account_id().clone(), s.handle.default_signer())
+        .send_to(&s.handle.network)
         .await
         .unwrap()
-        .unwrap();
+        .assert_success();
 }
 
 #[tokio::test]
 #[should_panic(expected = "Requires attached deposit of exactly 1 yoctoNEAR")]
 async fn transfer_no_deposit() {
-    let Setup {
-        contract, accounts, ..
-    } = setup_balances(3, |i| 10u128.pow(3 - i as u32).into()).await;
-    let alice = &accounts[0];
-    let bob = &accounts[1];
+    let s = setup().await.unwrap();
 
-    alice
-        .call(contract.id(), "mt_transfer")
-        .args_json(json!({
-            "receiver_id": bob.id(),
-            "token_id": "my_token",
-            "amount": "10",
-        }))
-        .transact()
+    let alice = s.setup_account("alice", 1000).await.unwrap();
+    let bob = s.setup_account("bob", 100).await.unwrap();
+
+    s.contract
+        .call_function(
+            "mt_transfer",
+            json!({
+                "receiver_id": bob.account_id(),
+                "token_id": "my_token",
+                "amount": "10",
+            }),
+        )
+        .transaction()
+        .with_signer(alice.account_id().clone(), s.handle.default_signer())
+        .send_to(&s.handle.network)
         .await
         .unwrap()
-        .unwrap();
+        .assert_success();
 }
 
 #[tokio::test]
 #[should_panic(expected = "Balance of the sender is insufficient")]
 async fn transfer_more_than_balance() {
-    let Setup {
-        contract, accounts, ..
-    } = setup_balances(3, |i| 10u128.pow(3 - i as u32).into()).await;
-    let alice = &accounts[0];
-    let bob = &accounts[1];
+    let s = setup().await.unwrap();
 
-    alice
-        .call(contract.id(), "mt_transfer")
-        .args_json(json!({
-            "receiver_id": bob.id(),
-            "token_id": "my_token",
-            "amount": "1000000",
-        }))
-        .deposit(ONE_YOCTO)
-        .transact()
+    let alice = s.setup_account("alice", 1000).await.unwrap();
+    let bob = s.setup_account("bob", 100).await.unwrap();
+
+    s.mt_transfer(&alice, Y, bob.account_id(), "my_token", 1000000, None, None)
         .await
-        .unwrap()
         .unwrap();
 }
 
 #[tokio::test]
 #[should_panic(expected = "would overflow u128")]
 async fn transfer_overflow_u128() {
-    let Setup {
-        contract, accounts, ..
-    } = setup_balances(2, |_| (u128::MAX / 2).into()).await;
-    let alice = &accounts[0];
+    let s = setup().await.unwrap();
 
-    alice
-        .call(contract.id(), "mint")
-        .args_json(json!({
-            "token_id": "my_token",
-            "amount": "2",
-        }))
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
+    let alice = s.setup_account("alice", u128::MAX / 2).await.unwrap();
+    let _bob = s.setup_account("bob", u128::MAX / 2).await.unwrap();
+
+    s.mint(&alice, None, "my_token", 2).await.unwrap();
 }
 
 #[tokio::test]
+#[should_panic = "Smart contract panicked: Account charlie is not registered"]
 async fn transfer_fail_not_registered() {
-    let Setup {
-        contract,
-        accounts,
-        worker,
-    } = setup_balances(2, |i| 10u128.pow(3 - i as u32).into()).await;
-    let alice = &accounts[0];
-    let charlie = worker.dev_create_account().await.unwrap();
+    let s = setup().await.unwrap();
 
-    let result = alice
-        .call(contract.id(), "mt_transfer")
-        .deposit(ONE_YOCTO)
-        .args_json(json!({
-            "receiver_id": charlie.id(),
-            "token_id": "my_token",
-            "amount": "10",
-        }))
-        .transact()
+    let alice = s.setup_account("alice", 1000).await.unwrap();
+    let charlie = s.handle.make_account("charlie").await.unwrap();
+
+    s.mt_transfer(&alice, Y, charlie.account_id(), "my_token", 10, None, None)
         .await
         .unwrap();
-
-    expect_execution_error(
-        &result,
-        format!(
-            "Smart contract panicked: Account {} is not registered",
-            charlie.id(),
-        ),
-    );
 }
 
 #[tokio::test]
+#[should_panic = "Smart contract panicked: Storage lock error: Account alice has insufficient balance: 0.010 NEAR available, but attempted to use 0.101 NEAR"]
 async fn fail_run_out_of_space() {
-    let Setup {
-        contract, accounts, ..
-    } = setup_balances(2, |i| 10u128.pow(3 - i as u32).into()).await;
-    let alice = &accounts[0];
+    let s = setup().await.unwrap();
 
-    let balance = contract
-        .view("storage_balance_of")
-        .args_json(json!({ "account_id": alice.id() }))
-        .await
-        .unwrap()
-        .json::<Option<StorageBalance>>()
-        .unwrap()
-        .unwrap();
+    let alice = s.setup_account("alice", 1000).await.unwrap();
 
-    let result = alice
-        .call(contract.id(), "use_storage")
-        .args_json(json!({
-            "blob": Base64VecU8::from(vec![1u8; 10000]),
-        }))
-        .transact()
-        .await
-        .unwrap();
-
-    expect_execution_error(
-        &result,
-        format!(
-            "Smart contract panicked: Storage lock error: {}",
-            InsufficientBalanceError {
-                account_id: alice.id().clone(),
-                available: balance.available,
-                attempted_to_use: NearToken::from_yoctonear(100490000000000000000000),
-            },
-        ),
-    );
+    s.use_storage(&alice, None, vec![1u8; 10000]).await.unwrap();
 }
 
 #[tokio::test]
-async fn transfer_call_normal() {
-    let Setup {
-        contract, accounts, ..
-    } = setup_balances(3, |i| 10u128.pow(3 - i as u32).into()).await;
-    let alice = &accounts[0];
-    let bob = &accounts[1];
-    let charlie = &accounts[2];
+async fn transfer_call_normal() -> TestResult<()> {
+    let s = setup().await?;
 
-    bob.deploy(RECEIVER_WASM).await.unwrap().unwrap();
+    let alice = s.setup_account("alice", 1000).await?;
+    let bob = s.setup_account("bob", 100).await?;
+    let charlie = s.setup_account("charlie", 10).await?;
 
-    let result = alice
-        .call(contract.id(), "mt_transfer_call")
-        .deposit(ONE_YOCTO)
-        .max_gas()
-        .args_json(json!({
-            "receiver_id": bob.id(),
-            "token_id": "my_token",
-            "amount": "10",
-            "msg": "", // keep all of the tokens
-        }))
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
+    s.handle
+        .deploy(
+            bob.account_id().clone(),
+            &s.handle.load_wasm("multi_token_receiver").await?,
+            json!({}),
+        )
+        .await?;
+
+    let result = s
+        .mt_transfer_call(
+            &alice,
+            Y,
+            bob.account_id().clone(),
+            "my_token",
+            10,
+            None,
+            None,
+            "", // keep all of the tokens
+        )
+        .await?;
 
     assert_eq!(
         result.logs().to_vec(),
         vec![
             Nep245Event::MtTransfer(vec![MtTransferData {
                 authorized_id: None,
-                old_owner_id: alice.id().into(),
-                new_owner_id: bob.id().into(),
+                old_owner_id: alice.account_id().into(),
+                new_owner_id: bob.account_id().into(),
                 memo: None,
                 token_ids: vec!["my_token".into()],
                 amounts: vec![10.into()],
@@ -518,61 +400,64 @@ async fn transfer_call_normal() {
             .to_event_string(),
             format!(
                 "Received 10 of my_token from {} via {}",
-                alice.id(),
-                alice.id(),
+                alice.account_id(),
+                alice.account_id(),
             ),
         ]
     );
 
-    assert_eq!(mt_balance_of(&contract, alice.id(), "my_token").await, 990);
-    assert_eq!(mt_balance_of(&contract, bob.id(), "my_token").await, 110);
-    assert_eq!(mt_balance_of(&contract, charlie.id(), "my_token").await, 10);
+    assert_eq!(
+        s.mt_balance_of(alice.account_id(), "my_token").await?.0,
+        990
+    );
+    assert_eq!(s.mt_balance_of(bob.account_id(), "my_token").await?.0, 110);
+    assert_eq!(
+        s.mt_balance_of(charlie.account_id(), "my_token").await?.0,
+        10
+    );
+
+    Ok(())
 }
 
 #[tokio::test]
-async fn batch_transfer_call_normal() {
-    let Setup {
-        contract, accounts, ..
-    } = setup_balances(3, |i| 10u128.pow(3 - i as u32).into()).await;
-    let alice = &accounts[0];
-    let bob = &accounts[1];
-    let charlie = &accounts[2];
+async fn batch_transfer_call_normal() -> TestResult<()> {
+    let s = setup().await?;
 
-    bob.deploy(RECEIVER_WASM).await.unwrap().unwrap();
+    let alice = s.setup_account("alice", 1000).await?;
+    let bob = s.setup_account("bob", 100).await?;
+    let charlie = s.setup_account("charlie", 10).await?;
 
-    alice
-        .call(contract.id(), "mint")
-        .args_json(json!({
-            "token_id": "my_token_2",
-            "amount": "1000",
-        }))
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
+    s.handle
+        .deploy(
+            bob.account_id().clone(),
+            &s.handle.load_wasm("multi_token_receiver").await?,
+            json!({}),
+        )
+        .await?;
 
-    let result = alice
-        .call(contract.id(), "mt_batch_transfer_call")
-        .deposit(ONE_YOCTO)
-        .max_gas()
-        .args_json(json!({
-            "receiver_id": bob.id(),
-            "token_ids": ["my_token","my_token_2"],
-            "amounts": ["10","20"],
-            "msg": "", // keep all of the tokens
-        }))
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
+    s.mint(&alice, None, "my_token_2", 1000).await?;
+
+    let token_ids = ["my_token".to_string(), "my_token_2".to_string()];
+    let result = s
+        .mt_batch_transfer_call(
+            &alice,
+            Y,
+            bob.account_id(),
+            token_ids.clone(),
+            [U128(10), U128(20)],
+            None,
+            None,
+            "", // keep all of the tokens
+        )
+        .await?;
 
     assert_eq!(
         result.logs().to_vec(),
         vec![
             Nep245Event::MtTransfer(vec![MtTransferData {
                 authorized_id: None,
-                old_owner_id: alice.id().into(),
-                new_owner_id: bob.id().into(),
+                old_owner_id: alice.account_id().into(),
+                new_owner_id: bob.account_id().into(),
                 memo: None,
                 token_ids: vec!["my_token".into(), "my_token_2".into()],
                 amounts: vec![10.into(), 20.into()],
@@ -580,63 +465,70 @@ async fn batch_transfer_call_normal() {
             .to_event_string(),
             format!(
                 "Received 10 of my_token from {} via {}",
-                alice.id(),
-                alice.id(),
+                alice.account_id(),
+                alice.account_id(),
             ),
             format!(
                 "Received 20 of my_token_2 from {} via {}",
-                alice.id(),
-                alice.id(),
+                alice.account_id(),
+                alice.account_id(),
             ),
         ]
     );
 
     assert_eq!(
-        mt_batch_balance_of(&contract, alice.id(), ["my_token", "my_token_2"]).await,
-        [990, 980],
+        s.mt_batch_balance_of(alice.account_id(), &token_ids)
+            .await?,
+        [U128(990), U128(980)],
     );
     assert_eq!(
-        mt_batch_balance_of(&contract, bob.id(), ["my_token", "my_token_2"]).await,
-        [110, 20],
+        s.mt_batch_balance_of(bob.account_id(), &token_ids).await?,
+        [U128(110), U128(20)],
     );
     assert_eq!(
-        mt_batch_balance_of(&contract, charlie.id(), ["my_token", "my_token_2"]).await,
-        [10, 0],
+        s.mt_batch_balance_of(charlie.account_id(), &token_ids)
+            .await?,
+        [U128(10), U128(0)],
     );
+
+    Ok(())
 }
 
 #[tokio::test]
-async fn transfer_call_return() {
-    let Setup {
-        contract, accounts, ..
-    } = setup_balances(3, |i| 10u128.pow(3 - i as u32).into()).await;
-    let alice = &accounts[0];
-    let bob = &accounts[1];
-    let charlie = &accounts[2];
+async fn transfer_call_return() -> TestResult<()> {
+    let s = setup().await?;
 
-    bob.deploy(RECEIVER_WASM).await.unwrap().unwrap();
+    let alice = s.setup_account("alice", 1000).await?;
+    let bob = s.setup_account("bob", 100).await?;
+    let charlie = s.setup_account("charlie", 10).await?;
 
-    let result = alice
-        .call(contract.id(), "mt_transfer_call")
-        .deposit(ONE_YOCTO)
-        .max_gas()
-        .args_json(json!({
-            "receiver_id": bob.id(),
-            "token_id": "my_token",
-            "amount": "10",
-            "msg": "return", // return all of the tokens
-        }))
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
+    s.handle
+        .deploy(
+            bob.account_id().clone(),
+            &s.handle.load_wasm("multi_token_receiver").await?,
+            json!({}),
+        )
+        .await?;
+
+    let result = s
+        .mt_transfer_call(
+            &alice,
+            Y,
+            bob.account_id(),
+            "my_token",
+            10,
+            None,
+            None,
+            "return", // return all of the tokens
+        )
+        .await?;
 
     assert_eq!(
         result.logs().to_vec(),
         vec![
             Nep245Event::MtTransfer(vec![MtTransferData {
-                old_owner_id: alice.id().into(),
-                new_owner_id: bob.id().into(),
+                old_owner_id: alice.account_id().into(),
+                new_owner_id: bob.account_id().into(),
                 memo: None,
                 authorized_id: None,
                 token_ids: vec!["my_token".into()],
@@ -645,12 +537,12 @@ async fn transfer_call_return() {
             .to_event_string(),
             format!(
                 "Received 10 of my_token from {} via {}",
-                alice.id(),
-                alice.id(),
+                alice.account_id(),
+                alice.account_id(),
             ),
             Nep245Event::MtTransfer(vec![MtTransferData {
-                old_owner_id: bob.id().into(),
-                new_owner_id: alice.id().into(),
+                old_owner_id: bob.account_id().into(),
+                new_owner_id: alice.account_id().into(),
                 memo: None,
                 authorized_id: None,
                 token_ids: vec!["my_token".into()],
@@ -660,54 +552,57 @@ async fn transfer_call_return() {
         ]
     );
 
-    assert_eq!(mt_balance_of(&contract, alice.id(), "my_token").await, 1000);
-    assert_eq!(mt_balance_of(&contract, bob.id(), "my_token").await, 100);
-    assert_eq!(mt_balance_of(&contract, charlie.id(), "my_token").await, 10);
+    assert_eq!(
+        s.mt_balance_of(alice.account_id(), "my_token").await?.0,
+        1000
+    );
+    assert_eq!(s.mt_balance_of(bob.account_id(), "my_token").await?.0, 100);
+    assert_eq!(
+        s.mt_balance_of(charlie.account_id(), "my_token").await?.0,
+        10
+    );
+
+    Ok(())
 }
 
 #[tokio::test]
-async fn batch_transfer_call_return() {
-    let Setup {
-        contract, accounts, ..
-    } = setup_balances(3, |i| 10u128.pow(3 - i as u32).into()).await;
-    let alice = &accounts[0];
-    let bob = &accounts[1];
-    let charlie = &accounts[2];
+async fn batch_transfer_call_return() -> TestResult<()> {
+    let s = setup().await?;
 
-    bob.deploy(RECEIVER_WASM).await.unwrap().unwrap();
+    let alice = s.setup_account("alice", 1000).await?;
+    let bob = s.setup_account("bob", 100).await?;
+    let charlie = s.setup_account("charlie", 10).await?;
 
-    alice
-        .call(contract.id(), "mint")
-        .args_json(json!({
-            "token_id": "my_token_2",
-            "amount": "1000",
-        }))
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
+    s.handle
+        .deploy(
+            bob.account_id().clone(),
+            &s.handle.load_wasm("multi_token_receiver").await?,
+            json!({}),
+        )
+        .await?;
 
-    let result = alice
-        .call(contract.id(), "mt_batch_transfer_call")
-        .deposit(ONE_YOCTO)
-        .max_gas()
-        .args_json(json!({
-            "receiver_id": bob.id(),
-            "token_ids": ["my_token", "my_token_2"],
-            "amounts": ["10", "20"],
-            "msg": "return:[\"1\",\"2\"]",
-        }))
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
+    s.mint(&alice, None, "my_token_2", 1000).await?;
+
+    let token_ids = ["my_token".to_string(), "my_token_2".to_string()];
+    let result = s
+        .mt_batch_transfer_call(
+            &alice,
+            Y,
+            bob.account_id(),
+            &token_ids,
+            [U128(10), U128(20)],
+            None,
+            None,
+            r#"return:["1","2"]"#,
+        )
+        .await?;
 
     assert_eq!(
         result.logs().to_vec(),
         vec![
             Nep245Event::MtTransfer(vec![MtTransferData {
-                old_owner_id: alice.id().into(),
-                new_owner_id: bob.id().into(),
+                old_owner_id: alice.account_id().into(),
+                new_owner_id: bob.account_id().into(),
                 memo: None,
                 authorized_id: None,
                 token_ids: vec!["my_token".into(), "my_token_2".into()],
@@ -716,17 +611,17 @@ async fn batch_transfer_call_return() {
             .to_event_string(),
             format!(
                 "Received 10 of my_token from {} via {}",
-                alice.id(),
-                alice.id(),
+                alice.account_id(),
+                alice.account_id(),
             ),
             format!(
                 "Received 20 of my_token_2 from {} via {}",
-                alice.id(),
-                alice.id(),
+                alice.account_id(),
+                alice.account_id(),
             ),
             Nep245Event::MtTransfer(vec![MtTransferData {
-                old_owner_id: bob.id().into(),
-                new_owner_id: alice.id().into(),
+                old_owner_id: bob.account_id().into(),
+                new_owner_id: alice.account_id().into(),
                 memo: None,
                 authorized_id: None,
                 token_ids: vec!["my_token".into(), "my_token_2".into()],
@@ -737,51 +632,50 @@ async fn batch_transfer_call_return() {
     );
 
     assert_eq!(
-        mt_batch_balance_of(&contract, alice.id(), ["my_token", "my_token_2"]).await,
-        [991, 982],
+        s.mt_batch_balance_of(alice.account_id(), &token_ids)
+            .await?,
+        [U128(991), U128(982)],
     );
     assert_eq!(
-        mt_batch_balance_of(&contract, bob.id(), ["my_token", "my_token_2"]).await,
-        [109, 18],
+        s.mt_batch_balance_of(bob.account_id(), &token_ids).await?,
+        [U128(109), U128(18)],
     );
     assert_eq!(
-        mt_batch_balance_of(&contract, charlie.id(), ["my_token", "my_token_2"]).await,
-        [10, 0],
+        s.mt_batch_balance_of(charlie.account_id(), &token_ids)
+            .await?,
+        [U128(10), U128(0)],
     );
+
+    Ok(())
 }
 
 #[tokio::test]
-async fn transfer_call_inner_transfer() {
-    let Setup {
-        contract, accounts, ..
-    } = setup_balances(3, |i| 10u128.pow(3 - i as u32).into()).await;
-    let alice = &accounts[0];
-    let bob = &accounts[1];
-    let charlie = &accounts[2];
+async fn transfer_call_inner_transfer() -> TestResult<()> {
+    let s = setup().await?;
 
-    bob.deploy(RECEIVER_WASM).await.unwrap().unwrap();
+    let alice = s.setup_account("alice", 1000).await?;
+    let bob = s.setup_account("bob", 100).await?;
+    let charlie = s.setup_account("charlie", 10).await?;
 
-    let result = alice
-        .call(contract.id(), "mt_transfer_call")
-        .deposit(ONE_YOCTO)
-        .max_gas()
-        .args_json(json!({
-            "receiver_id": bob.id(),
-            "token_id": "my_token",
-            "amount": "10",
-            "msg": format!("transfer:{}", charlie.id()),
-        }))
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
+    s.handle
+        .deploy(
+            bob.account_id().clone(),
+            &s.handle.load_wasm("multi_token_receiver").await?,
+            json!({}),
+        )
+        .await?;
+
+    let msg = format!("transfer:{}", charlie.account_id());
+    let result = s
+        .mt_transfer_call(&alice, Y, bob.account_id(), "my_token", 10, None, None, msg)
+        .await?;
 
     assert_eq!(
         result.logs().to_vec(),
         vec![
             Nep245Event::MtTransfer(vec![MtTransferData {
-                old_owner_id: alice.id().into(),
-                new_owner_id: bob.id().into(),
+                old_owner_id: alice.account_id().into(),
+                new_owner_id: bob.account_id().into(),
                 authorized_id: None,
                 token_ids: vec!["my_token".into()],
                 amounts: vec![10.into()],
@@ -790,13 +684,13 @@ async fn transfer_call_inner_transfer() {
             .to_event_string(),
             format!(
                 "Received 10 of my_token from {} via {}",
-                alice.id(),
-                alice.id(),
+                alice.account_id(),
+                alice.account_id(),
             ),
-            format!("Transferring all to {}", charlie.id()),
+            format!("Transferring all to {}", charlie.account_id()),
             Nep245Event::MtTransfer(vec![MtTransferData {
-                old_owner_id: bob.id().into(),
-                new_owner_id: charlie.id().into(),
+                old_owner_id: bob.account_id().into(),
+                new_owner_id: charlie.account_id().into(),
                 authorized_id: None,
                 token_ids: vec!["my_token".into()],
                 amounts: vec![10.into()],
@@ -804,8 +698,8 @@ async fn transfer_call_inner_transfer() {
             }])
             .to_event_string(),
             Nep245Event::MtTransfer(vec![MtTransferData {
-                old_owner_id: bob.id().into(),
-                new_owner_id: alice.id().into(),
+                old_owner_id: bob.account_id().into(),
+                new_owner_id: alice.account_id().into(),
                 authorized_id: None,
                 token_ids: vec!["my_token".into()],
                 amounts: vec![10.into()],
@@ -815,54 +709,58 @@ async fn transfer_call_inner_transfer() {
         ]
     );
 
-    assert_eq!(mt_balance_of(&contract, alice.id(), "my_token").await, 1000);
-    assert_eq!(mt_balance_of(&contract, bob.id(), "my_token").await, 90);
-    assert_eq!(mt_balance_of(&contract, charlie.id(), "my_token").await, 20);
+    assert_eq!(
+        s.mt_balance_of(alice.account_id(), "my_token").await?.0,
+        1000
+    );
+    assert_eq!(s.mt_balance_of(bob.account_id(), "my_token").await?.0, 90);
+    assert_eq!(
+        s.mt_balance_of(charlie.account_id(), "my_token").await?.0,
+        20
+    );
+
+    Ok(())
 }
 
 #[tokio::test]
-async fn batch_transfer_call_inner_transfer() {
-    let Setup {
-        contract, accounts, ..
-    } = setup_balances(3, |i| 10u128.pow(3 - i as u32).into()).await;
-    let alice = &accounts[0];
-    let bob = &accounts[1];
-    let charlie = &accounts[2];
+async fn batch_transfer_call_inner_transfer() -> TestResult<()> {
+    let s = setup().await?;
 
-    bob.deploy(RECEIVER_WASM).await.unwrap().unwrap();
+    let alice = s.setup_account("alice", 1000).await?;
+    let bob = s.setup_account("bob", 100).await?;
+    let charlie = s.setup_account("charlie", 10).await?;
 
-    alice
-        .call(contract.id(), "mint")
-        .args_json(json!({
-            "token_id": "my_token_2",
-            "amount": "1000",
-        }))
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
+    s.handle
+        .deploy(
+            bob.account_id().clone(),
+            &s.handle.load_wasm("multi_token_receiver").await?,
+            json!({}),
+        )
+        .await?;
 
-    let result = alice
-        .call(contract.id(), "mt_batch_transfer_call")
-        .deposit(ONE_YOCTO)
-        .max_gas()
-        .args_json(json!({
-            "receiver_id": bob.id(),
-            "token_ids": ["my_token","my_token_2"],
-            "amounts": ["10","20"],
-            "msg": format!("transfer:{}", charlie.id()),
-        }))
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
+    s.mint(&alice, None, "my_token_2", 1000).await?;
+
+    let token_ids = ["my_token".to_string(), "my_token_2".to_string()];
+    let msg = format!("transfer:{}", charlie.account_id());
+    let result = s
+        .mt_batch_transfer_call(
+            &alice,
+            Y,
+            bob.account_id(),
+            &token_ids,
+            [U128(10), U128(20)],
+            None,
+            None,
+            msg,
+        )
+        .await?;
 
     assert_eq!(
         result.logs().to_vec(),
         vec![
             Nep245Event::MtTransfer(vec![MtTransferData {
-                old_owner_id: alice.id().into(),
-                new_owner_id: bob.id().into(),
+                old_owner_id: alice.account_id().into(),
+                new_owner_id: bob.account_id().into(),
                 authorized_id: None,
                 token_ids: vec!["my_token".into(), "my_token_2".into()],
                 amounts: vec![10.into(), 20.into()],
@@ -871,18 +769,18 @@ async fn batch_transfer_call_inner_transfer() {
             .to_event_string(),
             format!(
                 "Received 10 of my_token from {} via {}",
-                alice.id(),
-                alice.id(),
+                alice.account_id(),
+                alice.account_id(),
             ),
             format!(
                 "Received 20 of my_token_2 from {} via {}",
-                alice.id(),
-                alice.id(),
+                alice.account_id(),
+                alice.account_id(),
             ),
-            format!("Transferring all to {}", charlie.id()),
+            format!("Transferring all to {}", charlie.account_id()),
             Nep245Event::MtTransfer(vec![MtTransferData {
-                old_owner_id: bob.id().into(),
-                new_owner_id: charlie.id().into(),
+                old_owner_id: bob.account_id().into(),
+                new_owner_id: charlie.account_id().into(),
                 authorized_id: None,
                 token_ids: vec!["my_token".into(), "my_token_2".into()],
                 amounts: vec![10.into(), 20.into()],
@@ -890,8 +788,8 @@ async fn batch_transfer_call_inner_transfer() {
             }])
             .to_event_string(),
             Nep245Event::MtTransfer(vec![MtTransferData {
-                old_owner_id: bob.id().into(),
-                new_owner_id: alice.id().into(),
+                old_owner_id: bob.account_id().into(),
+                new_owner_id: alice.account_id().into(),
                 authorized_id: None,
                 token_ids: vec!["my_token".into()],
                 amounts: vec![10.into()],
@@ -902,44 +800,51 @@ async fn batch_transfer_call_inner_transfer() {
     );
 
     assert_eq!(
-        mt_batch_balance_of(&contract, alice.id(), ["my_token", "my_token_2"]).await,
-        [1000, 1000 - 20],
+        s.mt_batch_balance_of(alice.account_id(), &token_ids)
+            .await?,
+        [U128(1000), U128(1000 - 20)],
     );
     assert_eq!(
-        mt_batch_balance_of(&contract, bob.id(), ["my_token", "my_token_2"]).await,
-        [100 - 10, 0],
+        s.mt_batch_balance_of(bob.account_id(), &token_ids).await?,
+        [U128(100 - 10), U128(0)],
     );
     assert_eq!(
-        mt_batch_balance_of(&contract, charlie.id(), ["my_token", "my_token_2"]).await,
-        [20, 20],
+        s.mt_batch_balance_of(charlie.account_id(), &token_ids)
+            .await?,
+        [U128(20), U128(20)],
     );
+
+    Ok(())
 }
 
 #[tokio::test]
-async fn transfer_call_inner_panic() {
-    let Setup {
-        contract, accounts, ..
-    } = setup_balances(3, |i| 10u128.pow(3 - i as u32).into()).await;
-    let alice = &accounts[0];
-    let bob = &accounts[1];
-    let charlie = &accounts[2];
+async fn transfer_call_inner_panic() -> TestResult<()> {
+    let s = setup().await?;
 
-    bob.deploy(RECEIVER_WASM).await.unwrap().unwrap();
+    let alice = s.setup_account("alice", 1000).await?;
+    let bob = s.setup_account("bob", 100).await?;
+    let charlie = s.setup_account("charlie", 10).await?;
 
-    let result = alice
-        .call(contract.id(), "mt_transfer_call")
-        .deposit(ONE_YOCTO)
-        .max_gas()
-        .args_json(json!({
-            "receiver_id": bob.id(),
-            "token_id": "my_token",
-            "amount": "10",
-            "msg": "panic",
-        }))
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
+    s.handle
+        .deploy(
+            bob.account_id().clone(),
+            &s.handle.load_wasm("multi_token_receiver").await?,
+            json!({}),
+        )
+        .await?;
+
+    let result = s
+        .mt_transfer_call(
+            &alice,
+            Y,
+            bob.account_id(),
+            "my_token",
+            10,
+            None,
+            None,
+            "panic",
+        )
+        .await?;
 
     let inner_outcome = result.outcomes().to_vec()[2];
 
@@ -949,8 +854,8 @@ async fn transfer_call_inner_panic() {
         result.logs().to_vec(),
         vec![
             Nep245Event::MtTransfer(vec![MtTransferData {
-                old_owner_id: alice.id().into(),
-                new_owner_id: bob.id().into(),
+                old_owner_id: alice.account_id().into(),
+                new_owner_id: bob.account_id().into(),
                 authorized_id: None,
                 token_ids: vec!["my_token".into()],
                 amounts: vec![10.into()],
@@ -959,12 +864,12 @@ async fn transfer_call_inner_panic() {
             .to_event_string(),
             format!(
                 "Received 10 of my_token from {} via {}",
-                alice.id(),
-                alice.id(),
+                alice.account_id(),
+                alice.account_id(),
             ),
             Nep245Event::MtTransfer(vec![MtTransferData {
-                old_owner_id: bob.id().into(),
-                new_owner_id: alice.id().into(),
+                old_owner_id: bob.account_id().into(),
+                new_owner_id: alice.account_id().into(),
                 authorized_id: None,
                 token_ids: vec!["my_token".into()],
                 amounts: vec![10.into()],
@@ -974,47 +879,50 @@ async fn transfer_call_inner_panic() {
         ]
     );
 
-    assert_eq!(mt_balance_of(&contract, alice.id(), "my_token").await, 1000);
-    assert_eq!(mt_balance_of(&contract, bob.id(), "my_token").await, 100);
-    assert_eq!(mt_balance_of(&contract, charlie.id(), "my_token").await, 10);
+    assert_eq!(
+        s.mt_balance_of(alice.account_id(), "my_token").await?.0,
+        1000
+    );
+    assert_eq!(s.mt_balance_of(bob.account_id(), "my_token").await?.0, 100);
+    assert_eq!(
+        s.mt_balance_of(charlie.account_id(), "my_token").await?.0,
+        10
+    );
+
+    Ok(())
 }
 
 #[tokio::test]
-async fn batch_transfer_call_inner_panic() {
-    let Setup {
-        contract, accounts, ..
-    } = setup_balances(3, |i| 10u128.pow(3 - i as u32).into()).await;
-    let alice = &accounts[0];
-    let bob = &accounts[1];
-    let charlie = &accounts[2];
+async fn batch_transfer_call_inner_panic() -> TestResult<()> {
+    let s = setup().await?;
 
-    bob.deploy(RECEIVER_WASM).await.unwrap().unwrap();
+    let alice = s.setup_account("alice", 1000).await?;
+    let bob = s.setup_account("bob", 100).await?;
+    let charlie = s.setup_account("charlie", 10).await?;
 
-    alice
-        .call(contract.id(), "mint")
-        .args_json(json!({
-            "token_id": "my_token_2",
-            "amount": "1000",
-        }))
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
+    s.handle
+        .deploy(
+            bob.account_id().clone(),
+            &s.handle.load_wasm("multi_token_receiver").await?,
+            json!({}),
+        )
+        .await?;
 
-    let result = alice
-        .call(contract.id(), "mt_batch_transfer_call")
-        .deposit(ONE_YOCTO)
-        .max_gas()
-        .args_json(json!({
-            "receiver_id": bob.id(),
-            "token_ids": ["my_token","my_token_2"],
-            "amounts": ["10","20"],
-            "msg": "panic",
-        }))
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
+    s.mint(&alice, None, "my_token_2", 1000).await?;
+
+    let token_ids = ["my_token".to_string(), "my_token_2".to_string()];
+    let result = s
+        .mt_batch_transfer_call(
+            &alice,
+            Y,
+            bob.account_id(),
+            &token_ids,
+            [U128(10), U128(20)],
+            None,
+            None,
+            "panic",
+        )
+        .await?;
 
     let inner_outcome = result.outcomes().to_vec()[2];
 
@@ -1024,8 +932,8 @@ async fn batch_transfer_call_inner_panic() {
         result.logs().to_vec(),
         vec![
             Nep245Event::MtTransfer(vec![MtTransferData {
-                old_owner_id: alice.id().into(),
-                new_owner_id: bob.id().into(),
+                old_owner_id: alice.account_id().into(),
+                new_owner_id: bob.account_id().into(),
                 authorized_id: None,
                 token_ids: vec!["my_token".into(), "my_token_2".into()],
                 amounts: vec![10.into(), 20.into()],
@@ -1034,17 +942,17 @@ async fn batch_transfer_call_inner_panic() {
             .to_event_string(),
             format!(
                 "Received 10 of my_token from {} via {}",
-                alice.id(),
-                alice.id(),
+                alice.account_id(),
+                alice.account_id(),
             ),
             format!(
                 "Received 20 of my_token_2 from {} via {}",
-                alice.id(),
-                alice.id(),
+                alice.account_id(),
+                alice.account_id(),
             ),
             Nep245Event::MtTransfer(vec![MtTransferData {
-                old_owner_id: bob.id().into(),
-                new_owner_id: alice.id().into(),
+                old_owner_id: bob.account_id().into(),
+                new_owner_id: alice.account_id().into(),
                 authorized_id: None,
                 token_ids: vec!["my_token".into(), "my_token_2".into()],
                 amounts: vec![10.into(), 20.into()],
@@ -1055,15 +963,19 @@ async fn batch_transfer_call_inner_panic() {
     );
 
     assert_eq!(
-        mt_batch_balance_of(&contract, alice.id(), ["my_token", "my_token_2"]).await,
-        [1000, 1000],
+        s.mt_batch_balance_of(alice.account_id(), &token_ids)
+            .await?,
+        [U128(1000), U128(1000)],
     );
     assert_eq!(
-        mt_batch_balance_of(&contract, bob.id(), ["my_token", "my_token_2"]).await,
-        [100, 0],
+        s.mt_batch_balance_of(bob.account_id(), &token_ids).await?,
+        [U128(100), U128(0)],
     );
     assert_eq!(
-        mt_batch_balance_of(&contract, charlie.id(), ["my_token", "my_token_2"]).await,
-        [10, 0],
+        s.mt_batch_balance_of(charlie.account_id(), &token_ids)
+            .await?,
+        [U128(10), U128(0)],
     );
+
+    Ok(())
 }

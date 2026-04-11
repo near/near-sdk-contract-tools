@@ -13,7 +13,7 @@ repository.workspace = true
 version.workspace = true
 
 [workspace]
-members = [".", "macros", "workspaces-tests", "workspaces-tests-utils"]
+members = [".", "macros", "workspaces-tests", "test-contracts/*"]
 
 [workspace.package]
 authors = ["Jacob Lindahl <jacob.lindahl@near.org>"]
@@ -25,6 +25,7 @@ version = "3.0.2"
 [workspace.dependencies]
 # normal dependencies
 near-sdk = { version = "5.18.0", default-features = false }
+near-sdk-contract-tools = { version = "=3.0.2", path = "." }
 near-sdk-contract-tools-macros = { version = "=3.0.2", path = "./macros" }
 thiserror = "1"
 
@@ -36,12 +37,6 @@ quote = "1.0"
 strum = "0.26"
 strum_macros = "0.26"
 syn = "2.0"
-
-# test/dev-dependencies
-near-crypto = "0.34"
-near-workspaces = "0.22"
-pretty_assertions = "1"
-tokio = "1"
 
 [workspace.lints.clippy]
 pedantic = { level = "warn", priority = -1 }

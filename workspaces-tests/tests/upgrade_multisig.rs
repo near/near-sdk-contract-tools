@@ -1,90 +1,57 @@
-use near_sdk::{json_types::Base64VecU8, serde_json::json};
-use near_workspaces::{Account, Contract};
+use near_api::Contract;
+use near_sdk::{json_types::Base64VecU8, near, serde_json::json};
 use pretty_assertions::assert_eq;
-
-const WASM: &[u8] =
-    include_bytes!("../../target/wasm32-unknown-unknown/release/upgrade_old_multisig.wasm");
-
-const NEW_WASM: &[u8] =
-    include_bytes!("../../target/wasm32-unknown-unknown/release/upgrade_new.wasm");
+use testresult::TestResult;
+use workspaces_tests::{Handle, read_only, transaction};
 
 struct Setup {
+    pub handle: Handle,
     pub contract: Contract,
-    pub accounts: Vec<Account>,
 }
 
 /// Setup for individual tests
-async fn setup(num_accounts: usize, wasm: &[u8]) -> Setup {
-    let worker = near_workspaces::sandbox().await.unwrap();
+async fn setup() -> TestResult<Setup> {
+    let handle = Handle::new().await;
+    let contract = handle
+        .make_contract("upgrade_old_multisig", "upgrade_old_multisig", json!({}))
+        .await?;
 
-    // Initialize user accounts
-    let mut accounts = vec![];
-    for _ in 0..(num_accounts + 1) {
-        accounts.push(worker.dev_create_account().await.unwrap());
-    }
+    Ok(Setup { contract, handle })
+}
 
-    let alice = &accounts[0].clone();
+#[derive(Debug, Clone)]
+#[near(serializers = [json])]
+pub enum ContractAction {
+    Upgrade { code: Base64VecU8 },
+}
 
-    let contract = alice.deploy(wasm).await.unwrap().unwrap();
-    contract.call("new").transact().await.unwrap().unwrap();
+impl Setup {
+    transaction! { fn execute(request_id: u32) }
+    transaction! { fn approve(request_id: u32) }
+    transaction! { fn request(request: ContractAction) -> u32 }
 
-    Setup { contract, accounts }
+    read_only! { fn get_bar() -> u64 }
 }
 
 #[tokio::test]
-async fn upgrade_multisig() {
-    let Setup { contract, accounts } = setup(1, WASM).await;
+async fn upgrade_multisig() -> TestResult<()> {
+    let s = setup().await?;
 
-    let alice = &accounts[0];
+    let alice = s.contract.as_account();
 
-    let code = Base64VecU8::from(Vec::from(NEW_WASM));
+    let code = Base64VecU8::from(s.handle.load_wasm("upgrade_new").await?);
 
-    let request_id: u32 = alice
-        .call(contract.id(), "request")
-        .max_gas()
-        .args_json(json!({
-            "request": {
-                "Upgrade": {
-                    "code": code,
-                },
-            },
-        }))
-        .transact()
-        .await
-        .unwrap()
-        .unwrap()
-        .json()
-        .unwrap();
+    let request_id = s
+        .request(&alice, None, ContractAction::Upgrade { code })
+        .await?;
 
-    alice
-        .call(contract.id(), "approve")
-        .max_gas()
-        .args_json(json!({
-            "request_id": request_id,
-        }))
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
+    s.approve(&alice, None, request_id).await?;
 
-    alice
-        .call(contract.id(), "execute")
-        .max_gas()
-        .args_json(json!({
-            "request_id": request_id,
-        }))
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
+    s.execute(&alice, None, request_id).await?;
 
-    let new_val = alice
-        .call(contract.id(), "get_bar")
-        .transact()
-        .await
-        .unwrap()
-        .json::<u64>()
-        .unwrap();
+    let new_val = s.get_bar().await?;
 
     assert_eq!(new_val, 0);
+
+    Ok(())
 }

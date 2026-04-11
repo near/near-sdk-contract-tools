@@ -1,125 +1,119 @@
-use std::{future::IntoFuture, time::Duration};
+use std::time::Duration;
 
-use near_crypto::{KeyType, SecretKey};
-use near_sdk::{Gas, serde_json::json};
-use near_sdk_contract_tools::approval::native_transaction_action::PromiseAction;
-use near_workspaces::{
-    Account, AccountDetailsPatch, Contract, DevNetwork, Worker,
-    result::{ExecutionResult, Value},
-    sandbox,
-    types::{AccessKeyPermission, Finality, NearToken},
+use near_api::{
+    Account, Contract,
+    types::{
+        AccessKeyPermission,
+        transaction::result::{ExecutionResult, Value},
+    },
 };
+use near_crypto::{KeyType, SecretKey};
+use near_sdk::{AccountId, Gas, NearToken, serde_json::json};
+use near_sdk_contract_tools::approval::native_transaction_action::PromiseAction;
 use pretty_assertions::assert_eq;
-use tokio::{join, time::sleep};
-use workspaces_tests_utils::ONE_NEAR;
+use testresult::TestResult;
+use tokio::time::sleep;
+use workspaces_tests::{Handle, read_only, transaction};
 
-const WASM: &[u8] =
-    include_bytes!("../../target/wasm32-unknown-unknown/release/native_multisig.wasm");
-
-const SECOND_WASM: &[u8] =
-    include_bytes!("../../target/wasm32-unknown-unknown/release/cross_target.wasm");
-
-const BASIC_ADDER_WASM: &[u8] =
-    include_bytes!("../../target/wasm32-unknown-unknown/release/basic_adder.wasm");
-
-struct Setup<T: DevNetwork> {
-    pub worker: Worker<T>,
+struct Setup {
+    pub handle: Handle,
     pub contract: Contract,
-    pub accounts: Vec<Account>,
 }
 
-async fn setup<T: DevNetwork>(worker: Worker<T>, num_accounts: usize) -> Setup<T> {
+async fn setup() -> TestResult<Setup> {
     // Initialize contract
-    let contract = worker.dev_deploy(WASM).await.unwrap();
-    contract.call("new").transact().await.unwrap().unwrap();
+    let handle = Handle::new().await;
+    let contract = handle
+        .make_contract("native_multisig", "native_multisig", json!({}))
+        .await?;
 
-    // Initialize user accounts
-    let mut accounts = vec![];
-    for _ in 0..(num_accounts + 1) {
-        accounts.push(worker.dev_create_account().await.unwrap());
-    }
-
-    Setup {
-        worker,
-        contract,
-        accounts,
-    }
+    Ok(Setup { handle, contract })
 }
 
-async fn setup_roles<T: DevNetwork>(worker: Worker<T>, num_accounts: usize) -> Setup<T> {
-    let s = setup(worker, num_accounts).await;
+impl Setup {
+    async fn setup_account(&self, account: impl Into<String>) -> TestResult<Account> {
+        let account = self.handle.make_account(account.into()).await?;
 
-    for account in s.accounts[..s.accounts.len() - 1].iter() {
-        account
-            .call(s.contract.id(), "obtain_multisig_permission")
-            .transact()
-            .await
-            .unwrap()
-            .unwrap();
+        self.obtain_multisig_permission(&account, None).await?;
+
+        Ok(account)
     }
 
-    s
-}
+    async fn execute_actions(
+        &self,
+        signer_1: &Account,
+        signer_2: &Account,
+        actions: Vec<PromiseAction>,
+    ) -> TestResult<()> {
+        let request_id = self
+            .request(signer_1, None, self.contract.account_id(), actions)
+            .await?;
 
-async fn double_approve_and_execute(
-    contract: &Contract,
-    signer_1: &Account,
-    signer_2: &Account,
-    executor: &Account,
-    request_id: u32,
-) -> ExecutionResult<Value> {
-    signer_1
-        .call(contract.id(), "approve")
-        .args_json(json!({ "request_id": request_id }))
-        .max_gas()
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
+        self.double_approve_and_execute(signer_1, signer_2, signer_1, request_id)
+            .await?;
 
-    signer_2
-        .call(contract.id(), "approve")
-        .args_json(json!({ "request_id": request_id }))
-        .max_gas()
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
+        // Finality is apparently insufficient here, as I was still getting some
+        // errors on both Testnet and Sandbox if I didn't add the delay.
+        sleep(Duration::from_secs(1)).await;
 
-    executor
-        .call(contract.id(), "execute")
-        .args_json(json!({ "request_id": request_id }))
-        .max_gas()
-        .transact()
-        .await
-        .unwrap()
-        .unwrap()
+        Ok(())
+    }
+
+    async fn double_approve_and_execute(
+        &self,
+        signer_1: &Account,
+        signer_2: &Account,
+        executor: &Account,
+        request_id: u32,
+    ) -> TestResult<ExecutionResult<Value>> {
+        self.approve(signer_1, None, request_id).await?;
+        self.approve(signer_2, None, request_id).await?;
+        self.execute(executor, None, request_id).await
+    }
+
+    transaction! { fn obtain_multisig_permission() }
+    transaction! { fn request(receiver_id: AccountId, actions: Vec<PromiseAction>) -> u32 }
+    transaction! { fn approve(request_id: u32) }
+    transaction! { fn execute(request_id: u32) }
+    read_only! { fn is_approved(request_id: u32) -> bool }
 }
 
 #[tokio::test]
-async fn stake() {
-    let Setup {
-        contract,
-        accounts,
-        worker,
-    } = setup_roles(sandbox().await.unwrap(), 2).await;
+async fn stake() -> TestResult<()> {
+    let s = setup().await?;
 
     const MINIMUM_STAKE: NearToken = NearToken::from_yoctonear(800_000_000_000_000_000_000_000_000);
 
-    worker
-        .patch(contract.id())
-        .account(AccountDetailsPatch::default().balance(MINIMUM_STAKE.saturating_mul(4)))
-        .transact()
-        .await
-        .unwrap();
+    // for some reason patch_state is returning HTTP error 400
+    {
+        let tokens_please_id: AccountId = "tokens_please".parse()?;
+        s.handle
+            .sandbox
+            .create_account(tokens_please_id.clone())
+            .initial_balance(MINIMUM_STAKE.saturating_mul(4))
+            .send()
+            .await?;
+        Account(tokens_please_id)
+            .delete_account_with_beneficiary(s.contract.account_id().clone())
+            .with_signer(s.handle.default_signer())
+            .send_to(&s.handle.network)
+            .await?
+            .assert_success();
+    }
 
-    let alice = &accounts[0];
-    let bob = &accounts[1];
+    let alice = s.setup_account("alice").await?;
+    let bob = s.setup_account("bob").await?;
 
     let secret_key = SecretKey::from_random(KeyType::ED25519);
     let public_key = secret_key.public_key();
 
-    let contract_before = contract.view_account().await.unwrap();
+    let contract_before = s
+        .contract
+        .as_account()
+        .view()
+        .fetch_from(&s.handle.network)
+        .await?
+        .data;
     assert_eq!(
         contract_before.locked.as_yoctonear(),
         0,
@@ -128,82 +122,93 @@ async fn stake() {
 
     let amount = MINIMUM_STAKE.saturating_mul(2);
 
-    let request_id = alice
-        .call(contract.id(), "request")
-        .args_json(json!({
-            "receiver_id": contract.id(),
-            "actions": [
-                PromiseAction::Stake {
-                    amount,
-                    public_key: public_key.to_string(),
-                },
-            ],
-        }))
-        .max_gas()
-        .transact()
-        .await
-        .unwrap()
-        .json::<u32>()
-        .unwrap();
+    let request_id = s
+        .request(
+            &alice,
+            None,
+            s.contract.account_id(),
+            [PromiseAction::Stake {
+                amount,
+                public_key: public_key.to_string(),
+            }],
+        )
+        .await?;
 
-    double_approve_and_execute(&contract, alice, bob, alice, request_id).await;
+    s.double_approve_and_execute(&alice, &bob, &alice, request_id)
+        .await?;
 
-    let contract_after = contract.view_account().await.unwrap();
+    let contract_after = s
+        .contract
+        .as_account()
+        .view()
+        .fetch_from(&s.handle.network)
+        .await?
+        .data;
 
     assert_eq!(
         contract_after.locked, amount,
         "Locked amount should be equal to the amount staked"
     );
+
+    Ok(())
 }
 
 #[tokio::test]
-async fn delete_account() {
-    let Setup {
-        contract,
-        accounts,
-        worker,
-    } = setup_roles(sandbox().await.unwrap(), 2).await;
+async fn delete_account() -> TestResult<()> {
+    let s = setup().await?;
 
-    let alice = &accounts[0];
-    let bob = &accounts[1];
+    let alice = s.setup_account("alice").await?;
+    let bob = s.setup_account("bob").await?;
 
-    let (alice_before, contract_before) = join!(
-        alice.view_account().into_future(),
-        contract.view_account().into_future(),
-    );
+    let alice_balance_before = alice
+        .tokens()
+        .near_balance()
+        .fetch_from(&s.handle.network)
+        .await?
+        .total;
+    let contract_balance_before = s
+        .contract
+        .as_account()
+        .tokens()
+        .near_balance()
+        .fetch_from(&s.handle.network)
+        .await?
+        .total;
 
-    let alice_balance_before = alice_before.unwrap().balance;
-    let contract_balance_before = contract_before.unwrap().balance;
+    let request_id = s
+        .request(
+            &alice,
+            None,
+            s.contract.account_id(),
+            [PromiseAction::DeleteAccount {
+                beneficiary_id: alice.account_id().clone(),
+            }],
+        )
+        .await?;
 
-    let request_id = alice
-        .call(contract.id(), "request")
-        .args_json(json!({
-            "receiver_id": contract.id(),
-            "actions": [
-                PromiseAction::DeleteAccount {
-                    beneficiary_id: alice.id().clone(),
-                },
-            ],
-        }))
-        .max_gas()
-        .transact()
+    s.double_approve_and_execute(&alice, &bob, &alice, request_id)
+        .await?;
+
+    s.contract
+        .as_account()
+        .view()
+        .fetch_from(&s.handle.network)
         .await
-        .unwrap()
-        .json::<u32>()
-        .unwrap();
+        .expect_err("Contract account should be deleted");
 
-    double_approve_and_execute(&contract, alice, bob, alice, request_id).await;
+    let alice_balance_after = alice
+        .tokens()
+        .near_balance()
+        .fetch_from(&s.handle.network)
+        .await?
+        .total;
 
-    let (contract_view, alice_view, gas_price) = join!(
-        contract.view_account().into_future(),
-        alice.view_account().into_future(),
-        worker.gas_price().into_future(),
-    );
+    let gas_price = near_api::Chain::block()
+        .fetch_from(&s.handle.network)
+        .await?
+        .header
+        .gas_price;
 
-    contract_view.expect_err("Contract account should be deleted");
-
-    let alice_balance_after = alice_view.unwrap().balance;
-    let gas_price = gas_price.unwrap();
     const MAX_GAS: u128 = 300_000_000_000_000;
 
     assert!(
@@ -214,100 +219,76 @@ async fn delete_account() {
         ) <= gas_price.saturating_mul(MAX_GAS).as_yoctonear(),
         "All contract account funds (sans gas) transfer to the beneficiary account",
     );
+
+    Ok(())
 }
 
 #[tokio::test]
-async fn create_account_transfer_deploy_contract_function_call() {
-    let Setup {
-        contract,
-        accounts,
-        worker,
-    } = setup_roles(sandbox().await.unwrap(), 2).await;
+async fn create_account_transfer_deploy_contract_function_call() -> TestResult<()> {
+    let s = setup().await?;
 
-    let alice = &accounts[0];
-    let bob = &accounts[1];
+    let alice = s.setup_account("alice").await?;
+    let bob = s.setup_account("bob").await?;
 
-    let new_account_id_str = format!("new.{}", contract.id());
-    let new_account_id: near_workspaces::AccountId = new_account_id_str.parse().unwrap();
+    let new_account = near_api::Account(s.contract.account_id().sub_account("new")?);
 
-    // Account does not exist yet
-    assert!(worker.view_account(&new_account_id).await.is_err());
+    new_account
+        .view()
+        .fetch_from(&s.handle.network)
+        .await
+        .expect_err("New account does not exist yet");
 
-    let request_id = alice
-        .call(contract.id(), "request")
-        .args_json(json!({
-            "receiver_id": new_account_id_str.clone(),
-            "actions": [
+    let request_id = s
+        .request(
+            &alice,
+            None,
+            new_account.account_id(),
+            [
                 PromiseAction::CreateAccount,
-                PromiseAction::Transfer { amount: NearToken::from_near(30) },
-                PromiseAction::DeployContract { code: BASIC_ADDER_WASM.to_vec().into() },
+                PromiseAction::Transfer {
+                    amount: NearToken::from_near(30),
+                },
+                PromiseAction::DeployContract {
+                    code: s.handle.load_wasm("basic_adder").await?.into(),
+                },
                 PromiseAction::FunctionCall {
                     function_name: "new".into(),
                     arguments: vec![].into(),
                     amount: NearToken::from_yoctonear(0),
                     gas: Gas::from_tgas(1),
-                }
+                },
             ],
-        }))
-        .max_gas()
-        .transact()
-        .await
-        .unwrap()
-        .json::<u32>()
-        .unwrap();
+        )
+        .await?;
 
-    double_approve_and_execute(&contract, alice, bob, alice, request_id).await;
+    s.double_approve_and_execute(&alice, &bob, &alice, request_id)
+        .await?;
 
-    let state = worker.view_account(&new_account_id).await.unwrap();
-    assert!(state.balance >= ONE_NEAR.saturating_mul(30));
+    let state = new_account.view().fetch_from(&s.handle.network).await?.data;
+    assert!(state.amount >= NearToken::from_near(30));
 
-    let result = worker
-        .view(&new_account_id, "add_five")
-        .args_json(json!({ "value": 5 }))
-        .await
-        .unwrap()
-        .json::<u32>()
-        .unwrap();
+    let result = new_account
+        .as_contract()
+        .call_function("add_five", json!({ "value": 5 }))
+        .read_only::<u32>()
+        .fetch_from(&s.handle.network)
+        .await?
+        .data;
 
     assert_eq!(
         result, 10,
         "Contract is deployed to child account and is working"
     );
+
+    Ok(())
 }
 
 #[tokio::test]
-async fn add_both_access_key_kinds_and_delete() {
-    let Setup {
-        contract, accounts, ..
-    } = setup_roles(sandbox().await.unwrap(), 2).await;
+async fn add_both_access_key_kinds_and_delete() -> TestResult<()> {
+    let s = setup().await?;
 
-    let alice = &accounts[0];
-    let bob = &accounts[1];
-
-    // Add a new access key to the contract account
-    let execute_actions = |actions: Vec<PromiseAction>| {
-        let contract = &contract;
-
-        async move {
-            let request_id = alice
-                .call(contract.id(), "request")
-                .args_json(json!({
-                    "receiver_id": contract.id(),
-                    "actions": actions,
-                }))
-                .transact()
-                .await
-                .unwrap()
-                .json::<u32>()
-                .unwrap();
-
-            double_approve_and_execute(contract, alice, bob, alice, request_id).await;
-
-            // Finality is apparently insufficient here, as I was still getting some
-            // errors on both Testnet and Sandbox if I didn't add the delay.
-            sleep(Duration::from_secs(1)).await;
-        }
-    };
+    let alice = s.setup_account("alice").await?;
+    let bob = s.setup_account("bob").await?;
 
     // Add full-access key
     let full_access_key = {
@@ -315,11 +296,13 @@ async fn add_both_access_key_kinds_and_delete() {
         let new_public_key = secret_key.public_key();
         let new_public_key_string = new_public_key.to_string();
 
-        let keys_before = contract
-            .view_access_keys()
-            .finality(Finality::Final)
-            .await
-            .unwrap();
+        let keys_before = s
+            .contract
+            .as_account()
+            .list_keys()
+            .fetch_from(&s.handle.network)
+            .await?
+            .data;
 
         // workspaces::types::PublicKey wrapper type's contents are package-private
         // and there is no Display/.to_string() implementation.
@@ -328,22 +311,31 @@ async fn add_both_access_key_kinds_and_delete() {
         assert!(
             !keys_before
                 .iter()
-                .any(|a| near_sdk::serde_json::to_string(&a.public_key).unwrap()
-                    == new_key_json_string),
+                .any(
+                    |(public_key, _access_key)| near_sdk::serde_json::to_string(&public_key)
+                        .unwrap()
+                        == new_key_json_string
+                ),
             "New key does not exist in access keys before being added"
         );
 
-        execute_actions(vec![PromiseAction::AddFullAccessKey {
-            public_key: new_public_key_string.clone(),
-            nonce: None,
-        }])
-        .await;
+        s.execute_actions(
+            &alice,
+            &bob,
+            vec![PromiseAction::AddFullAccessKey {
+                public_key: new_public_key_string.clone(),
+                nonce: None,
+            }],
+        )
+        .await?;
 
-        let keys_after = contract
-            .view_access_keys()
-            .finality(Finality::Final)
-            .await
-            .unwrap();
+        let keys_after = s
+            .contract
+            .as_account()
+            .list_keys()
+            .fetch_from(&s.handle.network)
+            .await?
+            .data;
 
         assert_eq!(
             keys_before.len() + 1,
@@ -353,12 +345,12 @@ async fn add_both_access_key_kinds_and_delete() {
 
         let key = keys_after
             .iter()
-            .find(|a| {
-                near_sdk::serde_json::to_string(&a.public_key).unwrap() == new_key_json_string
+            .find(|(public_key, _access_key)| {
+                near_sdk::serde_json::to_string(&public_key).unwrap() == new_key_json_string
             })
             .unwrap();
 
-        match &key.access_key.permission {
+        match &key.1.permission {
             AccessKeyPermission::FullAccess => {}
             _ => panic!("Expected full access key"),
         }
@@ -372,11 +364,13 @@ async fn add_both_access_key_kinds_and_delete() {
         let new_public_key = secret_key.public_key();
         let new_public_key_string = new_public_key.to_string();
 
-        let keys_before = contract
-            .view_access_keys()
-            .finality(Finality::Final)
-            .await
-            .unwrap();
+        let keys_before = s
+            .contract
+            .as_account()
+            .list_keys()
+            .fetch_from(&s.handle.network)
+            .await?
+            .data;
 
         // workspaces::types::PublicKey wrapper type's contents are package-private
         // and there is no Display/.to_string() implementation.
@@ -385,25 +379,34 @@ async fn add_both_access_key_kinds_and_delete() {
         assert!(
             !keys_before
                 .iter()
-                .any(|a| near_sdk::serde_json::to_string(&a.public_key).unwrap()
-                    == new_key_json_string),
+                .any(
+                    |(public_key, _access_key)| near_sdk::serde_json::to_string(&public_key)
+                        .unwrap()
+                        == new_key_json_string
+                ),
             "New key does not exist in access keys before being added",
         );
 
-        execute_actions(vec![PromiseAction::AddAccessKey {
-            public_key: new_public_key_string.clone(),
-            allowance: NearToken::from_yoctonear(1234567890),
-            receiver_id: alice.id().clone(),
-            function_names: vec!["one".into(), "two".into(), "three".into()],
-            nonce: None,
-        }])
-        .await;
+        s.execute_actions(
+            &alice,
+            &bob,
+            vec![PromiseAction::AddAccessKey {
+                public_key: new_public_key_string.clone(),
+                allowance: NearToken::from_yoctonear(1234567890),
+                receiver_id: alice.account_id().clone(),
+                function_names: vec!["one".into(), "two".into(), "three".into()],
+                nonce: None,
+            }],
+        )
+        .await?;
 
-        let keys_after = contract
-            .view_access_keys()
-            .finality(Finality::Final)
-            .await
-            .unwrap();
+        let keys_after = s
+            .contract
+            .as_account()
+            .list_keys()
+            .fetch_from(&s.handle.network)
+            .await?
+            .data;
 
         assert_eq!(
             keys_before.len() + 1,
@@ -413,46 +416,54 @@ async fn add_both_access_key_kinds_and_delete() {
 
         let key = keys_after
             .iter()
-            .find(|a| {
-                near_sdk::serde_json::to_string(&a.public_key).unwrap() == new_key_json_string
+            .find(|(public_key, _access_key)| {
+                near_sdk::serde_json::to_string(&public_key).unwrap() == new_key_json_string
             })
             .unwrap();
 
-        let perm = match &key.access_key.permission {
+        let perm = match &key.1.permission {
             AccessKeyPermission::FunctionCall(fc) => fc,
             _ => panic!("Expected function call permission"),
         };
 
         assert_eq!(perm.allowance, Some(NearToken::from_yoctonear(1234567890)));
         assert_eq!(perm.method_names, &["one", "two", "three"]);
-        assert_eq!(perm.receiver_id, alice.id().to_string());
+        assert_eq!(perm.receiver_id, alice.account_id().to_string());
 
         new_public_key_string
     };
 
     // Delete the access keys
     {
-        let keys_before = contract
-            .view_access_keys()
-            .finality(Finality::Final)
-            .await
-            .unwrap();
+        let keys_before = s
+            .contract
+            .as_account()
+            .list_keys()
+            .fetch_from(&s.handle.network)
+            .await?
+            .data;
 
-        execute_actions(vec![
-            PromiseAction::DeleteKey {
-                public_key: full_access_key.clone(),
-            },
-            PromiseAction::DeleteKey {
-                public_key: function_call_key.clone(),
-            },
-        ])
-        .await;
+        s.execute_actions(
+            &alice,
+            &bob,
+            vec![
+                PromiseAction::DeleteKey {
+                    public_key: full_access_key.clone(),
+                },
+                PromiseAction::DeleteKey {
+                    public_key: function_call_key.clone(),
+                },
+            ],
+        )
+        .await?;
 
-        let keys_after = contract
-            .view_access_keys()
-            .finality(Finality::Final)
-            .await
-            .unwrap();
+        let keys_after = s
+            .contract
+            .as_account()
+            .list_keys()
+            .fetch_from(&s.handle.network)
+            .await?
+            .data;
 
         assert_eq!(
             keys_before.len() - 2,
@@ -463,109 +474,81 @@ async fn add_both_access_key_kinds_and_delete() {
         let full_json = near_sdk::serde_json::to_string(&full_access_key).unwrap();
         let func_json = near_sdk::serde_json::to_string(&function_call_key).unwrap();
 
-        assert!(!keys_after.iter().any(|a| {
-            let k = near_sdk::serde_json::to_string(&a.public_key).unwrap();
+        assert!(!keys_after.iter().any(|(public_key, _access_key)| {
+            let k = near_sdk::serde_json::to_string(&public_key).unwrap();
             k == full_json || k == func_json
         }));
     }
+
+    Ok(())
 }
 
 #[tokio::test]
-async fn transfer() {
-    let Setup {
-        contract, accounts, ..
-    } = setup_roles(sandbox().await.unwrap(), 3).await;
+async fn transfer() -> TestResult<()> {
+    let s = setup().await?;
 
-    let alice = &accounts[0];
-    let bob = &accounts[1];
-    let charlie = &accounts[2];
+    let alice = s.setup_account("alice").await?;
+    let bob = s.setup_account("bob").await?;
+    let charlie = s.setup_account("charlie").await?;
 
     // Send 10 NEAR to charlie
-    let request_id = alice
-        .call(contract.id(), "request")
-        .args_json(json!({
-            "receiver_id": charlie.id(),
-            "actions": [
-                PromiseAction::Transfer {
-                    amount: NearToken::from_near(10),
-                },
-            ],
-        }))
-        .transact()
-        .await
-        .unwrap()
-        .json::<u32>()
-        .unwrap();
+    let request_id = s
+        .request(
+            &alice,
+            None,
+            charlie.account_id(),
+            [PromiseAction::Transfer {
+                amount: NearToken::from_near(10),
+            }],
+        )
+        .await?;
 
-    let is_approved = || async {
-        contract
-            .view("is_approved")
-            .args_json(json!({ "request_id": request_id }))
-            .await
-            .unwrap()
-            .json::<bool>()
-            .unwrap()
-    };
+    assert!(!s.is_approved(request_id).await?);
 
-    assert!(!is_approved().await);
+    s.approve(&alice, None, request_id).await?;
 
-    alice
-        .call(contract.id(), "approve")
-        .args_json(json!({ "request_id": request_id }))
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
+    assert!(!s.is_approved(request_id).await?);
 
-    assert!(!is_approved().await);
+    s.approve(&bob, None, request_id).await?;
 
-    bob.call(contract.id(), "approve")
-        .args_json(json!({ "request_id": request_id }))
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
+    assert!(s.is_approved(request_id).await?);
 
-    assert!(is_approved().await);
+    s.approve(&charlie, None, request_id).await?;
 
-    charlie
-        .call(contract.id(), "approve")
-        .args_json(json!({ "request_id": request_id }))
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
+    assert!(s.is_approved(request_id).await?);
 
-    assert!(is_approved().await);
+    let balance_before = charlie
+        .view()
+        .fetch_from(&s.handle.network)
+        .await?
+        .data
+        .amount;
 
-    let balance_before = charlie.view_account().await.unwrap().balance;
+    s.execute(&alice, None, request_id).await?;
 
-    alice
-        .call(contract.id(), "execute")
-        .args_json(json!({ "request_id": request_id }))
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
-
-    let balance_after = charlie.view_account().await.unwrap().balance;
+    let balance_after = charlie
+        .view()
+        .fetch_from(&s.handle.network)
+        .await?
+        .data
+        .amount;
 
     // charlie's balance should have increased by exactly 10 NEAR
     assert_eq!(
         balance_after.saturating_sub(balance_before),
         NearToken::from_near(10),
     );
+
+    Ok(())
 }
 
 #[tokio::test]
-async fn reflexive_xcc() {
-    let Setup {
-        contract, accounts, ..
-    } = setup_roles(sandbox().await.unwrap(), 3).await;
+async fn reflexive_xcc() -> TestResult<()> {
+    let s = setup().await?;
 
-    let alice = &accounts[0];
-    let bob = &accounts[1];
-    let charlie = &accounts[2];
+    let alice = s.setup_account("alice").await?;
+    let bob = s.setup_account("bob").await?;
+    let charlie = s.setup_account("charlie").await?;
 
     let actions = vec![PromiseAction::FunctionCall {
         function_name: "private_add_one".into(),
@@ -578,66 +561,36 @@ async fn reflexive_xcc() {
         gas: Gas::from_tgas(50),
     }];
 
-    let request_id = alice
-        .call(contract.id(), "request")
-        .args_json(json!({
-            "receiver_id": contract.id(),
-            "actions": actions,
-        }))
-        .transact()
-        .await
-        .unwrap()
-        .json::<u32>()
-        .unwrap();
+    let request_id = s
+        .request(&alice, None, s.contract.account_id(), actions)
+        .await?;
 
-    alice
-        .call(contract.id(), "approve")
-        .args_json(json!({ "request_id": request_id }))
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
-
-    bob.call(contract.id(), "approve")
-        .args_json(json!({ "request_id": request_id }))
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
-
-    let result = charlie
-        .call(contract.id(), "execute")
-        .max_gas()
-        .args_json(json!({ "request_id": request_id }))
-        .transact()
-        .await
-        .unwrap()
-        .json::<u32>()
-        .unwrap();
+    let result = s
+        .double_approve_and_execute(&alice, &bob, &charlie, request_id)
+        .await?
+        .json::<u32>()?;
 
     assert_eq!(result, 26);
+
+    Ok(())
 }
 
 #[tokio::test]
-async fn external_xcc() {
-    let Setup {
-        worker,
-        contract,
-        accounts,
-    } = setup_roles(sandbox().await.unwrap(), 3).await;
+async fn external_xcc() -> TestResult<()> {
+    let s = setup().await?;
 
-    let alice = &accounts[0];
-    let bob = &accounts[1];
-    let charlie = &accounts[2];
+    let alice = s.setup_account("alice").await?;
+    let bob = s.setup_account("bob").await?;
+    let charlie = s.setup_account("charlie").await?;
 
-    let second_contract = worker.dev_deploy(SECOND_WASM).await.unwrap();
-    second_contract
-        .call("new")
-        .args_json(json!({ "owner_id": contract.id() }))
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
+    let second_contract = s
+        .handle
+        .make_contract(
+            "cross_target",
+            "cross_target",
+            json!({ "owner_id": s.contract.account_id() }),
+        )
+        .await?;
 
     let actions = vec![PromiseAction::FunctionCall {
         function_name: "set_value".into(),
@@ -650,75 +603,50 @@ async fn external_xcc() {
         gas: Gas::from_tgas(50),
     }];
 
-    let request_id = alice
-        .call(contract.id(), "request")
-        .args_json(json!({
-            "receiver_id": second_contract.id(),
-            "actions": actions,
-        }))
-        .transact()
-        .await
-        .unwrap()
-        .json::<u32>()
-        .unwrap();
+    let request_id = s
+        .request(&alice, None, second_contract.account_id(), actions)
+        .await?;
 
-    alice
-        .call(contract.id(), "approve")
-        .args_json(json!({ "request_id": request_id }))
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
-
-    bob.call(contract.id(), "approve")
-        .args_json(json!({ "request_id": request_id }))
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
+    s.approve(&alice, None, request_id).await?;
+    s.approve(&bob, None, request_id).await?;
 
     let value_before = second_contract
-        .view("get_value")
-        .await
-        .unwrap()
-        .json::<String>()
-        .unwrap();
+        .call_function("get_value", json!({}))
+        .read_only::<String>()
+        .fetch_from(&s.handle.network)
+        .await?
+        .data;
 
     assert_eq!(value_before, "");
 
     let calls_before = second_contract
-        .view("get_calls")
-        .await
-        .unwrap()
-        .json::<u32>()
-        .unwrap();
+        .call_function("get_calls", json!({}))
+        .read_only::<u32>()
+        .fetch_from(&s.handle.network)
+        .await?
+        .data;
 
     assert_eq!(calls_before, 0);
 
-    charlie
-        .call(contract.id(), "execute")
-        .max_gas()
-        .args_json(json!({ "request_id": request_id }))
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
+    s.execute(&charlie, None, request_id).await?;
 
     let value_after = second_contract
-        .view("get_value")
-        .await
-        .unwrap()
-        .json::<String>()
-        .unwrap();
+        .call_function("get_value", json!({}))
+        .read_only::<String>()
+        .fetch_from(&s.handle.network)
+        .await?
+        .data;
 
     assert_eq!(value_after, "Hello, world!");
 
     let calls_after = second_contract
-        .view("get_calls")
-        .await
-        .unwrap()
-        .json::<u32>()
-        .unwrap();
+        .call_function("get_calls", json!({}))
+        .read_only::<u32>()
+        .fetch_from(&s.handle.network)
+        .await?
+        .data;
 
     assert_eq!(calls_after, 1);
+
+    Ok(())
 }

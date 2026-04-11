@@ -1,14 +1,10 @@
 use std::collections::HashSet;
 
-use near_sdk::{
-    serde::Deserialize,
-    serde_json::{self, json},
-};
-use near_workspaces::{Account, AccountId, Contract};
+use near_api::Contract;
+use near_sdk::{AccountId, serde::Deserialize, serde_json::json};
 use pretty_assertions::assert_eq;
-use tokio::join;
-
-const WASM: &[u8] = include_bytes!("../../target/wasm32-unknown-unknown/release/rbac.wasm");
+use testresult::TestResult;
+use workspaces_tests::{Handle, read_only, transaction};
 
 #[derive(Deserialize, Clone, Default, Debug, PartialEq, Eq)]
 #[serde(crate = "near_sdk::serde")]
@@ -20,149 +16,68 @@ struct ContractSchema {
 }
 
 struct Setup {
+    pub handle: Handle,
     pub contract: Contract,
-    pub accounts: Vec<Account>,
+}
+
+impl Setup {
+    transaction! { fn acquire_role(role: String) }
+    read_only! { fn members(role: String) -> Vec<AccountId> }
+    read_only! { fn count_members(role: String) -> u32 }
+    transaction! { fn requires_alpha() }
+    transaction! { fn requires_beta() }
+    transaction! { fn requires_gamma() }
+    transaction! { fn requires_delta() }
+    read_only! { fn get() -> ContractSchema }
 }
 
 /// Setup for individual tests
-async fn setup(num_accounts: usize, wasm: &[u8]) -> Setup {
-    let worker = near_workspaces::sandbox().await.unwrap();
+async fn setup() -> TestResult<Setup> {
+    let handle = Handle::new().await;
+    let contract = handle.make_contract("rbac", "rbac", json!({})).await?;
 
-    // Initialize user accounts
-    let mut accounts = vec![];
-    for _ in 0..(num_accounts + 1) {
-        accounts.push(worker.dev_create_account().await.unwrap());
-    }
-
-    let alice = &accounts[0].clone();
-
-    let contract = alice.deploy(wasm).await.unwrap().unwrap();
-    contract.call("new").transact().await.unwrap().unwrap();
-
-    Setup { contract, accounts }
+    Ok(Setup { contract, handle })
 }
 
 #[tokio::test]
-async fn happy() {
-    let Setup { contract, accounts } = setup(4, WASM).await;
+async fn happy() -> TestResult<()> {
+    let s = setup().await?;
 
-    let alice = &accounts[0];
-    let bob = &accounts[1];
-    let charlie = &accounts[2];
-    let daisy = &accounts[3];
+    let alice = s.handle.make_account("alice").await?;
+    let bob = s.handle.make_account("bob").await?;
+    let charlie = s.handle.make_account("charlie").await?;
+    let _daisy = s.handle.make_account("daisy").await?;
 
-    let call = |who: Account, contract: AccountId, method: String, args: Vec<u8>| async move {
-        who.call(&contract, &method)
-            .args(args)
-            .transact()
-            .await
-            .unwrap()
-            .unwrap()
-    };
+    // alice has every role
+    s.acquire_role(&alice, None, "a").await?;
+    s.acquire_role(&alice, None, "b").await?;
+    s.acquire_role(&alice, None, "g").await?;
+    s.acquire_role(&alice, None, "d").await?;
+    // duplicate alice roles should have no effect
+    s.acquire_role(&alice, None, "a").await?;
+    s.acquire_role(&alice, None, "b").await?;
+    s.acquire_role(&alice, None, "g").await?;
+    s.acquire_role(&alice, None, "d").await?;
+    // bob has same roles as alice
+    s.acquire_role(&bob, None, "a").await?;
+    s.acquire_role(&bob, None, "b").await?;
+    s.acquire_role(&bob, None, "g").await?;
+    s.acquire_role(&bob, None, "d").await?;
+    // charlie has the first two roles
+    s.acquire_role(&charlie, None, "a").await?;
+    s.acquire_role(&charlie, None, "b").await?;
+    // daisy has no roles
 
-    let acquire_role = |who: Account, role: &str| {
-        call(
-            who,
-            contract.id().clone(),
-            "acquire_role".to_string(),
-            serde_json::to_vec(&json!({ "role": role })).unwrap(),
-        )
-    };
+    s.requires_alpha(&alice, None).await?;
+    s.requires_alpha(&charlie, None).await?;
 
-    let count_members = |contract: Contract, role: &str| {
-        let role = role.to_string();
-        async move {
-            contract
-                .view("count_members")
-                .args_json(json!({ "role": role }))
-                .await
-                .unwrap()
-                .json::<u32>()
-                .unwrap()
-        }
-    };
+    s.requires_beta(&alice, None).await?;
 
-    let members = |contract: Contract, role: &str| {
-        let role = role.to_string();
-        async move {
-            contract
-                .view("members")
-                .args_json(json!({ "role": role }))
-                .await
-                .unwrap()
-                .json::<HashSet<String>>()
-                .unwrap()
-        }
-    };
+    s.requires_gamma(&bob, None).await?;
 
-    join!(
-        // alice has every role
-        acquire_role(alice.clone(), "a"),
-        acquire_role(alice.clone(), "b"),
-        acquire_role(alice.clone(), "g"),
-        acquire_role(alice.clone(), "d"),
-        // duplicate alice roles should have no effect
-        acquire_role(alice.clone(), "a"),
-        acquire_role(alice.clone(), "b"),
-        acquire_role(alice.clone(), "g"),
-        acquire_role(alice.clone(), "d"),
-        // bob has same roles as alice
-        acquire_role(bob.clone(), "a"),
-        acquire_role(bob.clone(), "b"),
-        acquire_role(bob.clone(), "g"),
-        acquire_role(bob.clone(), "d"),
-        // charlie has the first two roles
-        acquire_role(charlie.clone(), "a"),
-        acquire_role(charlie.clone(), "b"),
-        // daisy has no roles
-    );
+    s.requires_delta(&alice, None).await?;
 
-    call(
-        alice.clone(),
-        contract.id().clone(),
-        "requires_alpha".to_string(),
-        vec![],
-    )
-    .await;
-
-    call(
-        charlie.clone(),
-        contract.id().clone(),
-        "requires_alpha".to_string(),
-        vec![],
-    )
-    .await;
-
-    call(
-        alice.clone(),
-        contract.id().clone(),
-        "requires_beta".to_string(),
-        vec![],
-    )
-    .await;
-
-    call(
-        bob.clone(),
-        contract.id().clone(),
-        "requires_gamma".to_string(),
-        vec![],
-    )
-    .await;
-
-    call(
-        alice.clone(),
-        contract.id().clone(),
-        "requires_delta".to_string(),
-        vec![],
-    )
-    .await;
-
-    let schema = contract
-        .view("get")
-        .await
-        .unwrap()
-        .json::<ContractSchema>()
-        .unwrap();
+    let schema = s.get().await?;
 
     assert_eq!(
         schema,
@@ -174,52 +89,42 @@ async fn happy() {
         },
     );
 
-    let (members_a, members_b, members_g, members_d, count_a, count_b, count_g, count_d) = join!(
-        members(contract.clone(), "a"),
-        members(contract.clone(), "b"),
-        members(contract.clone(), "g"),
-        members(contract.clone(), "d"),
-        count_members(contract.clone(), "a"),
-        count_members(contract.clone(), "b"),
-        count_members(contract.clone(), "g"),
-        count_members(contract.clone(), "d"),
-    );
-
-    let (alice_str, bob_str, charlie_str, _daisy_str) = (
-        alice.id().to_string(),
-        bob.id().to_string(),
-        charlie.id().to_string(),
-        daisy.id().to_string(),
-    );
+    let members_a = s.members("a").await?;
+    let members_b = s.members("b").await?;
+    let members_g = s.members("g").await?;
+    let members_d = s.members("d").await?;
+    let count_a = s.count_members("a").await?;
+    let count_b = s.count_members("b").await?;
+    let count_g = s.count_members("g").await?;
+    let count_d = s.count_members("d").await?;
 
     assert_eq!(count_a, 3);
     assert_eq!(count_b, 3);
     assert_eq!(count_g, 2);
     assert_eq!(count_d, 2);
 
-    assert_eq!(
-        members_a,
-        [alice_str.clone(), bob_str.clone(), charlie_str.clone()].into(),
-    );
-    assert_eq!(
-        members_b,
-        [alice_str.clone(), bob_str.clone(), charlie_str].into(),
-    );
-    assert_eq!(members_g, [alice_str.clone(), bob_str.clone()].into());
-    assert_eq!(members_d, [alice_str, bob_str].into());
+    let abc = HashSet::<AccountId>::from_iter([
+        alice.account_id().clone(),
+        bob.account_id().clone(),
+        charlie.account_id().clone(),
+    ]);
+    let ab =
+        HashSet::<AccountId>::from_iter([alice.account_id().clone(), bob.account_id().clone()]);
+
+    assert_eq!(HashSet::from_iter(members_a), abc);
+    assert_eq!(HashSet::from_iter(members_b), abc);
+    assert_eq!(HashSet::from_iter(members_g), ab);
+    assert_eq!(HashSet::from_iter(members_d), ab);
+
+    Ok(())
 }
 
 #[tokio::test]
 #[should_panic = "Unauthorized role"]
 async fn fail_missing_role() {
-    let Setup { contract, accounts } = setup(1, WASM).await;
+    let s = setup().await.unwrap();
 
-    let alice = &accounts[0];
+    let alice = s.handle.make_account("alice").await.unwrap();
 
-    alice
-        .call(contract.id(), "requires_alpha")
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
+    s.requires_alpha(&alice, None).await.unwrap();
 }

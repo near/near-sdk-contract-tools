@@ -1,16 +1,21 @@
-[tasks.build]
-clear = true
+[tasks.build-contracts]
 script = """
-rustup target add wasm32-unknown-unknown
-cargo build --package workspaces-tests --target wasm32-unknown-unknown --release
+#!/usr/bin/env bash
+set -e
+
+for dir in ${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/test-contracts/*/; do
+  (cd "$dir" && cargo near build non-reproducible-wasm)
+done
 """
 
 [tasks.test]
 clear = true
-dependencies = ["build"]
+dependencies = ["build-contracts"]
 script = """
 #!/usr/bin/env bash
 set -e
+
+export NO_BUILD_TEST_CONTRACTS=1
 
 if [[ -n $1 ]]; then
     cargo test --package workspaces-tests --test "$1" "$2" -- --nocapture
@@ -22,10 +27,12 @@ fi
 
 [tasks.nextest]
 clear = true
-dependencies = ["build"]
+dependencies = ["build-contracts"]
 script = """
 #!/usr/bin/env bash
 set -e
+
+export NO_BUILD_TEST_CONTRACTS=1
 
 if [[ -n $2 ]]; then
     cargo nextest run --package workspaces-tests --no-default-features --test "$1" -E "test($2)"
