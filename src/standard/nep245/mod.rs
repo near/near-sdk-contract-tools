@@ -16,7 +16,10 @@ use near_sdk::{
     collections::Vector, env, json_types::U128, near,
 };
 
-use crate::{DefaultStorageKey, hook::Hook, slot::Slot, standard::nep297::*};
+use crate::{
+    DefaultStorageKey, constant_size_account_id::CSAccountId, hook::Hook, slot::Slot,
+    standard::nep297::*,
+};
 
 mod error;
 pub use error::*;
@@ -62,7 +65,7 @@ enum StorageKey<'a> {
 pub struct TokenRecord {
     /// Only `Some` if the supply has only ever been 1.
     /// (Will not be used even if tokens are burned from >1 to 1.)
-    pub owner_id: Option<AccountId>,
+    pub owner_id: Option<CSAccountId>,
     /// The quantity of tokens in circulation.
     pub supply: u128,
 }
@@ -636,7 +639,7 @@ impl<T: Nep245ControllerInternal> Nep245Controller for T {
         Self::LoadTokenMetadata::load(self, token_id, &mut metadata).ok()?;
         Self::slot_token(token_id).read().map(|token_record| Token {
             token_id: token_id.to_owned(),
-            owner_id: token_record.owner_id,
+            owner_id: token_record.owner_id.map(Into::into),
             extensions_metadata: metadata,
         })
     }
@@ -729,7 +732,7 @@ impl<T: Nep245ControllerInternal> Nep245Controller for T {
                 })?;
 
             if original_supply == 0 && token_record.supply == 1 && token_record.owner_id.is_none() {
-                token_record.owner_id = Some(account_id.to_owned());
+                token_record.owner_id = Some(account_id.to_owned().into());
             }
 
             Self::slot_balance(token_id, account_id).write(&balance);
