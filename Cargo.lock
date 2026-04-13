@@ -87,7 +87,7 @@ checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
 
 [[package]]
 name = "basic_adder"
-version = "3.0.2"
+version = "0.1.0"
 dependencies = [
  "near-sdk",
  "near-sdk-contract-tools",
@@ -444,7 +444,7 @@ checksum = "773648b94d0e5d620f64f280777445740e61fe701025087ec8b57f45c791888b"
 
 [[package]]
 name = "counter_multisig"
-version = "3.0.2"
+version = "0.1.0"
 dependencies = [
  "near-sdk",
  "near-sdk-contract-tools",
@@ -471,7 +471,7 @@ dependencies = [
 
 [[package]]
 name = "cross_target"
-version = "3.0.2"
+version = "0.1.0"
 dependencies = [
  "near-sdk",
  "near-sdk-contract-tools",
@@ -818,7 +818,7 @@ dependencies = [
 
 [[package]]
 name = "escrow"
-version = "3.0.2"
+version = "0.1.0"
 dependencies = [
  "near-sdk",
  "near-sdk-contract-tools",
@@ -930,7 +930,7 @@ dependencies = [
 
 [[package]]
 name = "fungible_token"
-version = "3.0.2"
+version = "0.1.0"
 dependencies = [
  "near-sdk",
  "near-sdk-contract-tools",
@@ -938,7 +938,7 @@ dependencies = [
 
 [[package]]
 name = "fungible_token_receiver"
-version = "3.0.2"
+version = "0.1.0"
 dependencies = [
  "near-sdk",
  "near-sdk-contract-tools",
@@ -1664,7 +1664,7 @@ dependencies = [
 
 [[package]]
 name = "multi_token"
-version = "3.0.2"
+version = "0.1.0"
 dependencies = [
  "near-sdk",
  "near-sdk-contract-tools",
@@ -1672,7 +1672,7 @@ dependencies = [
 
 [[package]]
 name = "multi_token_receiver"
-version = "3.0.2"
+version = "0.1.0"
 dependencies = [
  "near-sdk",
  "near-sdk-contract-tools",
@@ -1697,7 +1697,7 @@ dependencies = [
 
 [[package]]
 name = "native_multisig"
-version = "3.0.2"
+version = "0.1.0"
 dependencies = [
  "near-sdk",
  "near-sdk-contract-tools",
@@ -2020,7 +2020,7 @@ dependencies = [
 
 [[package]]
 name = "near-sdk-contract-tools"
-version = "3.0.2"
+version = "4.0.0"
 dependencies = [
  "near-sdk",
  "near-sdk-contract-tools-macros",
@@ -2029,7 +2029,7 @@ dependencies = [
 
 [[package]]
 name = "near-sdk-contract-tools-macros"
-version = "3.0.2"
+version = "4.0.0"
 dependencies = [
  "darling 0.21.3",
  "heck 0.5.0",
@@ -2125,7 +2125,7 @@ dependencies = [
 
 [[package]]
 name = "non_fungible_token_full"
-version = "3.0.2"
+version = "0.1.0"
 dependencies = [
  "near-sdk",
  "near-sdk-contract-tools",
@@ -2133,7 +2133,7 @@ dependencies = [
 
 [[package]]
 name = "non_fungible_token_nep171"
-version = "3.0.2"
+version = "0.1.0"
 dependencies = [
  "near-sdk",
  "near-sdk-contract-tools",
@@ -2141,7 +2141,7 @@ dependencies = [
 
 [[package]]
 name = "non_fungible_token_receiver"
-version = "3.0.2"
+version = "0.1.0"
 dependencies = [
  "near-sdk",
  "near-sdk-contract-tools",
@@ -2532,7 +2532,7 @@ dependencies = [
 
 [[package]]
 name = "rbac"
-version = "3.0.2"
+version = "0.1.0"
 dependencies = [
  "near-sdk",
  "near-sdk-contract-tools",
@@ -3060,7 +3060,7 @@ checksum = "703d5c7ef118737c72f1af64ad2f6f8c5e1921f818cdcb97b8fe6fc69bf66214"
 
 [[package]]
 name = "simple_multisig"
-version = "3.0.2"
+version = "0.1.0"
 dependencies = [
  "near-sdk",
  "near-sdk-contract-tools",
@@ -3132,7 +3132,7 @@ checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 
 [[package]]
 name = "storage_fee"
-version = "3.0.2"
+version = "0.1.0"
 dependencies = [
  "near-sdk",
  "near-sdk-contract-tools",
@@ -3685,7 +3685,7 @@ checksum = "8ecb6da28b8a351d773b68d5825ac39017e680750f980f3a1a85cd8dd28a47c1"
 
 [[package]]
 name = "upgrade_bad"
-version = "3.0.2"
+version = "0.1.0"
 dependencies = [
  "near-sdk",
  "near-sdk-contract-tools",
@@ -3693,7 +3693,7 @@ dependencies = [
 
 [[package]]
 name = "upgrade_new"
-version = "3.0.2"
+version = "0.1.0"
 dependencies = [
  "near-sdk",
  "near-sdk-contract-tools",
@@ -3701,7 +3701,7 @@ dependencies = [
 
 [[package]]
 name = "upgrade_old_borsh"
-version = "3.0.2"
+version = "0.1.0"
 dependencies = [
  "near-sdk",
  "near-sdk-contract-tools",
@@ -3709,7 +3709,7 @@ dependencies = [
 
 [[package]]
 name = "upgrade_old_jsonbase64"
-version = "3.0.2"
+version = "0.1.0"
 dependencies = [
  "near-sdk",
  "near-sdk-contract-tools",
@@ -3717,7 +3717,7 @@ dependencies = [
 
 [[package]]
 name = "upgrade_old_multisig"
-version = "3.0.2"
+version = "0.1.0"
 dependencies = [
  "near-sdk",
  "near-sdk-contract-tools",
@@ -3725,7 +3725,7 @@ dependencies = [
 
 [[package]]
 name = "upgrade_old_raw"
-version = "3.0.2"
+version = "0.1.0"
 dependencies = [
  "near-sdk",
  "near-sdk-contract-tools",

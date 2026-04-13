@@ -3,8 +3,9 @@ name = "upgrade_old_multisig"
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
+publish = false
 repository.workspace = true
-version.workspace = true
+version = "0.1.0"
 
 [dependencies]
 near-sdk.workspace = true
