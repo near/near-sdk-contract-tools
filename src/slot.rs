@@ -114,6 +114,7 @@ impl<T: BorshSerialize> Slot<T> {
     /// # Panics
     ///
     /// If Borsh serialization fails.
+    #[deprecated = "The two types might have incompatible serializations"]
     pub fn write_deref<U: BorshSerialize + ?Sized>(&mut self, value: &U) -> bool
     where
         T: Deref<Target = U>,

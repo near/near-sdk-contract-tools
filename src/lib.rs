@@ -58,6 +58,7 @@ impl near_sdk::IntoStorageKey for DefaultStorageKey {
 pub mod standard;
 
 pub mod approval;
+pub mod constant_size_account_id;
 pub mod escrow;
 pub mod fast_account_id;
 pub mod hook;

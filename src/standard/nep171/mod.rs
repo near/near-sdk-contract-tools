@@ -46,7 +46,10 @@ use near_sdk::{
     serde::{Deserialize, Serialize},
 };
 
-use crate::{DefaultStorageKey, hook::Hook, slot::Slot, standard::nep297::Event};
+use crate::{
+    DefaultStorageKey, constant_size_account_id::CSAccountId, hook::Hook, slot::Slot,
+    standard::nep297::Event,
+};
 
 pub mod action;
 use action::*;
@@ -110,7 +113,7 @@ pub trait Nep171ControllerInternal {
 
     /// Storage slot for the owner of a token.
     #[must_use]
-    fn slot_token_owner(token_id: &TokenId) -> Slot<AccountId> {
+    fn slot_token_owner(token_id: &TokenId) -> Slot<CSAccountId> {
         Self::root().field(StorageKey::TokenOwner(token_id))
     }
 }
@@ -309,16 +312,18 @@ impl<T: Nep171ControllerInternal> Nep171Controller for T {
     }
 
     fn transfer_unchecked(&mut self, token_ids: &[TokenId], receiver_id: &AccountIdRef) {
+        let receiver_id = receiver_id.to_owned().into();
         for token_id in token_ids {
             let mut slot = Self::slot_token_owner(token_id);
-            slot.write_deref(receiver_id);
+            slot.write(&receiver_id);
         }
     }
 
     fn mint_unchecked(&mut self, token_ids: &[TokenId], owner_id: &AccountIdRef) {
+        let owner_id = owner_id.to_owned().into();
         for token_id in token_ids {
             let mut slot = Self::slot_token_owner(token_id);
-            slot.write_deref(owner_id);
+            slot.write(&owner_id);
         }
     }
 
@@ -400,7 +405,7 @@ impl<T: Nep171ControllerInternal> Nep171Controller for T {
     }
 
     fn token_owner(&self, token_id: &TokenId) -> Option<AccountId> {
-        Self::slot_token_owner(token_id).read()
+        Self::slot_token_owner(token_id).read().map(Into::into)
     }
 
     fn load_token(&self, token_id: &TokenId) -> Option<Token> {
