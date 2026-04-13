@@ -4,10 +4,10 @@
 use std::borrow::Cow;
 
 use near_sdk::{
-    borsh::BorshSerialize, collections::UnorderedSet, env, AccountId, AccountIdRef, BorshStorageKey,
+    AccountId, AccountIdRef, BorshStorageKey, borsh::BorshSerialize, collections::UnorderedSet, env,
 };
 
-use crate::{hook::Hook, slot::Slot, standard::nep171::*, DefaultStorageKey};
+use crate::{DefaultStorageKey, hook::Hook, slot::Slot, standard::nep171::*};
 
 pub use ext::*;
 

@@ -31,10 +31,10 @@
 //! * (ERR) The external functions exposed in [`OwnerExternal`] call their
 //!   respective [`Owner`] methods and expect the same invariants.
 
-use near_sdk::{env, near, require, AccountId, BorshStorageKey};
+use near_sdk::{AccountId, BorshStorageKey, env, near, require};
 use near_sdk_contract_tools_macros::event;
 
-use crate::{slot::Slot, standard::nep297::Event, DefaultStorageKey};
+use crate::{DefaultStorageKey, slot::Slot, standard::nep297::Event};
 
 const ONLY_OWNER_FAIL_MESSAGE: &str = "Owner only";
 const OWNER_INIT_FAIL_MESSAGE: &str = "Owner already initialized";
@@ -325,7 +325,7 @@ pub mod hooks {
 mod ext {
     #![allow(missing_docs)] // #[ext_contract(...)] does not play nicely with clippy
 
-    use near_sdk::{ext_contract, AccountId};
+    use near_sdk::{AccountId, ext_contract};
 
     /// Externally-accessible functions for `Owner`.
     #[ext_contract(ext_owner)]
@@ -356,12 +356,12 @@ pub use ext::*;
 #[cfg(test)]
 mod tests {
     use near_sdk::{
-        near, test_utils::VMContextBuilder, testing_env, AccountId, NearToken, PanicOnDefault,
+        AccountId, NearToken, PanicOnDefault, near, test_utils::VMContextBuilder, testing_env,
     };
 
     use crate::{
-        owner::{Owner, OwnerExternal},
         Owner,
+        owner::{Owner, OwnerExternal},
     };
 
     #[derive(Owner, PanicOnDefault)]
@@ -392,9 +392,11 @@ mod tests {
 
         let contract = Contract::new(owner_id.clone());
 
-        testing_env!(VMContextBuilder::new()
-            .predecessor_account_id(owner_id)
-            .build());
+        testing_env!(
+            VMContextBuilder::new()
+                .predecessor_account_id(owner_id)
+                .build()
+        );
 
         contract.owner_only();
     }
@@ -408,9 +410,11 @@ mod tests {
 
         let alice: AccountId = "alice".parse().unwrap();
 
-        testing_env!(VMContextBuilder::new()
-            .predecessor_account_id(alice)
-            .build());
+        testing_env!(
+            VMContextBuilder::new()
+                .predecessor_account_id(alice)
+                .build()
+        );
 
         contract.owner_only();
     }
@@ -421,10 +425,12 @@ mod tests {
 
         let mut contract = Contract::new(owner_id.clone());
         assert_eq!(contract.own_get_owner(), Some(owner_id.clone()));
-        testing_env!(VMContextBuilder::new()
-            .predecessor_account_id(owner_id)
-            .attached_deposit(NearToken::from_yoctonear(1u128))
-            .build());
+        testing_env!(
+            VMContextBuilder::new()
+                .predecessor_account_id(owner_id)
+                .attached_deposit(NearToken::from_yoctonear(1u128))
+                .build()
+        );
         contract.own_renounce_owner();
         assert_eq!(contract.own_get_owner(), None);
     }
@@ -436,10 +442,12 @@ mod tests {
 
         let proposed_owner: AccountId = "proposed".parse().unwrap();
 
-        testing_env!(VMContextBuilder::new()
-            .predecessor_account_id(owner_id)
-            .attached_deposit(NearToken::from_yoctonear(1u128))
-            .build());
+        testing_env!(
+            VMContextBuilder::new()
+                .predecessor_account_id(owner_id)
+                .attached_deposit(NearToken::from_yoctonear(1u128))
+                .build()
+        );
 
         assert_eq!(contract.own_get_proposed_owner(), None);
 
@@ -456,10 +464,12 @@ mod tests {
 
         let proposed_owner: AccountId = "proposed".parse().unwrap();
 
-        testing_env!(VMContextBuilder::new()
-            .predecessor_account_id(proposed_owner.clone())
-            .attached_deposit(NearToken::from_yoctonear(1u128))
-            .build());
+        testing_env!(
+            VMContextBuilder::new()
+                .predecessor_account_id(proposed_owner.clone())
+                .attached_deposit(NearToken::from_yoctonear(1u128))
+                .build()
+        );
 
         contract.own_propose_owner(Some(proposed_owner));
     }
@@ -472,9 +482,11 @@ mod tests {
 
         let proposed_owner: AccountId = "proposed".parse().unwrap();
 
-        testing_env!(VMContextBuilder::new()
-            .predecessor_account_id(owner_id)
-            .build());
+        testing_env!(
+            VMContextBuilder::new()
+                .predecessor_account_id(owner_id)
+                .build()
+        );
 
         contract.own_propose_owner(Some(proposed_owner));
     }
@@ -487,17 +499,21 @@ mod tests {
 
         let proposed_owner: AccountId = "proposed".parse().unwrap();
 
-        testing_env!(VMContextBuilder::new()
-            .predecessor_account_id(owner_id)
-            .attached_deposit(NearToken::from_yoctonear(1u128))
-            .build());
+        testing_env!(
+            VMContextBuilder::new()
+                .predecessor_account_id(owner_id)
+                .attached_deposit(NearToken::from_yoctonear(1u128))
+                .build()
+        );
 
         contract.own_propose_owner(Some(proposed_owner.clone()));
 
-        testing_env!(VMContextBuilder::new()
-            .predecessor_account_id(proposed_owner.clone())
-            .attached_deposit(NearToken::from_yoctonear(1u128))
-            .build());
+        testing_env!(
+            VMContextBuilder::new()
+                .predecessor_account_id(proposed_owner.clone())
+                .attached_deposit(NearToken::from_yoctonear(1u128))
+                .build()
+        );
 
         contract.own_accept_owner();
 
@@ -514,19 +530,23 @@ mod tests {
 
         let proposed_owner: AccountId = "proposed".parse().unwrap();
 
-        testing_env!(VMContextBuilder::new()
-            .predecessor_account_id(owner_id)
-            .attached_deposit(NearToken::from_yoctonear(1u128))
-            .build());
+        testing_env!(
+            VMContextBuilder::new()
+                .predecessor_account_id(owner_id)
+                .attached_deposit(NearToken::from_yoctonear(1u128))
+                .build()
+        );
 
         contract.own_propose_owner(Some(proposed_owner));
 
         let third_party: AccountId = "third".parse().unwrap();
 
-        testing_env!(VMContextBuilder::new()
-            .predecessor_account_id(third_party)
-            .attached_deposit(NearToken::from_yoctonear(1u128))
-            .build());
+        testing_env!(
+            VMContextBuilder::new()
+                .predecessor_account_id(third_party)
+                .attached_deposit(NearToken::from_yoctonear(1u128))
+                .build()
+        );
 
         contract.own_accept_owner();
     }
@@ -540,16 +560,20 @@ mod tests {
 
         let proposed_owner: AccountId = "proposed".parse().unwrap();
 
-        testing_env!(VMContextBuilder::new()
-            .predecessor_account_id(owner_id)
-            .attached_deposit(NearToken::from_yoctonear(1u128))
-            .build());
+        testing_env!(
+            VMContextBuilder::new()
+                .predecessor_account_id(owner_id)
+                .attached_deposit(NearToken::from_yoctonear(1u128))
+                .build()
+        );
 
         contract.own_propose_owner(Some(proposed_owner.clone()));
 
-        testing_env!(VMContextBuilder::new()
-            .predecessor_account_id(proposed_owner)
-            .build());
+        testing_env!(
+            VMContextBuilder::new()
+                .predecessor_account_id(proposed_owner)
+                .build()
+        );
 
         contract.own_accept_owner();
     }

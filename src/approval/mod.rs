@@ -1,14 +1,14 @@
 //! Queue and approve actions
 
 use near_sdk::{
+    AccountId, BorshStorageKey,
     borsh::{BorshDeserialize, BorshSerialize},
     env, near, require,
     serde::Serialize,
-    AccountId, BorshStorageKey,
 };
 use thiserror::Error;
 
-use crate::{slot::Slot, DefaultStorageKey};
+use crate::{DefaultStorageKey, slot::Slot};
 
 /// Error message emitted when the component is used before it is initialized
 pub const NOT_INITIALIZED: &str = "init must be called before use";
@@ -379,7 +379,7 @@ where
 #[cfg(test)]
 mod tests {
     use near_sdk::{
-        near, test_utils::VMContextBuilder, testing_env, AccountId, BorshStorageKey, PanicOnDefault,
+        AccountId, BorshStorageKey, PanicOnDefault, near, test_utils::VMContextBuilder, testing_env,
     };
     use near_sdk_contract_tools_macros::Rbac;
 

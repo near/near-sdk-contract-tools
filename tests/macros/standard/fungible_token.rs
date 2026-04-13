@@ -1,4 +1,4 @@
-use near_sdk::{json_types::Base64VecU8, near, PanicOnDefault};
+use near_sdk::{PanicOnDefault, json_types::Base64VecU8, near};
 use near_sdk_contract_tools::ft::*;
 
 #[derive(FungibleToken, PanicOnDefault)]
@@ -25,7 +25,7 @@ impl MyFungibleTokenContract {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use near_sdk::{test_utils::VMContextBuilder, testing_env, AccountId, NearToken};
+    use near_sdk::{AccountId, NearToken, test_utils::VMContextBuilder, testing_env};
 
     #[test]
     fn fungible_token_transfer() {

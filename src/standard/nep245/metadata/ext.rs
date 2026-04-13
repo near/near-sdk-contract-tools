@@ -3,10 +3,10 @@
 use near_sdk::ext_contract;
 
 use crate::mt::{
+    TokenId,
     nep245::metadata::{
         BaseMetadata, BaseMetadataId, ContractMetadata, TokenMetadata, TokenMetadataAll,
     },
-    TokenId,
 };
 
 /// NEP-245 Metadata contract interface.

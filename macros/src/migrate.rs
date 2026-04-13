@@ -1,6 +1,6 @@
 use darling::FromDeriveInput;
 use proc_macro2::TokenStream;
-use quote::{quote, ToTokens};
+use quote::{ToTokens, quote};
 
 #[derive(Debug, FromDeriveInput)]
 #[darling(attributes(migrate), supports(struct_named))]

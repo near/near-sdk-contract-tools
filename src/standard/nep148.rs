@@ -1,9 +1,9 @@
 //! NEP-148 fungible token metadata implementation
 //! <https://github.com/near/NEPs/blob/master/neps/nep-0148.md>
 
-use near_sdk::{env, json_types::Base64VecU8, near, BorshStorageKey};
+use near_sdk::{BorshStorageKey, env, json_types::Base64VecU8, near};
 
-use crate::{slot::Slot, DefaultStorageKey};
+use crate::{DefaultStorageKey, slot::Slot};
 
 pub use ext::*;
 

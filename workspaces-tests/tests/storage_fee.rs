@@ -1,50 +1,46 @@
-use near_sdk::serde_json::json;
-use near_workspaces::{sandbox, types::NearToken, Account, Contract, DevNetwork, Worker};
-use workspaces_tests_utils::ONE_NEAR;
+use near_api::Contract;
+use near_sdk::{NearToken, serde_json::json};
+use testresult::TestResult;
+use workspaces_tests::{Handle, read_only, transaction};
 
-const WASM: &[u8] = include_bytes!("../../target/wasm32-unknown-unknown/release/storage_fee.wasm");
-
-struct Setup<T: DevNetwork> {
-    pub worker: Worker<T>,
+struct Setup {
+    pub handle: Handle,
     pub contract: Contract,
-    pub accounts: Vec<Account>,
 }
 
-async fn setup<T: DevNetwork>(worker: Worker<T>, num_accounts: usize) -> Setup<T> {
-    // Initialize contract
-    let contract = worker.dev_deploy(WASM).await.unwrap();
-    contract.call("new").transact().await.unwrap().unwrap();
+async fn setup() -> TestResult<Setup> {
+    let handle = Handle::new().await;
+    let contract = handle
+        .make_contract("storage_fee", "storage_fee", json!({}))
+        .await?;
 
-    // Initialize user accounts
-    let mut accounts = vec![];
-    for _ in 0..(num_accounts + 1) {
-        accounts.push(worker.dev_create_account().await.unwrap());
-    }
+    Ok(Setup { contract, handle })
+}
 
-    Setup {
-        worker,
-        contract,
-        accounts,
-    }
+impl Setup {
+    read_only! { fn storage_byte_cost() -> NearToken }
+    transaction! { fn store(item: String) }
 }
 
 #[tokio::test]
-async fn storage_fee() {
-    let Setup {
-        contract,
-        accounts,
-        worker,
-    } = setup(sandbox().await.unwrap(), 1).await;
+async fn storage_fee() -> TestResult<()> {
+    let s = setup().await?;
 
-    let alice = &accounts[0];
-    let balance_start = alice.view_account().await.unwrap().balance;
+    let alice = s.handle.make_account("alice").await?;
 
-    let byte_cost = contract
-        .view("storage_byte_cost")
-        .await
-        .unwrap()
-        .json::<NearToken>()
-        .unwrap();
+    let fetch_balance = || async {
+        alice
+            .view()
+            .fetch_from(&s.handle.network)
+            .await
+            .unwrap()
+            .data
+            .amount
+    };
+
+    let balance_start = fetch_balance().await;
+
+    let byte_cost = s.storage_byte_cost().await?;
 
     let num_bytes = NearToken::from_near(1)
         .as_yoctonear()
@@ -52,23 +48,22 @@ async fn storage_fee() {
     let payload = "0".repeat(usize::try_from(num_bytes).unwrap());
     // This is the absolute minimum this payload should require to store (uncompressed)
     let minimum_storage_fee = byte_cost.saturating_mul(num_bytes);
-    let gas_price = worker.gas_price().await.unwrap();
+    let gas_price = near_api::Chain::block()
+        .fetch_from(&s.handle.network)
+        .await?
+        .header
+        .gas_price;
 
     let go = || async {
-        let balance_before = alice.view_account().await.unwrap().balance;
+        let balance_before = fetch_balance().await;
 
-        let r = alice
-            .call(contract.id(), "store")
-            .args_json(json!({
-                "item": payload,
-            }))
-            .deposit(ONE_NEAR.saturating_mul(10)) // Should receive back about 9 NEAR as refund
-            .transact()
+        // Should receive back about 9 NEAR as refund
+        let r = s
+            .store(&alice, Some(NearToken::from_near(10)), &payload)
             .await
-            .unwrap()
             .unwrap();
 
-        let balance_after = alice.view_account().await.unwrap().balance;
+        let balance_after = fetch_balance().await;
 
         // How much was actually charged to the account?
         // Note that there will be *some* overhead, e.g. collection indexing
@@ -86,6 +81,8 @@ async fn storage_fee() {
         go().await;
     }
 
-    let balance_end = alice.view_account().await.unwrap().balance;
+    let balance_end = fetch_balance().await;
     assert!(balance_start.saturating_sub(balance_end) >= minimum_storage_fee.saturating_mul(5));
+
+    Ok(())
 }

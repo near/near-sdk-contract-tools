@@ -14,14 +14,14 @@
 //! [`root`][EscrowInternal::root], make sure you don't accidentally collide
 //! these storage entries in your contract. You can change the key this is
 //! stored under by providing `storage_key` to the macro.
+use crate::{DefaultStorageKey, slot::Slot};
 use crate::{event, standard::nep297::Event};
-use crate::{slot::Slot, DefaultStorageKey};
 use near_sdk::{
+    BorshStorageKey,
     borsh::{BorshDeserialize, BorshSerialize},
     env::panic_str,
     require,
     serde::Serialize,
-    BorshStorageKey,
 };
 
 const ESCROW_ALREADY_LOCKED_MESSAGE: &str = "Already locked";
@@ -176,8 +176,8 @@ mod tests {
     use super::Escrow;
     use crate::escrow::EscrowInternal;
     use near_sdk::{
-        near, test_utils::VMContextBuilder, testing_env, AccountId, NearToken, PanicOnDefault,
-        VMContext,
+        AccountId, NearToken, PanicOnDefault, VMContext, near, test_utils::VMContextBuilder,
+        testing_env,
     };
     use near_sdk_contract_tools_macros::Escrow;
 

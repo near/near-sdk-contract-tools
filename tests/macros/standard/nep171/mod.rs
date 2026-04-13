@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use near_sdk::{env, near, store, AccountId, PanicOnDefault};
+use near_sdk::{AccountId, PanicOnDefault, env, near, store};
 use near_sdk_contract_tools::{hook::Hook, nft::*};
 
 mod hooks;
@@ -105,13 +105,14 @@ impl NonFungibleToken {
 
 mod tests {
     use near_sdk::{
-        test_utils::{get_logs, VMContextBuilder},
-        testing_env, AccountId, NearToken,
+        AccountId, NearToken,
+        test_utils::{VMContextBuilder, get_logs},
+        testing_env,
     };
     use near_sdk_contract_tools::standard::{
         nep171::{
-            event::{Nep171Event, NftTransferLog},
             Nep171,
+            event::{Nep171Event, NftTransferLog},
         },
         nep297::Event,
     };
@@ -138,10 +139,12 @@ mod tests {
             "after_nft_transfer_balance_record should be empty",
         );
 
-        testing_env!(VMContextBuilder::new()
-            .predecessor_account_id(account_alice.clone())
-            .attached_deposit(NearToken::from_yoctonear(1u128))
-            .build());
+        testing_env!(
+            VMContextBuilder::new()
+                .predecessor_account_id(account_alice.clone())
+                .attached_deposit(NearToken::from_yoctonear(1u128))
+                .build()
+        );
 
         contract.nft_transfer(account_bob.clone(), token_id.to_string(), None, None);
 
@@ -164,14 +167,16 @@ mod tests {
 
         assert_eq!(
             get_logs(),
-            vec![Nep171Event::NftTransfer(vec![NftTransferLog {
-                memo: None,
-                authorized_id: None,
-                old_owner_id: account_alice.into(),
-                new_owner_id: account_bob.into(),
-                token_ids: vec![token_id.into()]
-            }])
-            .to_event_string()]
+            vec![
+                Nep171Event::NftTransfer(vec![NftTransferLog {
+                    memo: None,
+                    authorized_id: None,
+                    old_owner_id: account_alice.into(),
+                    new_owner_id: account_bob.into(),
+                    token_ids: vec![token_id.into()]
+                }])
+                .to_event_string()
+            ]
         );
     }
 }

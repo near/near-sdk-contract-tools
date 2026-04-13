@@ -14,10 +14,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.75
+          toolchain: 1.86
           components: rustfmt
       - name: Check formatting
         run: >
@@ -27,23 +27,24 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.75
+          toolchain: 1.86
           components: clippy
+          targets: wasm32-unknown-unknown
       - name: Run linter
-        run: cargo clippy -- -D warnings
+        run: cargo clippy --target wasm32-unknown-unknown -- -D warnings
   test:
     runs-on: ubuntu-latest
     env:
       CARGO_TERM_COLOR: always
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.75
+          toolchain: 1.86
       - uses: taiki-e/install-action@v2
         with:
           tool: nextest
@@ -58,14 +59,18 @@ jobs:
       CARGO_TERM_COLOR: always
 
     steps:
-      - uses: actions/checkout@v3
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libudev-dev
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.75
+          toolchain: 1.86
           targets: wasm32-unknown-unknown
       - uses: taiki-e/install-action@v2
         with:
-          tool: cargo-make,nextest
+          tool: cargo-make,nextest,cargo-near@0.17.0
       - uses: Swatinem/rust-cache@v2
       - name: Run workspaces tests
         run: cd workspaces-tests && cargo make nextest

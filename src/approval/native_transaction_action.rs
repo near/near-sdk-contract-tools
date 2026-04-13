@@ -3,8 +3,9 @@
 //! transfer)
 
 use near_sdk::{
+    AccountId, Gas, NearToken, Promise,
     json_types::{Base64VecU8, U64},
-    near, AccountId, Gas, NearToken, Promise,
+    near,
 };
 
 /// Every native NEAR action can be mapped to a Promise action.

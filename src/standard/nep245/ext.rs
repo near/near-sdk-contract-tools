@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 
 use near_sdk::{
-    ext_contract, json_types::U128, near, AccountId, AccountIdRef, Promise, PromiseOrValue,
+    AccountId, AccountIdRef, Promise, PromiseOrValue, ext_contract, json_types::U128, near,
 };
 
 use super::{ApprovalId, TokenId};

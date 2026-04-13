@@ -78,7 +78,9 @@ pub struct TokenNotOwnedByExpectedOwnerError {
 
 /// Occurs when a particular account is not allowed to transfer a token (e.g. on behalf of another user). See: NEP-178.
 #[derive(Error, Clone, Debug)]
-#[error("Sender `{sender_id}` does not have permission to transfer token `{token_id}`, owned by `{owner_id}`, with approval ID {approval_id}")]
+#[error(
+    "Sender `{sender_id}` does not have permission to transfer token `{token_id}`, owned by `{owner_id}`, with approval ID {approval_id}"
+)]
 pub struct SenderNotApprovedError {
     /// The unapproved sender.
     pub sender_id: AccountId,

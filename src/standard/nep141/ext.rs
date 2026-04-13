@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
 
-use near_sdk::{ext_contract, json_types::U128, AccountId, Promise, PromiseOrValue};
+use near_sdk::{AccountId, Promise, PromiseOrValue, ext_contract, json_types::U128};
 
 /// A contract that may be the recipient of an `ft_transfer_call` function
 /// call.

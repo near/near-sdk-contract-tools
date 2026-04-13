@@ -12,11 +12,11 @@ use std::{
 };
 
 use near_sdk::{
-    borsh::BorshSerialize, collections::Vector, env, json_types::U128, near, AccountId,
-    AccountIdRef, BorshStorageKey, Gas, Promise,
+    AccountId, AccountIdRef, BorshStorageKey, Gas, Promise, borsh::BorshSerialize,
+    collections::Vector, env, json_types::U128, near,
 };
 
-use crate::{hook::Hook, slot::Slot, standard::nep297::*, DefaultStorageKey};
+use crate::{DefaultStorageKey, hook::Hook, slot::Slot, standard::nep297::*};
 
 mod error;
 pub use error::*;
@@ -255,10 +255,9 @@ impl<'a> std::ops::Deref for Nep245TransferCall<'a> {
     }
 }
 
-impl<'a> Nep245TransferCall<'a> {
+impl Nep245TransferCall<'_> {
     /// Generates the appropriate [`Promise`] chain for resolving this
     /// transfer-call.
-    #[must_use]
     pub fn promise(&self, current_account_id: AccountId) -> Promise {
         let sender_id: AccountId = self.sender_id.clone().into();
         let receiver_id: AccountId = self.receiver_id.clone().into();

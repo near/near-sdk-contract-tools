@@ -20,19 +20,19 @@
 //! when accessed by unauthorized accounts.
 //!
 //! * (UB) The rbac root storage slot is not used or modified. The default key
-//!     is `~r`.
+//!   is `~r`.
 //! * (ERR) [`Rbac::require_role`] may only be called when the predecessor
-//!     account has the specified role.
+//!   account has the specified role.
 //! * (ERR) [`Rbac::prohibit_role`] may only be called when the predecessor
-//!     account does not have the specified role.
+//!   account does not have the specified role.
 use std::iter::FusedIterator;
 
 use near_sdk::{
-    borsh::BorshSerialize, collections::UnorderedSet, env, require, AccountId, BorshStorageKey,
-    IntoStorageKey,
+    AccountId, BorshStorageKey, IntoStorageKey, borsh::BorshSerialize, collections::UnorderedSet,
+    env, require,
 };
 
-use crate::{slot::Slot, DefaultStorageKey};
+use crate::{DefaultStorageKey, slot::Slot};
 
 const REQUIRE_ROLE_FAIL_MESSAGE: &str = "Unauthorized role";
 const PROHIBIT_ROLE_FAIL_MESSAGE: &str = "Prohibited role";
@@ -217,7 +217,7 @@ impl ExactSizeIterator for Iter {}
 #[cfg(test)]
 mod tests {
     use near_sdk::{
-        near, test_utils::VMContextBuilder, testing_env, AccountId, BorshStorageKey, PanicOnDefault,
+        AccountId, BorshStorageKey, PanicOnDefault, near, test_utils::VMContextBuilder, testing_env,
     };
     use near_sdk_contract_tools_macros::Rbac;
 

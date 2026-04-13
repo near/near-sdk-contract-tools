@@ -2,7 +2,7 @@
 //! Contract upgrade functions that work as expected in conjunction with
 //! `#[near]`.
 
-use near_sdk::{env, GasWeight, NearToken, Promise};
+use near_sdk::{GasWeight, NearToken, Promise, env};
 
 use super::PostUpgrade;
 

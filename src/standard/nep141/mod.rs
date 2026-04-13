@@ -3,9 +3,9 @@
 
 use std::borrow::Cow;
 
-use near_sdk::{borsh::BorshSerialize, near, AccountIdRef, BorshStorageKey, Gas};
+use near_sdk::{AccountIdRef, BorshStorageKey, Gas, borsh::BorshSerialize, near};
 
-use crate::{hook::Hook, slot::Slot, standard::nep297::*, DefaultStorageKey};
+use crate::{DefaultStorageKey, hook::Hook, slot::Slot, standard::nep297::*};
 
 mod error;
 pub use error::*;

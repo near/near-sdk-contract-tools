@@ -1,7 +1,7 @@
 use darling::FromDeriveInput;
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{parse_quote, Expr, Type};
+use syn::{Expr, Type, parse_quote};
 
 use crate::unitify;
 

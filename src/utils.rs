@@ -1,6 +1,6 @@
 //! Utility functions for storage key generation, storage fee management
 
-use near_sdk::{env, require, NearToken, Promise};
+use near_sdk::{NearToken, Promise, env, require};
 
 /// Concatenate bytes to form a key. Useful for generating storage keys.
 ///

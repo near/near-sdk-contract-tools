@@ -155,7 +155,7 @@ pub fn expand(meta: UpgradeMeta) -> Result<TokenStream, darling::Error> {
                         args: #migrate_method_args,
                         minimum_gas: #migrate_minimum_gas,
                     },
-                );
+                ).as_return().detach();
             }
         }
 

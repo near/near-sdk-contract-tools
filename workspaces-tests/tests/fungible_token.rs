@@ -1,404 +1,282 @@
+use near_api::{Account, Contract};
 use near_sdk::{
+    AccountId,
     json_types::{Base64VecU8, U128},
     serde_json::json,
-    NearToken,
 };
 use near_sdk_contract_tools::{
     ft::nep141::FtBurnData,
     nft::StorageBalance,
     standard::{
         nep141::{FtTransferData, Nep141Event},
-        nep145::error::InsufficientBalanceError,
         nep297::Event,
     },
 };
-use near_workspaces::{network::Sandbox, operations::Function, Account, Contract, Worker};
 use pretty_assertions::assert_eq;
-use tokio::task::JoinSet;
-use workspaces_tests_utils::{expect_execution_error, ft_balance_of, ONE_NEAR, ONE_YOCTO};
-
-const WASM: &[u8] =
-    include_bytes!("../../target/wasm32-unknown-unknown/release/fungible_token.wasm");
-
-const RECEIVER_WASM: &[u8] =
-    include_bytes!("../../target/wasm32-unknown-unknown/release/fungible_token_receiver.wasm");
+use testresult::TestResult;
+use workspaces_tests::{Handle, ONE_NEAR, ONE_YOCTO, Y, read_only, transaction};
 
 struct Setup {
+    pub handle: Handle,
     pub contract: Contract,
-    pub accounts: Vec<Account>,
-    pub worker: Worker<Sandbox>,
 }
 
 /// Setup for individual tests
-async fn setup(num_accounts: usize) -> Setup {
-    let worker = near_workspaces::sandbox().await.unwrap();
+async fn setup() -> TestResult<Setup> {
+    let handle = Handle::new().await;
+    let contract = handle
+        .make_contract("fungible_token", "fungible_token", json!({}))
+        .await?;
 
-    // Initialize contract
-    let contract = worker.dev_deploy(WASM).await.unwrap();
-    contract.call("new").transact().await.unwrap().unwrap();
-
-    // Initialize user accounts
-    let mut accounts = vec![];
-    for _ in 0..num_accounts {
-        accounts.push(worker.dev_create_account().await.unwrap());
-    }
-
-    Setup {
-        contract,
-        accounts,
-        worker,
-    }
+    Ok(Setup { contract, handle })
 }
 
-async fn setup_balances(num_accounts: usize, amount: impl Fn(usize) -> U128) -> Setup {
-    let setup = setup(num_accounts).await;
-
-    let mut transaction_set = JoinSet::new();
-
-    for (i, account) in setup.accounts.iter().enumerate() {
-        let transaction = account
-            .batch(setup.contract.id())
-            .call(
-                Function::new("storage_deposit")
-                    .args_json(json!({}))
-                    .deposit(ONE_NEAR.saturating_div(100)),
-            )
-            .call(Function::new("mint").args_json(json!({ "amount": amount(i) })))
-            .transact();
-        transaction_set.spawn(async move {
-            transaction.await.unwrap().unwrap();
-        });
+impl Setup {
+    async fn setup_account(&self, name: impl Into<String>, amount: u128) -> TestResult<Account> {
+        let account = self.handle.make_account(name).await?;
+        self.storage_deposit(&account, Some(ONE_NEAR.saturating_div(100)))
+            .await?;
+        self.mint(&account, None, amount).await?;
+        Ok(account)
     }
 
-    while transaction_set.join_next().await.is_some() {}
-
-    setup
+    transaction! { fn storage_deposit() }
+    read_only! { fn ft_balance_of(account_id: AccountId) -> U128 }
+    transaction! { fn mint(amount: U128) }
+    transaction! { fn ft_transfer(receiver_id: AccountId, amount: U128) }
+    read_only! { fn storage_balance_of(account_id: AccountId) -> Option<StorageBalance> }
+    read_only! { fn total_supply() -> U128 }
+    transaction! { fn use_storage(blob: Base64VecU8) }
+    transaction! { fn ft_transfer_call(receiver_id: AccountId, amount: U128, msg: String) }
+    transaction! { fn storage_unregister(force: Option<bool>) }
 }
 
 #[tokio::test]
-async fn start_empty() {
-    let Setup {
-        contract, accounts, ..
-    } = setup(3).await;
+async fn start_empty() -> TestResult<()> {
+    let s = setup().await?;
+
+    let alice = s.handle.make_account("alice").await?;
+    let bob = s.handle.make_account("bob").await?;
 
     // All accounts must start with 0 balance
-    for account in accounts.iter() {
-        assert_eq!(ft_balance_of(&contract, account.id()).await, 0);
-    }
+    assert_eq!(s.ft_balance_of(alice.account_id()).await?.0, 0);
+    assert_eq!(s.ft_balance_of(bob.account_id()).await?.0, 0);
+
+    Ok(())
 }
 
 #[tokio::test]
-async fn mint() {
-    let Setup {
-        contract, accounts, ..
-    } = setup_balances(3, |i| 10u128.pow(3 - i as u32).into()).await;
-    let alice = &accounts[0];
-    let bob = &accounts[1];
-    let charlie = &accounts[2];
+async fn mint() -> TestResult<()> {
+    let s = setup().await?;
+
+    let alice = s.setup_account("alice", 1000).await?;
+    let bob = s.setup_account("bob", 100).await?;
+    let charlie = s.setup_account("charlie", 10).await?;
 
     // Verify issued balances
-    assert_eq!(ft_balance_of(&contract, alice.id()).await, 1000);
-    assert_eq!(ft_balance_of(&contract, bob.id()).await, 100);
-    assert_eq!(ft_balance_of(&contract, charlie.id()).await, 10);
+    assert_eq!(s.ft_balance_of(alice.account_id()).await?.0, 1000);
+    assert_eq!(s.ft_balance_of(bob.account_id()).await?.0, 100);
+    assert_eq!(s.ft_balance_of(charlie.account_id()).await?.0, 10);
+
+    Ok(())
 }
 
 #[tokio::test]
-async fn transfer_normal() {
-    let Setup {
-        contract, accounts, ..
-    } = setup_balances(3, |i| 10u128.pow(3 - i as u32).into()).await;
-    let alice = &accounts[0];
-    let bob = &accounts[1];
-    let charlie = &accounts[2];
+async fn transfer_normal() -> TestResult<()> {
+    let s = setup().await?;
 
-    alice
-        .call(contract.id(), "ft_transfer")
-        .deposit(ONE_YOCTO)
-        .args_json(json!({
-            "receiver_id": bob.id(),
-            "amount": "10",
-        }))
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
-    assert_eq!(ft_balance_of(&contract, alice.id()).await, 990);
-    assert_eq!(ft_balance_of(&contract, bob.id()).await, 110);
-    assert_eq!(ft_balance_of(&contract, charlie.id()).await, 10);
+    let alice = s.setup_account("alice", 1000).await?;
+    let bob = s.setup_account("bob", 100).await?;
+    let charlie = s.setup_account("charlie", 10).await?;
+
+    s.ft_transfer(&alice, Y, bob.account_id(), 10).await?;
+
+    assert_eq!(s.ft_balance_of(alice.account_id()).await?.0, 990);
+    assert_eq!(s.ft_balance_of(bob.account_id()).await?.0, 110);
+    assert_eq!(s.ft_balance_of(charlie.account_id()).await?.0, 10);
+
+    Ok(())
 }
 
 #[tokio::test]
-async fn transfer_zero() {
-    let Setup {
-        contract, accounts, ..
-    } = setup_balances(3, |i| 10u128.pow(3 - i as u32).into()).await;
-    let alice = &accounts[0];
-    let bob = &accounts[1];
-    let charlie = &accounts[2];
+async fn transfer_zero() -> TestResult<()> {
+    let s = setup().await?;
 
-    alice
-        .call(contract.id(), "ft_transfer")
-        .deposit(ONE_YOCTO)
-        .args_json(json!({
-            "receiver_id": bob.id(),
-            "amount": "0",
-        }))
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
-    assert_eq!(ft_balance_of(&contract, alice.id()).await, 1000);
-    assert_eq!(ft_balance_of(&contract, bob.id()).await, 100);
-    assert_eq!(ft_balance_of(&contract, charlie.id()).await, 10);
+    let alice = s.setup_account("alice", 1000).await?;
+    let bob = s.setup_account("bob", 100).await?;
+    let charlie = s.setup_account("charlie", 10).await?;
+
+    let _ = s.ft_transfer(&alice, Y, bob.account_id(), 0).await;
+
+    assert_eq!(s.ft_balance_of(alice.account_id()).await?.0, 1000);
+    assert_eq!(s.ft_balance_of(bob.account_id()).await?.0, 100);
+    assert_eq!(s.ft_balance_of(charlie.account_id()).await?.0, 10);
+
+    Ok(())
 }
 
 #[tokio::test]
 #[should_panic(expected = "invalid digit found in string")]
 async fn transfer_negative() {
-    let Setup {
-        contract, accounts, ..
-    } = setup_balances(3, |i| 10u128.pow(3 - i as u32).into()).await;
-    let alice = &accounts[0];
-    let bob = &accounts[1];
+    let s = setup().await.unwrap();
 
-    alice
-        .call(contract.id(), "ft_transfer")
+    let alice = s.setup_account("alice", 1000).await.unwrap();
+    let bob = s.setup_account("bob", 100).await.unwrap();
+
+    s.contract
+        .call_function(
+            "ft_transfer",
+            json!({
+                "receiver_id": bob.account_id(),
+                "amount": "-10",
+            }),
+        )
+        .transaction()
         .deposit(ONE_YOCTO)
-        .args_json(json!({
-            "receiver_id": bob.id(),
-            "amount": "-10",
-        }))
-        .transact()
+        .with_signer(alice.account_id().clone(), s.handle.default_signer())
+        .send_to(&s.handle.network)
         .await
         .unwrap()
-        .unwrap();
+        .assert_success();
 }
 
 #[tokio::test]
 #[should_panic(expected = "Requires attached deposit of exactly 1 yoctoNEAR")]
 async fn transfer_no_deposit() {
-    let Setup {
-        contract, accounts, ..
-    } = setup_balances(3, |i| 10u128.pow(3 - i as u32).into()).await;
-    let alice = &accounts[0];
-    let bob = &accounts[1];
+    let s = setup().await.unwrap();
 
-    alice
-        .call(contract.id(), "ft_transfer")
-        .args_json(json!({
-            "receiver_id": bob.id(),
-            "amount": "10",
-        }))
-        .transact()
+    let alice = s.setup_account("alice", 1000).await.unwrap();
+    let bob = s.setup_account("bob", 100).await.unwrap();
+
+    s.ft_transfer(&alice, None, bob.account_id(), 10)
         .await
-        .unwrap()
         .unwrap();
 }
 
 #[tokio::test]
 #[should_panic(expected = "Balance of the sender is insufficient")]
 async fn transfer_more_than_balance() {
-    let Setup {
-        contract, accounts, ..
-    } = setup_balances(3, |i| 10u128.pow(3 - i as u32).into()).await;
-    let alice = &accounts[0];
-    let bob = &accounts[1];
+    let s = setup().await.unwrap();
 
-    alice
-        .call(contract.id(), "ft_transfer")
-        .args_json(json!({
-            "receiver_id": bob.id(),
-            "amount": "1000000",
-        }))
-        .deposit(ONE_YOCTO)
-        .transact()
+    let alice = s.setup_account("alice", 1000).await.unwrap();
+    let bob = s.setup_account("bob", 100).await.unwrap();
+
+    s.ft_transfer(&alice, Y, bob.account_id(), 1000000)
         .await
-        .unwrap()
         .unwrap();
 }
 
 #[tokio::test]
 #[should_panic(expected = "TotalSupplyOverflowError")]
 async fn transfer_overflow_u128() {
-    let Setup {
-        contract, accounts, ..
-    } = setup_balances(2, |_| (u128::MAX / 2).into()).await;
-    let alice = &accounts[0];
+    let s = setup().await.unwrap();
 
-    alice
-        .call(contract.id(), "mint")
-        .args_json(json!({
-            "amount": "2",
-        }))
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
+    let alice = s.setup_account("alice", u128::MAX / 2).await.unwrap();
+    let _bob = s.setup_account("bob", u128::MAX / 2).await.unwrap();
+
+    s.mint(&alice, None, u128::MAX / 2).await.unwrap();
 }
 
 #[tokio::test]
+#[should_panic(expected = "Account charlie is not registered")]
 async fn transfer_fail_not_registered() {
-    let Setup {
-        contract,
-        accounts,
-        worker,
-    } = setup_balances(2, |i| 10u128.pow(3 - i as u32).into()).await;
-    let alice = &accounts[0];
-    let charlie = worker.dev_create_account().await.unwrap();
+    let s = setup().await.unwrap();
 
-    let result = alice
-        .call(contract.id(), "ft_transfer")
-        .deposit(ONE_YOCTO)
-        .args_json(json!({
-            "receiver_id": charlie.id(),
-            "amount": "10",
-        }))
-        .transact()
+    let alice = s.setup_account("alice", 1000).await.unwrap();
+    let charlie = s.handle.make_account("charlie").await.unwrap();
+
+    s.ft_transfer(&alice, Y, charlie.account_id(), 10)
         .await
         .unwrap();
-
-    expect_execution_error(
-        &result,
-        format!(
-            "Smart contract panicked: Account {} is not registered",
-            charlie.id(),
-        ),
-    );
 }
 
 #[tokio::test]
+#[should_panic(
+    expected = "Storage lock error: Account alice has insufficient balance: 0.009 NEAR available, but attempted to use 0.101 NEAR"
+)]
 async fn fail_run_out_of_space() {
-    let Setup {
-        contract, accounts, ..
-    } = setup_balances(2, |i| 10u128.pow(3 - i as u32).into()).await;
-    let alice = &accounts[0];
+    let s = setup().await.unwrap();
 
-    let balance = contract
-        .view("storage_balance_of")
-        .args_json(json!({ "account_id": alice.id() }))
-        .await
-        .unwrap()
-        .json::<Option<StorageBalance>>()
-        .unwrap()
-        .unwrap();
+    let alice = s.setup_account("alice", 1000).await.unwrap();
 
-    let result = alice
-        .call(contract.id(), "use_storage")
-        .args_json(json!({
-            "blob": Base64VecU8::from(vec![1u8; 10000]),
-        }))
-        .transact()
-        .await
-        .unwrap();
-
-    expect_execution_error(
-        &result,
-        format!(
-            "Smart contract panicked: Storage lock error: {}",
-            InsufficientBalanceError {
-                account_id: alice.id().clone(),
-                available: balance.available,
-                attempted_to_use: NearToken::from_yoctonear(100490000000000000000000),
-            }
-        ),
-    );
+    s.use_storage(&alice, None, vec![1u8; 10000]).await.unwrap();
 }
 
 #[tokio::test]
-async fn transfer_call_normal() {
-    let Setup {
-        contract, accounts, ..
-    } = setup_balances(3, |i| 10u128.pow(3 - i as u32).into()).await;
-    let alice = &accounts[0];
-    let bob = &accounts[1];
-    let charlie = &accounts[2];
+async fn transfer_call_normal() -> TestResult<()> {
+    let s = setup().await?;
 
-    bob.batch(bob.id())
-        .deploy(RECEIVER_WASM)
-        .call(Function::new("new").args_json(json!({})))
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
+    let alice = s.setup_account("alice", 1000).await?;
+    let bob = s.setup_account("bob", 100).await?;
+    let charlie = s.setup_account("charlie", 10).await?;
 
-    let result = alice
-        .call(contract.id(), "ft_transfer_call")
-        .deposit(ONE_YOCTO)
-        .max_gas()
-        .args_json(json!({
-            "receiver_id": bob.id(),
-            "amount": "10",
-            "msg": "", // keep all of the tokens
-        }))
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
+    s.handle
+        .deploy(
+            bob.account_id().clone(),
+            &s.handle.load_wasm("fungible_token_receiver").await?,
+            json!({}),
+        )
+        .await?;
+
+    let result = s
+        .ft_transfer_call(&alice, Y, bob.account_id(), 10, "".to_string())
+        .await?;
 
     assert_eq!(
         result.logs().to_vec(),
         vec![
             Nep141Event::FtTransfer(vec![FtTransferData {
-                old_owner_id: alice.id().into(),
-                new_owner_id: bob.id().into(),
+                old_owner_id: alice.account_id().into(),
+                new_owner_id: bob.account_id().into(),
                 amount: U128(10),
                 memo: None,
             }])
             .to_event_string(),
-            format!("Received 10 from {}", alice.id()),
+            format!("Received 10 from {}", alice.account_id()),
         ]
     );
 
-    assert_eq!(ft_balance_of(&contract, alice.id()).await, 990);
-    assert_eq!(ft_balance_of(&contract, bob.id()).await, 110);
-    assert_eq!(ft_balance_of(&contract, charlie.id()).await, 10);
+    assert_eq!(s.ft_balance_of(alice.account_id()).await?.0, 990);
+    assert_eq!(s.ft_balance_of(bob.account_id()).await?.0, 110);
+    assert_eq!(s.ft_balance_of(charlie.account_id()).await?.0, 10);
+
+    Ok(())
 }
 
 #[tokio::test]
-async fn transfer_call_return() {
-    let Setup {
-        contract, accounts, ..
-    } = setup_balances(3, |i| 10u128.pow(3 - i as u32).into()).await;
-    let alice = &accounts[0];
-    let bob = &accounts[1];
-    let charlie = &accounts[2];
+async fn transfer_call_return() -> TestResult<()> {
+    let s = setup().await?;
 
-    bob.batch(bob.id())
-        .deploy(RECEIVER_WASM)
-        .call(Function::new("new").args_json(json!({})))
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
+    let alice = s.setup_account("alice", 1000).await?;
+    let bob = s.setup_account("bob", 100).await?;
+    let charlie = s.setup_account("charlie", 10).await?;
 
-    let result = alice
-        .call(contract.id(), "ft_transfer_call")
-        .deposit(ONE_YOCTO)
-        .max_gas()
-        .args_json(json!({
-            "receiver_id": bob.id(),
-            "amount": "10",
-            "msg": "return", // return all of the tokens
-        }))
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
+    s.handle
+        .deploy(
+            bob.account_id().clone(),
+            &s.handle.load_wasm("fungible_token_receiver").await?,
+            json!({}),
+        )
+        .await?;
+
+    let result = s
+        .ft_transfer_call(&alice, Y, bob.account_id(), 10, "return")
+        .await?;
 
     assert_eq!(
         result.logs().to_vec(),
         vec![
             Nep141Event::FtTransfer(vec![FtTransferData {
-                old_owner_id: alice.id().into(),
-                new_owner_id: bob.id().into(),
+                old_owner_id: alice.account_id().into(),
+                new_owner_id: bob.account_id().into(),
                 amount: U128(10),
                 memo: None,
             }])
             .to_event_string(),
-            format!("Received 10 from {}", alice.id()),
+            format!("Received 10 from {}", alice.account_id()),
             Nep141Event::FtTransfer(vec![FtTransferData {
-                old_owner_id: bob.id().into(),
-                new_owner_id: alice.id().into(),
+                old_owner_id: bob.account_id().into(),
+                new_owner_id: alice.account_id().into(),
                 amount: U128(10),
                 memo: None,
             }])
@@ -406,64 +284,56 @@ async fn transfer_call_return() {
         ]
     );
 
-    assert_eq!(ft_balance_of(&contract, alice.id()).await, 1000);
-    assert_eq!(ft_balance_of(&contract, bob.id()).await, 100);
-    assert_eq!(ft_balance_of(&contract, charlie.id()).await, 10);
+    assert_eq!(s.ft_balance_of(alice.account_id()).await?.0, 1000);
+    assert_eq!(s.ft_balance_of(bob.account_id()).await?.0, 100);
+    assert_eq!(s.ft_balance_of(charlie.account_id()).await?.0, 10);
+
+    Ok(())
 }
 
 #[tokio::test]
-async fn transfer_call_inner_transfer() {
-    let Setup {
-        contract, accounts, ..
-    } = setup_balances(3, |i| 10u128.pow(3 - i as u32).into()).await;
-    let alice = &accounts[0];
-    let bob = &accounts[1];
-    let charlie = &accounts[2];
+async fn transfer_call_inner_transfer() -> TestResult<()> {
+    let s = setup().await?;
 
-    bob.batch(bob.id())
-        .deploy(RECEIVER_WASM)
-        .call(Function::new("new").args_json(json!({})))
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
+    let alice = s.setup_account("alice", 1000).await?;
+    let bob = s.setup_account("bob", 100).await?;
+    let charlie = s.setup_account("charlie", 10).await?;
 
-    let result = alice
-        .call(contract.id(), "ft_transfer_call")
-        .deposit(ONE_YOCTO)
-        .max_gas()
-        .args_json(json!({
-            "receiver_id": bob.id(),
-            "amount": "10",
-            "msg": format!("transfer:{}", charlie.id()),
-        }))
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
+    s.handle
+        .deploy(
+            bob.account_id().clone(),
+            &s.handle.load_wasm("fungible_token_receiver").await?,
+            json!({}),
+        )
+        .await?;
+
+    let msg = format!("transfer:{}", charlie.account_id());
+    let result = s
+        .ft_transfer_call(&alice, Y, bob.account_id(), 10, msg)
+        .await?;
 
     assert_eq!(
         result.logs().to_vec(),
         vec![
             Nep141Event::FtTransfer(vec![FtTransferData {
-                old_owner_id: alice.id().into(),
-                new_owner_id: bob.id().into(),
+                old_owner_id: alice.account_id().into(),
+                new_owner_id: bob.account_id().into(),
                 amount: U128(10),
                 memo: None,
             }])
             .to_event_string(),
-            format!("Received 10 from {}", alice.id()),
-            format!("Transferring 10 to {}", charlie.id()),
+            format!("Received 10 from {}", alice.account_id()),
+            format!("Transferring 10 to {}", charlie.account_id()),
             Nep141Event::FtTransfer(vec![FtTransferData {
-                old_owner_id: bob.id().into(),
-                new_owner_id: charlie.id().into(),
+                old_owner_id: bob.account_id().into(),
+                new_owner_id: charlie.account_id().into(),
                 amount: U128(10),
                 memo: None,
             }])
             .to_event_string(),
             Nep141Event::FtTransfer(vec![FtTransferData {
-                old_owner_id: bob.id().into(),
-                new_owner_id: alice.id().into(),
+                old_owner_id: bob.account_id().into(),
+                new_owner_id: alice.account_id().into(),
                 amount: U128(10),
                 memo: None,
             }])
@@ -471,41 +341,32 @@ async fn transfer_call_inner_transfer() {
         ]
     );
 
-    assert_eq!(ft_balance_of(&contract, alice.id()).await, 1000);
-    assert_eq!(ft_balance_of(&contract, bob.id()).await, 90);
-    assert_eq!(ft_balance_of(&contract, charlie.id()).await, 20);
+    assert_eq!(s.ft_balance_of(alice.account_id()).await?.0, 1000);
+    assert_eq!(s.ft_balance_of(bob.account_id()).await?.0, 90);
+    assert_eq!(s.ft_balance_of(charlie.account_id()).await?.0, 20);
+
+    Ok(())
 }
 
 #[tokio::test]
-async fn transfer_call_inner_panic() {
-    let Setup {
-        contract, accounts, ..
-    } = setup_balances(3, |i| 10u128.pow(3 - i as u32).into()).await;
-    let alice = &accounts[0];
-    let bob = &accounts[1];
-    let charlie = &accounts[2];
+async fn transfer_call_inner_panic() -> TestResult<()> {
+    let s = setup().await?;
 
-    bob.batch(bob.id())
-        .deploy(RECEIVER_WASM)
-        .call(Function::new("new").args_json(json!({})))
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
+    let alice = s.setup_account("alice", 1000).await?;
+    let bob = s.setup_account("bob", 100).await?;
+    let charlie = s.setup_account("charlie", 10).await?;
 
-    let result = alice
-        .call(contract.id(), "ft_transfer_call")
-        .deposit(ONE_YOCTO)
-        .max_gas()
-        .args_json(json!({
-            "receiver_id": bob.id(),
-            "amount": "10",
-            "msg": "panic",
-        }))
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
+    s.handle
+        .deploy(
+            bob.account_id().clone(),
+            &s.handle.load_wasm("fungible_token_receiver").await?,
+            json!({}),
+        )
+        .await?;
+
+    let result = s
+        .ft_transfer_call(&alice, Y, bob.account_id(), 10, "panic")
+        .await?;
 
     let inner_outcome = result.outcomes().to_vec()[2];
 
@@ -515,16 +376,16 @@ async fn transfer_call_inner_panic() {
         result.logs().to_vec(),
         vec![
             Nep141Event::FtTransfer(vec![FtTransferData {
-                old_owner_id: alice.id().into(),
-                new_owner_id: bob.id().into(),
+                old_owner_id: alice.account_id().into(),
+                new_owner_id: bob.account_id().into(),
                 amount: U128(10),
                 memo: None,
             }])
             .to_event_string(),
-            format!("Received 10 from {}", alice.id()),
+            format!("Received 10 from {}", alice.account_id()),
             Nep141Event::FtTransfer(vec![FtTransferData {
-                old_owner_id: bob.id().into(),
-                new_owner_id: alice.id().into(),
+                old_owner_id: bob.account_id().into(),
+                new_owner_id: alice.account_id().into(),
                 amount: U128(10),
                 memo: None,
             }])
@@ -532,38 +393,34 @@ async fn transfer_call_inner_panic() {
         ]
     );
 
-    assert_eq!(ft_balance_of(&contract, alice.id()).await, 1000);
-    assert_eq!(ft_balance_of(&contract, bob.id()).await, 100);
-    assert_eq!(ft_balance_of(&contract, charlie.id()).await, 10);
+    assert_eq!(s.ft_balance_of(alice.account_id()).await?.0, 1000);
+    assert_eq!(s.ft_balance_of(bob.account_id()).await?.0, 100);
+    assert_eq!(s.ft_balance_of(charlie.account_id()).await?.0, 10);
+
+    Ok(())
 }
 
 #[tokio::test]
-async fn force_unregister() {
-    let Setup {
-        contract, accounts, ..
-    } = setup_balances(3, |i| 10u128.pow(3 - i as u32).into()).await;
-    let alice = &accounts[0];
+async fn force_unregister() -> TestResult<()> {
+    let s = setup().await?;
 
-    let result = alice
-        .call(contract.id(), "storage_unregister")
-        .deposit(ONE_YOCTO)
-        .args_json(json!({
-            "force": true,
-        }))
-        .transact()
-        .await
-        .unwrap()
-        .unwrap();
+    let alice = s.setup_account("alice", 1000).await?;
+
+    let result = s.storage_unregister(&alice, Y, true).await?;
 
     assert_eq!(
         result.logs().to_vec(),
-        vec![Nep141Event::FtBurn(vec![FtBurnData {
-            owner_id: alice.id().into(),
-            amount: U128(1000),
-            memo: Some("storage forced unregistration".into()),
-        }])
-        .to_event_string(),]
+        vec![
+            Nep141Event::FtBurn(vec![FtBurnData {
+                owner_id: alice.account_id().into(),
+                amount: U128(1000),
+                memo: Some("storage forced unregistration".into()),
+            }])
+            .to_event_string(),
+        ]
     );
 
-    assert_eq!(ft_balance_of(&contract, alice.id()).await, 0);
+    assert_eq!(s.ft_balance_of(alice.account_id()).await?.0, 0);
+
+    Ok(())
 }

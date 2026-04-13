@@ -1,5 +1,6 @@
-use near_sdk::{env, near, PanicOnDefault};
+use near_sdk::{PanicOnDefault, env, near};
 use near_sdk_contract_tools::{
+    Nep171, Nep177, Nep178, Nep181, Owner, Pause,
     hook::Hook,
     owner::Owner,
     pause::Pause,
@@ -8,7 +9,6 @@ use near_sdk_contract_tools::{
         nep177::{self, Nep177Controller},
         nep178, nep181,
     },
-    Nep171, Nep177, Nep178, Nep181, Owner, Pause,
 };
 
 #[derive(Nep171, Nep177, Nep178, Nep181, Pause, Owner, PanicOnDefault)]

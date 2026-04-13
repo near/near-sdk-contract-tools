@@ -1,6 +1,6 @@
 //! Hooks to integrate NEP-145 with other components.
 
-use near_sdk::{env, AccountIdRef};
+use near_sdk::{AccountIdRef, env};
 
 use crate::{
     hook::Hook,

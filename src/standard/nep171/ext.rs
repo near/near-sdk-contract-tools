@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use near_sdk::{ext_contract, AccountId, PromiseOrValue};
+use near_sdk::{AccountId, PromiseOrValue, ext_contract};
 
 use super::TokenId;
 

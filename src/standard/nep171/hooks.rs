@@ -5,7 +5,7 @@ use crate::{
     standard::{nep145::Nep145ForceUnregister, nep181::Nep181Controller},
 };
 
-use super::{action::Nep171Burn, Nep171Controller};
+use super::{Nep171Controller, action::Nep171Burn};
 
 /// Hook that burns all NEP-171 tokens held by an account when the account
 /// performs an NEP-145 force unregister.

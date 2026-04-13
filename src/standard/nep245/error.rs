@@ -42,7 +42,9 @@ pub enum WithdrawError {
 
 /// An account does not have enough balance to withdraw the given amount.
 #[derive(Debug, Error)]
-#[error("The account {account_id} does not have enough balance of {token_id} to withdraw {amount} (current balance: {balance}).")]
+#[error(
+    "The account {account_id} does not have enough balance of {token_id} to withdraw {amount} (current balance: {balance})."
+)]
 pub struct BalanceUnderflowError {
     /// The token ID.
     pub token_id: TokenId,

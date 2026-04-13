@@ -59,13 +59,12 @@ This package is a collection of common tools and patterns in NEAR smart contract
   - [NEP-141][nep141] (fungible token), extension [NEP-148][nep148].
   - [NEP-145][nep145] (storage management), and integrations for the fungible token and non-fungible token standards.
   - [NEP-171][nep171] (non-fungible token), extensions [NEP-177][nep177], [NEP-178][nep178], [NEP-181][nep181].
+  - [NEP-245][nep245] (multi token), extensions [Metadata][nep245metadata], [Events (integrated)][nep245events].
   - [NEP-297][nep297] (events).
 
 Not to be confused with [`near-contract-standards`](https://crates.io/crates/near-contract-standards), which contains official implementations of standardized NEPs. This crate is intended to be a complement to `near-contract-standards`.
 
 You can think of this collection of common tools and patterns (mostly in the form of [derive macros](https://doc.rust-lang.org/reference/procedural-macros.html#derive-macros)) as a sort of [OpenZeppelin](https://docs.openzeppelin.com/contracts/4.x/) for NEAR.
-
-Pro tip: Use the [contract wizard](https://near.org/contractwizard.near/widget/ContractWizardUI) to generate starter code for your next project.
 
 ## Installation
 
@@ -284,11 +283,14 @@ Version 1.0.0 of this library has been [audited](./documents/NEAR%20Contract%20T
 
 (Formerly known as [`near-contract-tools`](https://crates.io/crates/near-contract-tools).)
 
-[nep145]: https://nomicon.io/Standards/StorageManagement
-[nep141]: https://nomicon.io/Standards/Tokens/FungibleToken/Core
-[nep148]: https://nomicon.io/Standards/Tokens/FungibleToken/Metadata
-[nep171]: https://nomicon.io/Standards/NonFungibleToken/NonFungibleToken
-[nep177]: https://nomicon.io/Standards/Tokens/NonFungibleToken/Metadata
-[nep178]: https://nomicon.io/Standards/Tokens/NonFungibleToken/ApprovalManagement
-[nep181]: https://nomicon.io/Standards/Tokens/NonFungibleToken/Enumeration
-[nep297]: https://nomicon.io/Standards/EventsFormat
+[nep141]: https://github.com/near/NEPs/blob/master/neps/nep-0141.md
+[nep145]: https://github.com/near/NEPs/blob/master/neps/nep-0145.md
+[nep148]: https://github.com/near/NEPs/blob/master/neps/nep-0148.md
+[nep171]: https://github.com/near/NEPs/blob/master/neps/nep-0171.md
+[nep177]: https://github.com/near/NEPs/blob/master/neps/nep-0177.md
+[nep178]: https://github.com/near/NEPs/blob/master/neps/nep-0178.md
+[nep181]: https://github.com/near/NEPs/blob/master/neps/nep-0181.md
+[nep245]: https://github.com/near/NEPs/blob/master/neps/nep-0245.md
+[nep245metadata]: https://github.com/near/NEPs/blob/master/neps/nep-0245/Metadata.md
+[nep245events]: https://github.com/near/NEPs/blob/master/neps/nep-0245/Events.md
+[nep297]: https://github.com/near/NEPs/blob/master/neps/nep-0297.md

@@ -1,10 +1,10 @@
 use near_sdk::{
-    json_types::U64, near, test_utils::VMContextBuilder, testing_env, AccountId, BorshStorageKey,
-    NearToken, PanicOnDefault, VMContext,
+    AccountId, BorshStorageKey, NearToken, PanicOnDefault, VMContext, json_types::U64, near,
+    test_utils::VMContextBuilder, testing_env,
 };
 use near_sdk_contract_tools::{
-    escrow::{Escrow, EscrowInternal},
     Escrow,
+    escrow::{Escrow, EscrowInternal},
 };
 
 const ID: U64 = U64(1);

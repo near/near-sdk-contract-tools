@@ -1,163 +1,104 @@
+use near_api::{Account, Contract};
 use near_sdk::serde_json::json;
-use near_workspaces::{Account, Contract};
 use pretty_assertions::assert_eq;
-
-const WASM: &[u8] =
-    include_bytes!("../../target/wasm32-unknown-unknown/release/counter_multisig.wasm");
+use testresult::TestResult;
+use workspaces_tests::{Handle, read_only, transaction};
 
 struct Setup {
+    pub handle: Handle,
     pub contract: Contract,
-    pub accounts: Vec<Account>,
 }
 
-/// Setup for individual tests
-async fn setup(num_accounts: usize) -> Setup {
-    let worker = near_workspaces::sandbox().await.unwrap();
-
-    // Initialize contract
-    let contract = worker.dev_deploy(WASM).await.unwrap();
-    contract.call("new").transact().await.unwrap().unwrap();
-
-    // Initialize user accounts
-    let mut accounts = vec![];
-    for _ in 0..(num_accounts + 1) {
-        accounts.push(worker.dev_create_account().await.unwrap());
-    }
-
-    Setup { contract, accounts }
+async fn setup() -> TestResult<Setup> {
+    let handle = Handle::new().await;
+    let contract = handle
+        .make_contract("counter_multisig", "counter_multisig", json!({}))
+        .await?;
+    Ok(Setup { handle, contract })
 }
 
-async fn setup_roles(num_accounts: usize) -> Setup {
-    let s = setup(num_accounts).await;
-
-    for account in s.accounts[..s.accounts.len() - 1].iter() {
-        account
-            .call(s.contract.id(), "obtain_multisig_permission")
-            .transact()
-            .await
-            .unwrap()
-            .unwrap();
+impl Setup {
+    async fn setup_role(&self, account_id: impl Into<String>) -> TestResult<Account> {
+        let account = self.handle.make_account(account_id).await?;
+        self.contract
+            .call_function("obtain_multisig_permission", json!({}))
+            .transaction()
+            .with_signer(account.account_id().clone(), self.handle.default_signer())
+            .send_to(&self.handle.network)
+            .await?
+            .assert_success();
+        Ok(account)
     }
 
-    s
+    read_only! { fn is_approved(request_id: u32) -> bool }
+    read_only! { fn get_counter() -> u32 }
+    transaction! { fn request_increment() -> u32 }
+    transaction! { fn request_decrement() -> u32 }
+    transaction! { fn request_reset() -> u32 }
+    transaction! { fn approve(request_id: u32) }
+    transaction! { fn execute(request_id: u32) -> u32 }
 }
 
 #[tokio::test]
-async fn success() {
-    let Setup { contract, accounts } = setup_roles(3).await;
+async fn success() -> TestResult<()> {
+    let s = setup().await?;
 
-    let alice = &accounts[0];
-    let bob = &accounts[1];
-    let charlie = &accounts[2];
-
-    let create_request = |account: &Account, fname: &str| {
-        let fname = fname.to_string();
-        let account = account.clone();
-        let contract_id = contract.id();
-        async move {
-            account
-                .clone()
-                .call(contract_id, &fname)
-                .transact()
-                .await
-                .unwrap()
-                .json::<u32>()
-                .unwrap()
-        }
-    };
+    let alice = s.setup_role("alice").await?;
+    let bob = s.setup_role("bob").await?;
+    let charlie = s.setup_role("charlie").await?;
 
     // Increment
-    let request_id = create_request(alice, "request_increment").await;
+    let request_id = s.request_increment(&alice, None).await?;
 
-    let is_approved = |request_id: u32| {
-        let view = contract
-            .view("is_approved")
-            .args_json(json!({ "request_id": request_id }));
-        async move { view.await.unwrap().json::<bool>().unwrap() }
-    };
+    assert!(!s.is_approved(request_id).await?);
 
-    assert!(!is_approved(request_id).await);
+    s.approve(&alice, None, request_id).await?;
 
-    let approve = |account: Account, request_id: u32| {
-        let contract_id = contract.id();
-        async move {
-            account
-                .call(contract_id, "approve")
-                .args_json(json!({ "request_id": request_id }))
-                .transact()
-                .await
-                .unwrap()
-        }
-    };
+    assert!(!s.is_approved(request_id).await?);
 
-    approve(alice.clone(), request_id).await.unwrap();
+    s.approve(&bob, None, request_id).await?;
 
-    assert!(!is_approved(request_id).await);
+    assert!(s.is_approved(request_id).await?);
 
-    approve(bob.clone(), request_id).await.unwrap();
+    s.approve(&charlie, None, request_id).await?;
 
-    assert!(is_approved(request_id).await);
+    assert!(s.is_approved(request_id).await?);
 
-    approve(charlie.clone(), request_id).await.unwrap();
-
-    assert!(is_approved(request_id).await);
-
-    let get_counter = || async {
-        contract
-            .view("get_counter")
-            .await
-            .unwrap()
-            .json::<u32>()
-            .unwrap()
-    };
-
-    let counter = get_counter().await;
+    let counter = s.get_counter().await?;
 
     assert_eq!(counter, 0);
 
-    let execute = |account: Account, request_id: u32| {
-        let contract_id = contract.id();
-        async move {
-            account
-                .call(contract_id, "execute")
-                .args_json(json!({ "request_id": request_id }))
-                .transact()
-                .await
-                .unwrap()
-                .json::<u32>()
-                .unwrap()
-        }
-    };
-
-    let result = execute(alice.clone(), request_id).await;
+    let result = s.execute(&alice, None, request_id).await?;
 
     assert_eq!(result, 1);
 
-    let counter = get_counter().await;
+    let counter = s.get_counter().await?;
 
     assert_eq!(counter, 1);
 
-    let request_id = create_request(bob, "request_increment").await;
-    approve(bob.clone(), request_id).await.unwrap();
-    approve(alice.clone(), request_id).await.unwrap();
-    let result = execute(bob.clone(), request_id).await;
-    let counter = get_counter().await;
+    let request_id = s.request_increment(&bob, None).await?;
+    s.approve(&bob, None, request_id).await?;
+    s.approve(&alice, None, request_id).await?;
+    let result = s.execute(&bob, None, request_id).await?;
+    let counter = s.get_counter().await?;
     assert_eq!(result, counter);
     assert_eq!(counter, 2);
 
-    let request_id = create_request(charlie, "request_decrement").await;
-    approve(bob.clone(), request_id).await.unwrap();
-    approve(charlie.clone(), request_id).await.unwrap();
-    let result = execute(alice.clone(), request_id).await;
-    let counter = get_counter().await;
+    let request_id = s.request_decrement(&charlie, None).await?;
+    s.approve(&bob, None, request_id).await?;
+    s.approve(&charlie, None, request_id).await?;
+    let result = s.execute(&alice, None, request_id).await?;
+    let counter = s.get_counter().await?;
     assert_eq!(result, counter);
     assert_eq!(counter, 1);
 
-    let request_id = create_request(charlie, "request_reset").await;
-    approve(bob.clone(), request_id).await.unwrap();
-    approve(alice.clone(), request_id).await.unwrap();
-    let result = execute(alice.clone(), request_id).await;
-    let counter = get_counter().await;
+    let request_id = s.request_reset(&charlie, None).await?;
+    s.approve(&bob, None, request_id).await?;
+    s.approve(&alice, None, request_id).await?;
+    let result = s.execute(&alice, None, request_id).await?;
+    let counter = s.get_counter().await?;
     assert_eq!(result, counter);
     assert_eq!(counter, 0);
+
+    Ok(())
 }
