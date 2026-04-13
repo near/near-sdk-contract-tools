@@ -1,0 +1,4 @@
+[profile.ci]
+retries = 1
+global-timeout = "180s"
+test-threads = 2
